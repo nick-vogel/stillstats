@@ -20,7 +20,7 @@
 //
 // Each Studio page is drawn in a window of 1280 by 960 CSS pixels and shot zoomed in on its
 // surface, the popup is shot at twice its size on the page background of stillstats.com, and the
-// first-run page, which opens on install, is shot whole in a window of 1536 by 960: every image is
+// first-run page, which opens on install, is shot whole in a window of 1792 by 1120: every image is
 // 1280 by 800 pixels, the size both stores ask for. With FULL_WINDOW set, each Studio page is shot
 // whole instead, to see where its regions lie. The images carry no "Sample data" label (Nick,
 // 2026-10-16). It also draws the Chrome Web Store's small promo tile, 440 by 280: the S of
@@ -395,11 +395,11 @@ async function shootPopup(
 }
 
 /**
- * The first-run page, which opens in a tab on install, whole in a window of 1536 by 960, which its
+ * The first-run page, which opens in a tab on install, whole in a window of 1792 by 1120, which its
  * button fits in, scaled to 1280 by 800.
  */
 async function shootFirstRun(chrome: Chrome, extensionId: string): Promise<Buffer> {
-  const window = { width: 1536, height: 960 }
+  const window = { width: 1792, height: 1120 }
   const tab = await openTab(chrome, `chrome-extension://${extensionId}/first-run.html`, {
     ...window,
     deviceScaleFactor: 1,
