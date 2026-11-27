@@ -13,8 +13,8 @@
     "@creator-analytics/database": "workspace:*",
     "@creator-analytics/entitlements": "workspace:*",
     "@creator-analytics/reporter": "workspace:*",
-    "drizzle-orm": "^0.45.3",
-    "stripe": "^23.1.0"
+    "drizzle-orm": "^0.45.4",
+    "stripe": "^23.2.0"
   },
   "devDependencies": {
     "@creator-analytics/fake-stripe": "workspace:*"
