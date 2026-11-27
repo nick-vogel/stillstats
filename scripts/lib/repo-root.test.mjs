@@ -22,9 +22,19 @@ import { REPO_ROOT } from './repo-root.mjs'
 
 const SCRIPTS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** Every `.mjs` in `scripts/`, excluding the `lib/` helpers themselves. */
+/**
+ * Scripts that read the checkout they are CALLED from, on purpose, so they must not move to
+ * their own. `check-private-terms.mjs` checks the repository its caller is in: the local
+ * pre-push hook runs a copy of the pushed commit's version from a temporary folder, inside the
+ * repository being pushed, and its tests run it inside scratch repositories. Moving it to its own
+ * checkout would check the wrong repository and pass. Its test spawns it the same way.
+ */
+const READS_THE_CALLERS_CHECKOUT = ['check-private-terms.mjs', 'check-private-terms.test.mjs']
+
+/** Every `.mjs` in `scripts/`, excluding the `lib/` helpers themselves and the scripts above. */
 const scriptFiles = readdirSync(SCRIPTS_DIR)
   .filter((f) => f.endsWith('.mjs'))
+  .filter((f) => !READS_THE_CALLERS_CHECKOUT.includes(f))
   .map((f) => ({ name: f, source: readFileSync(join(SCRIPTS_DIR, f), 'utf8') }))
 
 /** Comment lines stripped, so a mention in prose is never mistaken for a call. */
