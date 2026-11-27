@@ -41,7 +41,7 @@ An extension tag (`extension-1.0.0`) passes the tag check and deploys nothing; t
 
 When a step fails:
 
-- The tag check: the tag is not the newest app release note in the commit, or is no valid version. Delete the release and its tag, then publish again with the right tag, or from the commit that holds the note.
+- The tag check: the tag is not the newest app release note in the commit, or is no valid version. Delete the release. The tag ruleset `release tags: no move, no delete` refuses a move or a delete of a `20*` or `extension-*` tag, from anyone: set it to Disabled in the repository's Settings, Rules, delete the tag, and set it back to Active. Then publish again with the right tag, or from the commit that holds the note.
 - The image check: the merge commit's CI run has not pushed its images yet, or failed. Wait for the run to go green, or fix it, then re-run the failed jobs of the release run.
 - The migration: production's schema is as the failed migration left it, and the old images still run, since `latest` did not move. Fix the migration in a new release.
 - The deploy or the running-image check: redeploy the application in Dokploy by hand, then read `https://stillstats.com/api/client-settings` until it answers the new version and commit. Re-running the deploy job retags and redeploys again, which is safe.
