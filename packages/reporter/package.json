@@ -12,6 +12,6 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@sentry/node": "^11.4.0"
+    "@sentry/node": "^11.17.0"
   }
 }
