@@ -11,6 +11,7 @@
 // does, inside the test's transaction, and a re-queued job at its start time, which pg-boss's
 // fetch honouring `startAfter` is outside.
 import {
+  proEnds,
   reachHistory,
   reachHistoryDays,
   reportingJobs,
@@ -151,16 +152,20 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-ended', 'UC-reach-ended')
-    await worker.forChannel(channelId, (tx) =>
-      tx.sql.insert(subscriptions).values({
+    await worker.forChannel(channelId, async (tx) => {
+      await tx.sql.insert(subscriptions).values({
         channelId,
         stripeCustomerId: `cus_${channelId}`,
         stripeSubscriptionId: `sub_${channelId}`,
         status: 'canceled',
-        purgeAfter: new Date('2026-12-17T12:00:00.000Z'),
         updatedAt: tx.now,
-      }),
-    )
+      })
+      await tx.sql.insert(proEnds).values({
+        channelId,
+        endedAt: new Date('2026-11-17T12:00:00.000Z'),
+        purgeAfter: new Date('2026-12-17T12:00:00.000Z'),
+      })
+    })
     addDay(google, 'UC-reach-ended', '2026-11-15', '2026-11-16T10:00:00Z')
 
     await handlers.ensureReportingJob(worker, { channelId })
@@ -255,10 +260,23 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     // The report of the UTC date `n` days after day 0, created at 10:00 UTC the day after it.
     const addReport = (n: number) =>
       addDay(google, 'UC-reach-return', dateOf(n), `${dateOf(n + 1)}T10:00:00Z`)
-    const setSubscription = (fields: { status: string; purgeAfter: Date | null }) =>
-      worker.forChannel(channelId, (tx) =>
-        tx.sql.update(subscriptions).set(fields).where(eq(subscriptions.channelId, channelId)),
-      )
+    // The channel's purge date is on its pro_ends row, which a paid status deletes.
+    const setSubscription = ({ status, purgeAfter }: { status: string; purgeAfter: Date | null }) =>
+      worker.forChannel(channelId, async (tx) => {
+        await tx.sql
+          .update(subscriptions)
+          .set({ status })
+          .where(eq(subscriptions.channelId, channelId))
+        if (!purgeAfter) {
+          await tx.sql.delete(proEnds).where(eq(proEnds.channelId, channelId))
+          return
+        }
+        const ended = { endedAt: day0, purgeAfter }
+        await tx.sql
+          .insert(proEnds)
+          .values({ channelId, ...ended })
+          .onConflictDoUpdate({ target: proEnds.channelId, set: ended })
+      })
     const runAt = async (n: number) => {
       clock.set(dayAt(n))
       google.setNow(dayAt(n))

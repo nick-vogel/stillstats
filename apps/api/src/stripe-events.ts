@@ -162,7 +162,7 @@ function subscriptionFieldsOf(
 }
 
 /**
- * The purge date an update sets: 30 days after the subscription ended, for one Stripe marks
+ * The channel's purge date an update sets: 30 days after the subscription ended, for one Stripe marks
  * `canceled`, or after the event, for one it marks `unpaid` once its retries are exhausted, which
  * ends the channel's Pro subscription as surely. Null for any other status, a cancellation at period end
  * included: the channel stays paid until Stripe ends it.
@@ -180,8 +180,8 @@ function purgeOfUpdate(subscription: Stripe.Subscription, event: Stripe.Event): 
  * that names a Stillstats channel in its metadata is read, at whatever price, and one whose item
  * bills neither monthly nor annually records with no plan. A paid subscription Checkout makes the
  * channel's subscription active. A created or an updated subscription carries its plan, its status
- * and the end of its paid period; a deleted one has ended, and sets the purge date 30 days after
- * its `ended_at` (ADR 0022), the event's own time when it carries none. Each carries the event's
+ * and the end of its paid period; a deleted one has ended, and sets the channel's purge date 30 days
+ * after its `ended_at` (ADR 0022), the event's own time when it carries none. Each carries the event's
  * time, which orders it against the others, since Stripe delivers them in no order and a failed
  * one again later. Invoice events, paid or failed, change no subscription: the subscription events
  * carry every change they cause (a failed renewal makes it `past_due`, still paid, and a paid retry

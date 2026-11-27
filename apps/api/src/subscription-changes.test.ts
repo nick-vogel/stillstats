@@ -3,9 +3,10 @@
 // sends them in, or what the Customer Portal and link.com change on a Managed Payments
 // subscription. Nick's walk of Pro on production (creator-analytics#791) covers those.
 import { randomUUID } from 'node:crypto'
-import { subscriptions, type WebDatabase } from '@creator-analytics/database'
+import { proEnds, subscriptions, type WebDatabase } from '@creator-analytics/database'
 import { test } from '@creator-analytics/database/testing'
 import { entitlementOf } from '@creator-analytics/entitlements'
+import { eq } from 'drizzle-orm'
 import { describe, expect } from 'vitest'
 import { channelsOf, connect, signIn, userIdOf } from '../test/flows.ts'
 import { type StartedApi, startApi } from '../test/start-api.ts'
@@ -62,7 +63,7 @@ async function paidChannel(web: WebDatabase) {
 const entitlementIn = (web: WebDatabase, ownerId: string, channelId: string) =>
   web.asUser(ownerId, (scope) => entitlementOf(scope, channelId))
 
-/** The channel's subscription row, as its owner's scope reads it. */
+/** The channel's subscription row and its purge date, as its owner's scope reads them. */
 function storedSubscription(web: WebDatabase, ownerId: string) {
   return web.asUser(ownerId, (scope) =>
     scope.sql
@@ -71,10 +72,11 @@ function storedSubscription(web: WebDatabase, ownerId: string) {
         plan: subscriptions.plan,
         status: subscriptions.status,
         periodEnd: subscriptions.currentPeriodEnd,
-        purgeAfter: subscriptions.purgeAfter,
+        purgeAfter: proEnds.purgeAfter,
         updatedAt: subscriptions.updatedAt,
       })
-      .from(subscriptions),
+      .from(subscriptions)
+      .leftJoin(proEnds, eq(proEnds.channelId, subscriptions.channelId)),
   )
 }
 

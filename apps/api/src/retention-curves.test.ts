@@ -4,6 +4,7 @@
 // what it stores.
 import type { RetentionCurvesAnswer, VideoListAnswer } from '@creator-analytics/api-types'
 import {
+  proEnds,
   retentionCurveReads,
   retentionCurves,
   subscriptions,
@@ -67,16 +68,20 @@ async function subscribe(
   channelId: string,
   { status = 'active', purgeAfter = null }: { status?: string; purgeAfter?: Date | null } = {},
 ): Promise<void> {
-  await worker.forChannel(channelId, (tx) =>
-    tx.sql.insert(subscriptions).values({
+  await worker.forChannel(channelId, async (tx) => {
+    await tx.sql.insert(subscriptions).values({
       channelId,
       stripeCustomerId: 'cus_retention_curves',
       stripeSubscriptionId: 'sub_retention_curves',
       status,
-      purgeAfter,
       updatedAt: tx.now,
-    }),
-  )
+    })
+    // The channel's own purge date, 30 days after it stopped being Pro.
+    if (purgeAfter) {
+      const endedAt = new Date(purgeAfter.getTime() - 30 * 24 * 60 * 60 * 1000)
+      await tx.sql.insert(proEnds).values({ channelId, endedAt, purgeAfter })
+    }
+  })
 }
 
 const readOfV1 = new Date('2026-10-06T09:00:05Z')

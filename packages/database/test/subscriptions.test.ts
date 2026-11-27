@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { describe, expect } from 'vitest'
-import { subscriptions } from '../src/schema.ts'
+import { proEnds, subscriptions } from '../src/schema.ts'
 import type { Scoped, ScopeKind, WebDatabase, WorkerDatabase } from '../src/scopes.ts'
 import { test } from './harness.ts'
 import { seedChannel, seedUser } from './seed.ts'
@@ -29,10 +29,13 @@ const completed: Recorded = {
 }
 const created: Recorded = { ...completed, plan: 'monthly', status: null, periodEnd }
 
-/** A channel the user owns, with a row in every channel-owned table but subscriptions. */
+/** A channel the user owns, with a row in every channel-owned table but subscriptions and pro_ends. */
 async function freeChannel(web: WebDatabase, worker: WorkerDatabase, ownerId: string) {
   const channelId = await seedChannel(web, worker, ownerId)
-  await worker.forChannel(channelId, (scope) => scope.sql.delete(subscriptions))
+  await worker.forChannel(channelId, async (scope) => {
+    await scope.sql.delete(subscriptions)
+    await scope.sql.delete(proEnds)
+  })
   return channelId
 }
 
@@ -71,9 +74,10 @@ function readSubscriptions(scope: Scoped<ScopeKind>) {
       plan: subscriptions.plan,
       status: subscriptions.status,
       periodEnd: subscriptions.currentPeriodEnd,
-      purgeAfter: subscriptions.purgeAfter,
+      purgeAfter: proEnds.purgeAfter,
     })
     .from(subscriptions)
+    .leftJoin(proEnds, eq(proEnds.channelId, subscriptions.channelId))
 }
 
 const purgeAfter = new Date('2027-01-16T12:00:00.000Z')

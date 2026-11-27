@@ -10,6 +10,7 @@ import {
   feedbackMessages,
   type JobData,
   jobNames,
+  proEnds,
   reachHistory,
   readCache,
   securityEvents,
@@ -271,12 +272,13 @@ describe('seam 2: the job worker', () => {
     // Each channel's subscription ends when it is seeded: the first on day 0, the second on day 10.
     const endedAt = new Date('2026-11-02T12:00:00.000Z')
     const endNow = (channelId: string) =>
-      worker.forChannel(channelId, (scope) =>
-        scope.sql
-          .update(subscriptions)
-          .set({ purgeAfter: purgeDateOf(scope.now) })
-          .where(eq(subscriptions.channelId, channelId)),
-      )
+      worker.forChannel(channelId, (scope) => {
+        const ended = { endedAt: scope.now, purgeAfter: purgeDateOf(scope.now) }
+        return scope.sql
+          .insert(proEnds)
+          .values({ channelId, ...ended })
+          .onConflictDoUpdate({ target: proEnds.channelId, set: ended })
+      })
     clock.set(endedAt)
     const due = await seedChannel(web, worker, 'purge-job-owner-a')
     await endNow(due)
