@@ -1,0 +1,287 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <title>Stillstats architecture</title>
+  <!-- Rebuild the PNG after any change: node docs/audit-application/build-diagrams.ts -->
+  <!-- Each data-code names the repository files that the box or arrow stands for. -->
+  <style>
+    text { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; fill: #1d2430; }
+    .heading { font-size: 30px; font-weight: 700; }
+    .intro { font-size: 17px; fill: #3b4452; }
+    .group-name { font-size: 19px; font-weight: 700; }
+    .name { font-size: 17px; font-weight: 700; }
+    .big-name { font-size: 21px; font-weight: 700; }
+    .note { font-size: 14px; fill: #3b4452; }
+    .label { font-size: 14px; fill: #1d2430; }
+    .group { fill: #f3f5f8; stroke: #aeb6c2; stroke-width: 1.5; }
+    .box { fill: #ffffff; stroke: #566273; stroke-width: 1.5; }
+    .module { fill: #e9eff6; stroke: #7f8c9d; stroke-width: 1.2; }
+    .gateway { fill: #fff1c7; stroke: #b7791f; stroke-width: 2.5; }
+    .key { fill: #fffaf0; stroke: #b7791f; stroke-width: 1.2; stroke-dasharray: 6 4; }
+    .edge { fill: none; stroke: #39424e; stroke-width: 2; }
+    .youtube-edge { fill: none; stroke: #b7791f; stroke-width: 3.5; }
+  </style>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#39424e"/>
+    </marker>
+    <marker id="youtube-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#b7791f"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1920" height="1080" fill="#ffffff"/>
+
+  <text class="heading" x="30" y="52">Stillstats architecture</text>
+  <text class="intro" x="30" y="84">Every call to YouTube's Data, Analytics and Reporting APIs goes through the YouTube gateway (yellow). Arrows say what passes along them.</text>
+
+  <!-- The creator's browser -->
+  <g id="browser" data-code="apps/web/src/App.tsx apps/extension/src/product-api.ts">
+    <rect class="group" x="30" y="120" width="260" height="520" rx="14"/>
+    <text class="group-name" x="46" y="148">Creator's browser</text>
+  </g>
+  <g id="web-app" data-code="apps/web/src/App.tsx apps/api/src/app.ts">
+    <rect class="box" x="50" y="170" width="220" height="100" rx="10"/>
+    <text class="name" x="160" y="203" text-anchor="middle">Web app</text>
+    <text class="note" x="160" y="228" text-anchor="middle">stillstats.com/app</text>
+    <text class="note" x="160" y="250" text-anchor="middle">dashboards and settings</text>
+  </g>
+  <g id="embedded-player" data-code="apps/web/src/youtube-player.ts">
+    <rect class="box" x="50" y="320" width="220" height="100" rx="10"/>
+    <text class="name" x="160" y="353" text-anchor="middle">YouTube's embedded</text>
+    <text class="name" x="160" y="375" text-anchor="middle">player</text>
+    <text class="note" x="160" y="400" text-anchor="middle">privacy-enhanced mode</text>
+  </g>
+  <g id="extension" data-code="apps/extension/src/product-api.ts apps/extension/src/manifest.ts apps/extension/src/entrypoints/studio.content.ts apps/extension/src/entrypoints/youtube.content.ts">
+    <rect class="box" x="50" y="480" width="220" height="130" rx="10"/>
+    <text class="name" x="160" y="513" text-anchor="middle">Studio extension</text>
+    <text class="note" x="160" y="538" text-anchor="middle">Chrome and Firefox, on Studio</text>
+    <text class="note" x="160" y="560" text-anchor="middle">and, if turned on, youtube.com</text>
+    <text class="note" x="160" y="582" text-anchor="middle">beside YouTube's own figures</text>
+  </g>
+  <g id="arrow-web-app-player" data-code="apps/web/src/youtube-player.ts">
+    <path class="edge" d="M160 270 V316" marker-end="url(#head)"/>
+    <text class="label" x="172" y="300">plays a video</text>
+  </g>
+
+  <!-- Cloudflare -->
+  <g id="cloudflare" data-code="docs/deploy.md">
+    <rect class="box" x="430" y="170" width="150" height="440" rx="10"/>
+    <text class="name" x="505" y="370" text-anchor="middle">Cloudflare</text>
+    <text class="note" x="505" y="396" text-anchor="middle">proxies</text>
+    <text class="note" x="505" y="416" text-anchor="middle">stillstats.com,</text>
+    <text class="note" x="505" y="436" text-anchor="middle">HTTPS at the edge</text>
+  </g>
+  <g id="arrow-web-app-cloudflare" data-code="apps/web/src/App.tsx">
+    <path class="edge" d="M270 220 H426" marker-end="url(#head)"/>
+    <text class="label" x="350" y="190" text-anchor="middle">pages and</text>
+    <text class="label" x="350" y="207" text-anchor="middle">API requests</text>
+  </g>
+  <g id="arrow-extension-cloudflare" data-code="apps/extension/src/product-api.ts">
+    <path class="edge" d="M270 545 H426" marker-end="url(#head)"/>
+    <text class="label" x="350" y="515" text-anchor="middle">requests to the</text>
+    <text class="label" x="350" y="532" text-anchor="middle">Stillstats API only</text>
+  </g>
+  <g id="email-service" data-code="apps/api/src/notification-email.ts">
+    <rect class="box" x="430" y="680" width="150" height="90" rx="10"/>
+    <text class="name" x="505" y="713" text-anchor="middle">Cloudflare</text>
+    <text class="name" x="505" y="735" text-anchor="middle">Email Service</text>
+    <text class="note" x="505" y="757" text-anchor="middle">emails the operator</text>
+  </g>
+
+  <!-- The API -->
+  <g id="api" data-code="apps/api/src/server.ts apps/api/src/app.ts apps/api/src/modules.ts">
+    <rect class="group" x="710" y="120" width="300" height="760" rx="14"/>
+    <text class="big-name" x="860" y="152" text-anchor="middle">API</text>
+    <text class="note" x="860" y="174" text-anchor="middle">one Node server process</text>
+  </g>
+  <g id="api-routes" data-code="apps/api/src/app.ts">
+    <rect class="module" x="725" y="190" width="270" height="50" rx="8"/>
+    <text class="name" x="860" y="221" text-anchor="middle">Site, web app and API routes</text>
+  </g>
+  <g id="risc-receiver" data-code="apps/api/src/risc.ts apps/api/src/app.ts">
+    <rect class="module" x="725" y="255" width="270" height="50" rx="8"/>
+    <text class="name" x="860" y="286" text-anchor="middle">RISC receiver</text>
+  </g>
+  <g id="sign-in" data-code="apps/api/src/auth.ts">
+    <rect class="module" x="725" y="320" width="270" height="50" rx="8"/>
+    <text class="name" x="860" y="351" text-anchor="middle">Sign-in</text>
+  </g>
+  <g id="api-token-vault" data-code="packages/token-vault/src/token-vault.ts packages/token-vault/src/encryption.ts apps/api/src/modules.ts">
+    <rect class="module" x="725" y="385" width="270" height="60" rx="8"/>
+    <text class="name" x="860" y="410" text-anchor="middle">Token vault</text>
+    <text class="note" x="860" y="432" text-anchor="middle">encrypts and decrypts tokens</text>
+  </g>
+  <g id="api-gateway" data-code="packages/youtube-gateway/src/youtube-gateway.ts apps/api/src/modules.ts">
+    <rect class="gateway" x="725" y="520" width="270" height="90" rx="8"/>
+    <text class="name" x="860" y="548" text-anchor="middle">YouTube gateway</text>
+    <text class="note" x="860" y="572" text-anchor="middle">quota count, cache of 6 hours</text>
+    <text class="note" x="860" y="594" text-anchor="middle">at most, read-only scopes</text>
+  </g>
+  <g id="feedback-notice" data-code="apps/api/src/feedback-notice.ts apps/api/src/notification-email.ts">
+    <rect class="module" x="725" y="690" width="270" height="50" rx="8"/>
+    <text class="name" x="860" y="721" text-anchor="middle">Feedback notice</text>
+  </g>
+  <g id="billing" data-code="apps/api/src/billing.ts apps/api/src/routes/billing.ts apps/api/src/routes/stripe-events.ts apps/api/src/routes/support.ts">
+    <rect class="module" x="725" y="790" width="270" height="70" rx="8"/>
+    <text class="name" x="860" y="818" text-anchor="middle">Billing and Stripe webhook</text>
+    <text class="note" x="860" y="842" text-anchor="middle">Pro plan and tips</text>
+  </g>
+  <g id="arrow-cloudflare-api" data-code="docs/deploy.md apps/api/src/app.ts">
+    <path class="edge" d="M580 215 H721" marker-end="url(#head)"/>
+    <text class="label" x="645" y="187" text-anchor="middle">forwards</text>
+    <text class="label" x="645" y="204" text-anchor="middle">every request</text>
+  </g>
+  <g id="arrow-feedback-email" data-code="apps/api/src/notification-email.ts">
+    <path class="edge" d="M725 715 H584" marker-end="url(#head)"/>
+    <text class="label" x="645" y="687" text-anchor="middle">feedback notice,</text>
+    <text class="label" x="645" y="704" text-anchor="middle">no message text</text>
+  </g>
+
+  <!-- The gateway boundary -->
+  <g id="gateway-boundary" data-code="lint/youtube-hosts.grit biome.json packages/youtube-gateway/test/boundary.test.ts">
+    <rect class="key" x="320" y="800" width="360" height="100" rx="10"/>
+    <text class="name" x="340" y="828">Only the gateway calls YouTube</text>
+    <text class="note" x="340" y="852">A lint rule and a test fail the build when</text>
+    <text class="note" x="340" y="872">any other code names a YouTube API host</text>
+    <text class="note" x="340" y="892">or imports Google's YouTube client.</text>
+  </g>
+
+  <!-- Google -->
+  <g id="google" data-code="apps/api/src/auth.ts apps/api/src/risc.ts packages/token-vault/src/token-vault.ts packages/youtube-gateway/src/youtube-gateway.ts">
+    <rect class="group" x="1190" y="120" width="240" height="620" rx="14"/>
+    <text class="group-name" x="1206" y="148">Google</text>
+  </g>
+  <g id="google-risc" data-code="apps/api/src/risc.ts docs/deploy.md">
+    <rect class="box" x="1205" y="240" width="210" height="80" rx="10"/>
+    <text class="name" x="1310" y="268" text-anchor="middle">Cross-Account</text>
+    <text class="name" x="1310" y="290" text-anchor="middle">Protection (RISC)</text>
+    <text class="note" x="1310" y="310" text-anchor="middle">security events</text>
+  </g>
+  <g id="google-oauth" data-code="apps/api/src/auth.ts packages/token-vault/src/token-vault.ts">
+    <rect class="box" x="1205" y="335" width="210" height="125" rx="10"/>
+    <text class="name" x="1310" y="368" text-anchor="middle">Google sign-in</text>
+    <text class="name" x="1310" y="390" text-anchor="middle">and OAuth</text>
+    <text class="note" x="1310" y="418" text-anchor="middle">accounts.google.com,</text>
+    <text class="note" x="1310" y="438" text-anchor="middle">oauth2.googleapis.com</text>
+  </g>
+  <g id="youtube-apis" data-code="packages/youtube-gateway/src/youtube-gateway.ts">
+    <rect class="box" x="1205" y="480" width="210" height="245" rx="10"/>
+    <text class="name" x="1310" y="508" text-anchor="middle">YouTube APIs</text>
+  </g>
+  <g id="youtube-data-api" data-code="packages/youtube-gateway/src/youtube-gateway.ts packages/youtube-gateway/src/reads/uploads.ts">
+    <rect class="module" x="1220" y="522" width="180" height="48" rx="8"/>
+    <text class="note" x="1310" y="551" text-anchor="middle">Data API v3</text>
+  </g>
+  <g id="youtube-analytics-api" data-code="packages/youtube-gateway/src/youtube-gateway.ts packages/youtube-gateway/src/reads/channel-totals.ts">
+    <rect class="module" x="1220" y="582" width="180" height="48" rx="8"/>
+    <text class="note" x="1310" y="611" text-anchor="middle">Analytics API v2</text>
+  </g>
+  <g id="youtube-reporting-api" data-code="packages/youtube-gateway/src/youtube-gateway.ts packages/youtube-gateway/src/reach-report.ts packages/youtube-gateway/src/reporting-job.ts">
+    <rect class="module" x="1220" y="642" width="180" height="48" rx="8"/>
+    <text class="note" x="1310" y="671" text-anchor="middle">Reporting API v1</text>
+  </g>
+  <g id="arrow-risc-keys" data-code="apps/api/src/risc.ts apps/api/src/server.ts">
+    <path class="edge" d="M995 262 H1201" marker-end="url(#head)"/>
+    <text class="label" x="1100" y="236" text-anchor="middle">fetches the RISC</text>
+    <text class="label" x="1100" y="253" text-anchor="middle">configuration and keys</text>
+  </g>
+  <g id="arrow-risc-receiver" data-code="apps/api/src/app.ts apps/api/src/risc.ts">
+    <path class="edge" d="M1205 296 H999" marker-end="url(#head)"/>
+    <text class="label" x="1100" y="288" text-anchor="middle">revocation event</text>
+  </g>
+  <g id="arrow-sign-in-google" data-code="apps/api/src/auth.ts">
+    <path class="edge" d="M995 345 H1201" marker-end="url(#head)"/>
+    <text class="label" x="1100" y="336" text-anchor="middle">sign-in, identity only</text>
+  </g>
+  <g id="arrow-api-vault-oauth" data-code="packages/token-vault/src/token-vault.ts">
+    <path class="edge" d="M995 415 H1201" marker-end="url(#head)"/>
+    <text class="label" x="1100" y="388" text-anchor="middle">exchanges, refreshes</text>
+    <text class="label" x="1100" y="405" text-anchor="middle">and revokes tokens</text>
+  </g>
+  <g id="arrow-api-gateway-youtube" data-code="packages/youtube-gateway/src/youtube-gateway.ts apps/api/src/routes/videos.ts">
+    <path class="youtube-edge" d="M995 565 H1199" marker-end="url(#youtube-head)"/>
+    <text class="label" x="1100" y="538" text-anchor="middle">read-only reads when</text>
+    <text class="label" x="1100" y="555" text-anchor="middle">a screen needs them</text>
+  </g>
+
+  <!-- Postgres -->
+  <g id="postgres" data-code="packages/database/src/migrate.ts packages/database/src/open.ts packages/database/src/jobs.ts">
+    <rect class="box" x="1190" y="790" width="240" height="90" rx="10"/>
+    <text class="name" x="1310" y="818" text-anchor="middle">Postgres</text>
+    <text class="note" x="1310" y="842" text-anchor="middle">row-level security forced</text>
+    <text class="note" x="1310" y="862" text-anchor="middle">on every table, job queue</text>
+  </g>
+  <g id="arrow-api-postgres" data-code="packages/database/src/open.ts packages/youtube-gateway/src/youtube-gateway.ts packages/token-vault/src/token-vault.ts">
+    <path class="edge" d="M1010 835 H1186" marker-end="url(#head)"/>
+    <text class="label" x="1100" y="808" text-anchor="middle">accounts, encrypted</text>
+    <text class="label" x="1100" y="825" text-anchor="middle">tokens, cached reads</text>
+  </g>
+
+  <!-- The worker -->
+  <g id="worker" data-code="apps/worker/src/worker.ts apps/worker/src/jobs.ts">
+    <rect class="group" x="1610" y="120" width="280" height="760" rx="14"/>
+    <text class="big-name" x="1750" y="152" text-anchor="middle">Worker</text>
+    <text class="note" x="1750" y="174" text-anchor="middle">scheduled and queued jobs</text>
+  </g>
+  <g id="worker-jobs" data-code="apps/worker/src/jobs.ts packages/database/src/jobs.ts">
+    <rect class="module" x="1625" y="190" width="250" height="180" rx="8"/>
+    <text class="name" x="1750" y="216" text-anchor="middle">Jobs on a schedule</text>
+    <text class="note" x="1750" y="242" text-anchor="middle">connection check, daily</text>
+    <text class="note" x="1750" y="264" text-anchor="middle">YouTube reporting jobs, daily</text>
+    <text class="note" x="1750" y="286" text-anchor="middle">deleted-video check, daily</text>
+    <text class="note" x="1750" y="308" text-anchor="middle">Pro history, daily</text>
+    <text class="note" x="1750" y="330" text-anchor="middle">Pro history purge, daily</text>
+    <text class="note" x="1750" y="352" text-anchor="middle">expired cache sweep, hourly</text>
+  </g>
+  <g id="worker-token-vault" data-code="packages/token-vault/src/token-vault.ts apps/worker/src/worker.ts">
+    <rect class="module" x="1625" y="385" width="250" height="60" rx="8"/>
+    <text class="name" x="1750" y="410" text-anchor="middle">Token vault</text>
+    <text class="note" x="1750" y="432" text-anchor="middle">refreshes stored tokens</text>
+  </g>
+  <g id="worker-gateway" data-code="packages/youtube-gateway/src/youtube-gateway.ts apps/worker/src/worker.ts">
+    <rect class="gateway" x="1625" y="520" width="250" height="90" rx="8"/>
+    <text class="name" x="1750" y="548" text-anchor="middle">YouTube gateway</text>
+    <text class="note" x="1750" y="572" text-anchor="middle">the same module as</text>
+    <text class="note" x="1750" y="594" text-anchor="middle">the API's</text>
+  </g>
+  <g id="worker-retention" data-code="packages/retention-engine/src/retention-engine.ts packages/retention-engine/src/history-purge.ts">
+    <rect class="module" x="1625" y="690" width="250" height="70" rx="8"/>
+    <text class="name" x="1750" y="718" text-anchor="middle">Deletion and retention</text>
+    <text class="note" x="1750" y="742" text-anchor="middle">deletes data on time</text>
+  </g>
+  <g id="arrow-worker-vault-oauth" data-code="packages/token-vault/src/token-vault.ts">
+    <path class="edge" d="M1625 415 H1434" marker-end="url(#head)"/>
+    <text class="label" x="1520" y="405" text-anchor="middle">daily token check</text>
+  </g>
+  <g id="arrow-worker-gateway-youtube" data-code="apps/worker/src/reporting-jobs.ts apps/worker/src/reach-history.ts apps/worker/src/retention-curves.ts apps/worker/src/deleted-videos.ts">
+    <path class="youtube-edge" d="M1625 565 H1436" marker-end="url(#youtube-head)"/>
+    <text class="label" x="1520" y="538" text-anchor="middle">reporting jobs, Pro</text>
+    <text class="label" x="1520" y="555" text-anchor="middle">history, video checks</text>
+  </g>
+  <g id="arrow-worker-postgres" data-code="packages/database/src/open.ts packages/database/src/jobs.ts">
+    <path class="edge" d="M1610 835 H1434" marker-end="url(#head)"/>
+    <text class="label" x="1520" y="808" text-anchor="middle">jobs, Pro history,</text>
+    <text class="label" x="1520" y="825" text-anchor="middle">deletions</text>
+  </g>
+
+  <!-- Stripe -->
+  <g id="stripe" data-code="apps/api/src/billing.ts apps/api/src/routes/stripe-events.ts packages/retention-engine/src/subscription-cancellation.ts">
+    <rect class="box" x="710" y="970" width="1180" height="80" rx="10"/>
+    <text class="name" x="1300" y="1000" text-anchor="middle">Stripe</text>
+    <text class="note" x="1300" y="1026" text-anchor="middle">hosted Checkout, Customer Portal and the tip's Payment Link</text>
+  </g>
+  <g id="arrow-billing-stripe" data-code="apps/api/src/billing.ts">
+    <path class="edge" d="M770 860 V966" marker-end="url(#head)"/>
+    <text class="label" x="758" y="932" text-anchor="end">opens Checkout and the portal</text>
+  </g>
+  <g id="arrow-stripe-webhook" data-code="apps/api/src/routes/stripe-events.ts">
+    <path class="edge" d="M950 970 V864" marker-end="url(#head)"/>
+    <text class="label" x="962" y="932">payment events (webhook)</text>
+  </g>
+  <g id="arrow-worker-stripe" data-code="packages/retention-engine/src/subscription-cancellation.ts">
+    <path class="edge" d="M1750 760 V966" marker-end="url(#head)"/>
+    <text class="label" x="1738" y="932" text-anchor="end">cancels and refunds a deleted channel's Pro plan</text>
+  </g>
+  <g id="arrow-browser-stripe" data-code="apps/web/src/App.tsx apps/api/src/routes/support.ts">
+    <path class="edge" d="M160 640 V1010 H706" marker-end="url(#head)"/>
+    <text class="label" x="434" y="1000" text-anchor="middle">pays on Stripe's hosted pages</text>
+  </g>
+</svg>

@@ -13,8 +13,8 @@ export default defineConfig({
     define: {
       // Written in at build time, so a production build's scripts carry no local API origin.
       'import.meta.env.API_ORIGIN': JSON.stringify(apiOriginOf(mode)),
-      // Read here, not at the top of the file, as WXT loads `.env.<mode>.local` into the
-      // environment before it calls this. A staging build without the token fails here. Only the
+      // Read here, from the environment `pnpm build:extension:staging` builds from the local env
+      // (scripts/with-env.mjs). A staging build without the token fails here. Only the
       // background reads it, so no content script or popup carries the token.
       'import.meta.env.API_HEADERS': JSON.stringify(accessHeadersOf(mode, process.env)),
     },

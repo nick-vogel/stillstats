@@ -1,0 +1,193 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <title>Stillstats user flow</title>
+  <!-- Rebuild the PNG after any change: node docs/audit-application/build-diagrams.ts -->
+  <!-- Each data-code names the repository files that the box or arrow stands for. -->
+  <style>
+    text { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; fill: #1d2430; }
+    .heading { font-size: 30px; font-weight: 700; }
+    .intro { font-size: 17px; fill: #3b4452; }
+    .phase { font-size: 21px; font-weight: 700; }
+    .name { font-size: 17px; font-weight: 700; }
+    .note { font-size: 15px; fill: #3b4452; }
+    .label { font-size: 14px; fill: #1d2430; }
+    .box { fill: #ffffff; stroke: #566273; stroke-width: 1.5; }
+    .trigger { fill: #f3f5f8; stroke: #566273; stroke-width: 1.5; }
+    .gateway { fill: #fff1c7; stroke: #b7791f; stroke-width: 2.5; }
+    .ending { fill: #fdeceb; stroke: #b24a3f; stroke-width: 2; }
+    .divider { stroke: #d3d8df; stroke-width: 1.5; stroke-dasharray: 6 6; }
+    .edge { fill: none; stroke: #39424e; stroke-width: 2; }
+  </style>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#39424e"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1920" height="1080" fill="#ffffff"/>
+
+  <text class="heading" x="30" y="52">Stillstats user flow</text>
+  <text class="intro" x="30" y="84">What happens to a creator's data, from sign-in to deletion. Every time on this page is one the code sets, apart from the privacy policy's 24 hours.</text>
+
+  <line class="divider" x1="592" y1="115" x2="592" y2="1050"/>
+  <line class="divider" x1="1255" y1="115" x2="1255" y2="1050"/>
+  <text class="phase" x="50" y="140">1. Sign in and connect</text>
+  <text class="phase" x="620" y="140">2. Using Stillstats</text>
+  <text class="phase" x="1290" y="140">3. Ending a connection</text>
+
+  <!-- 1. Sign in and connect -->
+  <g id="sign-in" data-code="apps/api/src/auth.ts apps/api/src/app.ts">
+    <rect class="box" x="50" y="170" width="450" height="120" rx="10"/>
+    <text class="name" x="70" y="202">Sign in with Google</text>
+    <text class="note" x="70" y="228">Google shares the creator's name, email and</text>
+    <text class="note" x="70" y="250">profile picture only. No YouTube access is</text>
+    <text class="note" x="70" y="272">asked for at sign-in.</text>
+  </g>
+  <g id="arrow-sign-in-connect" data-code="apps/api/src/app.ts">
+    <path class="edge" d="M275 290 V336" marker-end="url(#head)"/>
+    <text class="label" x="287" y="318">right after the first sign-in</text>
+  </g>
+  <g id="connect" data-code="packages/token-vault/src/token-vault.ts apps/api/src/app.ts">
+    <rect class="box" x="50" y="340" width="450" height="200" rx="10"/>
+    <text class="name" x="70" y="372">Connect a channel</text>
+    <text class="note" x="70" y="398">Google's consent screen asks for two read-only</text>
+    <text class="note" x="70" y="420">scopes: YouTube, and YouTube Analytics.</text>
+    <text class="note" x="70" y="452">Revenue is a separate consent the creator may</text>
+    <text class="note" x="70" y="474">give later, for one more read-only scope.</text>
+    <text class="note" x="70" y="506">Stillstats asks for no scope that can change</text>
+    <text class="note" x="70" y="528">anything on a channel.</text>
+  </g>
+  <g id="arrow-connect-tokens" data-code="packages/token-vault/src/token-vault.ts">
+    <path class="edge" d="M275 540 V596" marker-end="url(#head)"/>
+    <text class="label" x="287" y="573">Google returns the tokens</text>
+  </g>
+  <g id="tokens" data-code="packages/token-vault/src/encryption.ts packages/database/src/migrate.ts">
+    <rect class="box" x="50" y="600" width="450" height="120" rx="10"/>
+    <text class="name" x="70" y="632">Tokens kept encrypted</text>
+    <text class="note" x="70" y="658">in Postgres, where row-level security limits</text>
+    <text class="note" x="70" y="680">every query to the creator's own account and</text>
+    <text class="note" x="70" y="702">channels.</text>
+  </g>
+
+  <!-- 2. Using Stillstats -->
+  <g id="arrow-tokens-screen" data-code="apps/web/src/App.tsx">
+    <path class="edge" d="M500 640 H535 V220 H616" marker-end="url(#head)"/>
+  </g>
+  <g id="arrow-tokens-daily" data-code="packages/database/src/jobs.ts">
+    <path class="edge" d="M500 690 H616" marker-end="url(#head)"/>
+    <text class="label" x="545" y="682" text-anchor="middle">every day</text>
+  </g>
+  <g id="open-screen" data-code="apps/web/src/App.tsx apps/extension/src/product-api.ts">
+    <rect class="box" x="620" y="170" width="580" height="100" rx="10"/>
+    <text class="name" x="640" y="202">The creator opens a screen</text>
+    <text class="note" x="640" y="228">in the web app or the Studio extension. Both ask the Stillstats</text>
+    <text class="note" x="640" y="250">API only, never YouTube.</text>
+  </g>
+  <g id="arrow-screen-read" data-code="apps/api/src/routes/videos.ts">
+    <path class="edge" d="M910 270 V316" marker-end="url(#head)"/>
+  </g>
+  <g id="read" data-code="packages/youtube-gateway/src/youtube-gateway.ts">
+    <rect class="gateway" x="620" y="320" width="580" height="100" rx="10"/>
+    <text class="name" x="640" y="352">The YouTube gateway reads YouTube on demand</text>
+    <text class="note" x="640" y="378">from the Data and Analytics APIs, with the channel's read-only</text>
+    <text class="note" x="640" y="400">tokens, when the screen needs a figure.</text>
+  </g>
+  <g id="arrow-read-cache" data-code="packages/youtube-gateway/src/youtube-gateway.ts">
+    <path class="edge" d="M910 420 V466" marker-end="url(#head)"/>
+    <text class="label" x="922" y="448">each answer</text>
+  </g>
+  <g id="cache" data-code="packages/youtube-gateway/src/read-definition.ts packages/youtube-gateway/src/reads/channel-totals.ts packages/database/src/jobs.ts">
+    <rect class="box" x="620" y="470" width="580" height="120" rx="10"/>
+    <text class="name" x="640" y="502">Cached for 6 hours at most</text>
+    <text class="note" x="640" y="528">A copy of each answer expires 6 hours after Google gave it, and</text>
+    <text class="note" x="640" y="550">a sweep every hour deletes expired copies. A free channel's</text>
+    <text class="note" x="640" y="572">figures are never stored as history.</text>
+  </g>
+  <g id="daily" data-code="apps/worker/src/jobs.ts packages/database/src/jobs.ts">
+    <rect class="box" x="620" y="640" width="580" height="290" rx="10"/>
+    <text class="name" x="640" y="672">Every day, the worker</text>
+    <text class="note" x="640" y="702">checks that each connection still works, by refreshing its token</text>
+    <text class="note" x="640" y="732">keeps each channel's YouTube Reporting API job</text>
+    <text class="note" x="640" y="762">checks that each video it stores history for still exists on</text>
+    <text class="note" x="640" y="784">YouTube, and deletes the history of any that does not</text>
+    <text class="note" x="640" y="814">for a Pro channel: downloads its reach history (impressions and</text>
+    <text class="note" x="640" y="836">click-through rate) and its videos' audience retention curves</text>
+    <text class="note" x="640" y="866">deletes a channel's stored history 30 days after its Pro</text>
+    <text class="note" x="640" y="888">subscription ends</text>
+  </g>
+
+  <!-- 3. Ending a connection -->
+  <g id="trigger-risc" data-code="apps/api/src/risc.ts apps/api/src/app.ts packages/token-vault/src/token-vault.ts">
+    <rect class="trigger" x="1290" y="170" width="290" height="105" rx="10"/>
+    <text class="name" x="1305" y="200">Google reports a revocation</text>
+    <text class="note" x="1305" y="226">through Cross-Account Protection</text>
+    <text class="note" x="1305" y="248">(RISC), which sends an event</text>
+  </g>
+  <g id="trigger-disconnect" data-code="packages/accounts/src/accounts.ts packages/token-vault/src/token-vault.ts">
+    <rect class="trigger" x="1290" y="290" width="290" height="105" rx="10"/>
+    <text class="name" x="1305" y="320">The creator disconnects</text>
+    <text class="note" x="1305" y="346">a channel in the app. Stillstats</text>
+    <text class="note" x="1305" y="368">revokes its access at Google.</text>
+  </g>
+  <g id="trigger-probe" data-code="packages/token-vault/src/token-vault.ts">
+    <rect class="trigger" x="1290" y="410" width="290" height="105" rx="10"/>
+    <text class="name" x="1305" y="440">Google refuses a token</text>
+    <text class="note" x="1305" y="466">in the daily check or any read: the</text>
+    <text class="note" x="1305" y="488">creator removed the access.</text>
+  </g>
+  <g id="trigger-delete-account" data-code="apps/api/src/app.ts packages/accounts/src/accounts.ts">
+    <rect class="trigger" x="1290" y="530" width="290" height="105" rx="10"/>
+    <text class="name" x="1305" y="560">The creator deletes the account</text>
+    <text class="note" x="1305" y="586">Every channel is disconnected and</text>
+    <text class="note" x="1305" y="608">revoked at Google.</text>
+  </g>
+  <g id="revoked" data-code="packages/token-vault/src/token-vault.ts packages/retention-engine/src/retention-engine.ts">
+    <rect class="ending" x="1640" y="170" width="250" height="465" rx="10"/>
+    <text class="name" x="1655" y="202">Connection marked</text>
+    <text class="name" x="1655" y="224">revoked</text>
+    <text class="note" x="1655" y="256">and the channel's</text>
+    <text class="note" x="1655" y="278">deletion requested, in</text>
+    <text class="note" x="1655" y="300">one step.</text>
+    <text class="note" x="1655" y="332">Nothing more is read</text>
+    <text class="note" x="1655" y="354">from YouTube for it.</text>
+  </g>
+  <g id="arrow-risc-revoked" data-code="packages/token-vault/src/token-vault.ts apps/worker/src/jobs.ts">
+    <path class="edge" d="M1580 222 H1636" marker-end="url(#head)"/>
+  </g>
+  <g id="arrow-disconnect-revoked" data-code="packages/token-vault/src/token-vault.ts">
+    <path class="edge" d="M1580 342 H1636" marker-end="url(#head)"/>
+  </g>
+  <g id="arrow-probe-revoked" data-code="packages/token-vault/src/token-vault.ts">
+    <path class="edge" d="M1580 462 H1636" marker-end="url(#head)"/>
+  </g>
+  <g id="arrow-delete-account-revoked" data-code="packages/accounts/src/accounts.ts">
+    <path class="edge" d="M1580 582 H1636" marker-end="url(#head)"/>
+  </g>
+  <g id="arrow-revoked-deleted" data-code="packages/retention-engine/src/retention-engine.ts">
+    <path class="edge" d="M1765 635 V668 H1435 V696" marker-end="url(#head)"/>
+    <text class="label" x="1600" y="660" text-anchor="middle">at once</text>
+  </g>
+  <g id="deleted" data-code="packages/retention-engine/src/retention-engine.ts packages/retention-engine/src/subscription-cancellation.ts">
+    <rect class="ending" x="1290" y="700" width="290" height="130" rx="10"/>
+    <text class="name" x="1305" y="730">Deleted right away</text>
+    <text class="note" x="1305" y="756">every row of the channel's data</text>
+    <text class="note" x="1305" y="778">and history. A Pro subscription</text>
+    <text class="note" x="1305" y="800">is cancelled and refunded.</text>
+  </g>
+  <g id="arrow-deleted-check" data-code="packages/retention-engine/src/retention-engine.ts">
+    <path class="edge" d="M1580 765 H1636" marker-end="url(#head)"/>
+  </g>
+  <g id="check" data-code="packages/retention-engine/src/retention-engine.ts">
+    <rect class="ending" x="1640" y="700" width="250" height="130" rx="10"/>
+    <text class="name" x="1655" y="730">Checked at 1 hour</text>
+    <text class="note" x="1655" y="756">The deletion runs again</text>
+    <text class="note" x="1655" y="778">if it has not finished.</text>
+  </g>
+  <g id="arrow-check-alarm" data-code="packages/retention-engine/src/retention-engine.ts">
+    <path class="edge" d="M1765 830 V876" marker-end="url(#head)"/>
+  </g>
+  <g id="alarm" data-code="packages/retention-engine/src/retention-engine.ts">
+    <rect class="ending" x="1290" y="880" width="600" height="110" rx="10"/>
+    <text class="name" x="1305" y="910">Alert at 12 hours</text>
+    <text class="note" x="1305" y="936">If the deletion is still not complete, the operator is alerted at</text>
+    <text class="note" x="1305" y="958">12 hours to finish it by hand, inside the privacy policy's 24 hours.</text>
+  </g>
+</svg>

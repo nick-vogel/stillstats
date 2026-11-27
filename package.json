@@ -14,6 +14,9 @@
     "test": "vitest run",
     "test:browser": "node apps/site/test/screenshot/browser-walk.ts",
     "build": "pnpm -r build",
+    "build:extension:staging": "node scripts/with-env.mjs build:extension:staging",
+    "migrate": "node scripts/with-env.mjs migrate",
+    "env:check": "node scripts/check-local-env.mjs",
     "fonts": "pnpm --filter @creator-analytics/visual-system fonts"
   },
   "devDependencies": {

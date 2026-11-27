@@ -10,7 +10,8 @@ export default defineConfig({
   // The web app's `@/` alias (apps/web/vite.config.ts), for its tests that render the app here.
   resolve: { alias: { '@': fileURLToPath(new URL('./apps/web/src', import.meta.url)) } },
   test: {
-    include: ['{apps,packages}/*/{src,test}/**/*.test.ts'],
+    // The env wrapper's tests (scripts/lib), with the packages', so CI runs them bare.
+    include: ['{apps,packages}/*/{src,test}/**/*.test.ts', 'scripts/**/*.test.mjs'],
     globalSetup: ['packages/database/test/global-setup.ts'],
     hookTimeout: 120_000,
     server: {

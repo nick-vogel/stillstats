@@ -22,8 +22,9 @@ export function accessHeadersOf(mode: string, env: AccessEnv): AccessHeaders {
   const { CF_ACCESS_CLIENT_ID: id, CF_ACCESS_CLIENT_SECRET: secret } = env
   if (!id || !secret) {
     throw new Error(
-      'A staging build needs the Cloudflare Access service token: set CF_ACCESS_CLIENT_ID and ' +
-        'CF_ACCESS_CLIENT_SECRET in the environment or in apps/extension/.env.staging.local.',
+      'A staging build needs the Cloudflare Access service token in CF_ACCESS_CLIENT_ID and ' +
+        'CF_ACCESS_CLIENT_SECRET. Run pnpm build:extension:staging from the repository root, ' +
+        'which reads both from the local env.',
     )
   }
   return { 'CF-Access-Client-Id': id, 'CF-Access-Client-Secret': secret }

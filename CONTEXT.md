@@ -1,6 +1,6 @@
 # Stillstats
 
-Privacy-first YouTube analytics for creators. It shows a creator the numbers that still matter about their own channel, stores only what a feature needs, and never sells or shares that data.
+Privacy-first YouTube analytics for creators. It shows a creator the numbers that still matter about their own channel, stores only what a feature needs, never sells that data, and shares it only with the services its privacy policy names.
 
 ## Language
 
