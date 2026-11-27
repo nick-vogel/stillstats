@@ -342,6 +342,24 @@ describe('seam 1: the API serves the site', () => {
     }
   })
 
+  // Cloudflare's Email Address Obfuscation, on for the zone, rewrites a bare address and injects
+  // its own decode script into the page (production /privacy and /terms, 2026-11-24).
+  test("every email address on a site page sits inside Cloudflare's email_off markers", async ({
+    web,
+  }) => {
+    for (const { path, html } of (await servedSite(web)).pages) {
+      const outside = html.replace(/<!--email_off-->[\s\S]*?<!--\/email_off-->/g, '')
+
+      expect({
+        path,
+        addresses: outside.match(/[\w.+-]+@(?!\d+(?:\.\d+)?x\.)(?:[a-z\d][\w-]*\.)+[a-z]{2,}\b/gi),
+      }).toEqual({
+        path,
+        addresses: null,
+      })
+    }
+  })
+
   // Stripe allows a donation only for a charitable purpose, and Stillstats takes tips (#338).
   test('no site page contains "donat"', async ({ web }) => {
     for (const { path, html } of (await servedSite(web)).pages) {
@@ -1462,8 +1480,9 @@ describe('seam 1: the privacy policy and the terms', () => {
   // holds the built manifest to it (#137). The rest of the wording (the global rule
   // `tests-state-a-rule`), and whether the policy's claims (the scopes, the stored data, the cookies, the encryption,
   // the retention windows) match what the code does, rest on Nick's copy approval on #5, #29, #61, #98,
-  // #120, #202, #338, #488, #539, #582, #657, #691, #732, #779, #790 and #950. The feedback message tests hold
-  // the facts its two items name, not their sentences, and so do the reach report tests (#779), the
+  // #120, #202, #338, #488, #539, #582, #657, #691, #732, #779, #790, #950 and #970. The feedback message tests hold
+  // the facts its two items name, not their sentences, and so does the Cloudflare Email Service test
+  // (#970), which holds the facts its paragraph names, and so do the reach report tests (#779), the
   // Pro tests (#790) and the thumbnail preview tool's analytics test (#732), which holds the
   // facts its sentence names. The Studio extension section's tests hold the sentences
   // #488 and #539 approve, word for word, but for its usage events sentence: a fact test holds that
@@ -1588,6 +1607,36 @@ describe('seam 1: the privacy policy and the terms', () => {
     const facts = ['Stripe', "Stripe's page", 'account ID', 'tip']
 
     expect(facts.filter((fact) => !text.includes(fact))).toEqual([])
+  })
+
+  // creator-analytics#970: each saved feedback message sends Nick one email through Cloudflare
+  // Email Service, and `feedbackNoticeOf` takes only the message's type and the time it was saved,
+  // and adds the admin screen's link. The facts are held against the one paragraph that names the
+  // service, since the Stripe paragraphs say "account" and "link" too.
+  test("the privacy policy's sharing section names Cloudflare Email Service, the feedback notice it carries, and what it receives", async ({
+    web,
+  }) => {
+    const section = sectionOf(await privacyMain(web), 'How Stillstats shares your data')
+    const [paragraph = ''] = [...section.matchAll(/<p>([\s\S]*?)<\/p>/g)]
+      .map(([, inner]) => textOf(inner ?? ''))
+      .filter((text) => text.includes('Cloudflare Email Service'))
+
+    expect(
+      [
+        /Cloudflare Email Service/,
+        /feedback message/,
+        /\bnotice\b/,
+        /\bCloudflare\b[^.]*\breceives\b/,
+        /\bmessage's type\b/,
+        /\btime\b[^.]*\bsent\b/,
+        /\blink\b[^.]*\bscreen\b/,
+      ].filter((fact) => !affirms(paragraph, fact)),
+    ).toEqual([])
+    expect(
+      [/\btext\b/, /reply address/, /\baccount\b/, /\bchannel\b/].filter(
+        (fact) => !denies(paragraph, fact),
+      ),
+    ).toEqual([])
   })
 
   // The tip link carries the account ID as client_reference_id (#338), so opening it sends the ID

@@ -11,7 +11,9 @@
  *    uuid in the API's channel routes.
  * 2. In the shell, set `STILLSTATS_SESSION_COOKIE` to that header, and `CF_ACCESS_CLIENT_ID` and
  *    `CF_ACCESS_CLIENT_SECRET` to staging's Access service token, the one the staging extension
- *    build reads (`apps/extension/.env.staging.local`). Against a local API, set the cookie only.
+ *    build reads. The walk does not run through the env wrapper (`scripts/with-env.mjs`), so the
+ *    shell must hold the token: copy the two values from `creator-analytics/local.env` in the
+ *    secrets repo, decrypted in your own terminal. Against a local API, set the cookie only.
  * 3. From the repository root, run
  *    `pnpm --filter @creator-analytics/api cold-cache-walk --channel <id> --target https://staging.stillstats.com --out <file>`.
  *    A relative file is the directory you ran pnpm from's, and a file that exists is refused.

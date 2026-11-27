@@ -21,7 +21,8 @@ interface ConsentScreenDescriptor {
   openedEvent: ProductEvent
 }
 
-// The text is approved word for word in creator-analytics#56. Change it only with Nick.
+// The text is approved word for word in creator-analytics#56, but for the disclosure line that
+// `retentionAndSharingLines` marks pending. Change it only with Nick.
 export const consentScreens: Record<ConsentRequest['consent'], ConsentScreenDescriptor> = {
   connection: {
     heading: 'Connect your channel',
