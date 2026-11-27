@@ -17,6 +17,7 @@
     "build:extension:staging": "node scripts/with-env.mjs build:extension:staging",
     "migrate": "node scripts/with-env.mjs migrate",
     "env:check": "node scripts/check-local-env.mjs",
+    "check:private": "node scripts/check-private-terms.mjs",
     "fonts": "pnpm --filter @creator-analytics/visual-system fonts"
   },
   "devDependencies": {

@@ -49,7 +49,7 @@ Each spec is one epic, and each one's output is the input to the next:
 
 ## Development
 
-Node 24 and pnpm. `pnpm lint`, `pnpm typecheck`, `pnpm build` and `pnpm test` are the four checks CI runs on every pull request.
+Node 24 and pnpm. `pnpm lint`, `pnpm typecheck`, `pnpm build` and `pnpm test` are the four checks CI runs on every pull request. `pnpm check:private` checks the tree, or with `--range origin/main..HEAD` the commits, against the maintainer's private list of terms that never land in this public repository (`.claude/rules/public-repository.md`). In a clone without that list it passes with a note.
 
 Switzer and Cabinet Grotesk, the site's and the web app's type, are Fontshare fonts under the ITF Free Font License, which does not allow them in a public repository. They live in the private repository `nick-vogel/stillstats-fonts`. Run `pnpm fonts` once after cloning, signed in to `gh` with an account that can read it, to copy them into `packages/visual-system/fonts/`, which `.gitignore` leaves out. Without them every build and test still runs: the build leaves out their `@font-face` rules and prints which file is absent, and the pages draw in the system's sans-serif. CI checks the fonts out with the `STILLSTATS_FONTS_TOKEN` secret, and a push to `main` refuses to build the deploy images without them (`docs/deploy.md`, Environments).
 
