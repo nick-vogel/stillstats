@@ -5,6 +5,7 @@
 // time slots run on the database's own clock, not the pinned one.
 import {
   channels,
+  proEnds,
   reachHistory,
   reachHistoryDays,
   retentionCurveReads,
@@ -24,14 +25,24 @@ const dayMs = 24 * 60 * 60 * 1000
 const endedAt = new Date('2026-11-02T12:00:00.000Z')
 const dayAfterEnd = (days: number) => new Date(endedAt.getTime() + days * dayMs)
 
+/** Sets the channel's purge date, 30 days after it stopped being Pro, as an end event does. */
+function setPurgeDate(scope: Scoped<'channel'>, channelId: string, ended: Date) {
+  const values = { endedAt: ended, purgeAfter: purgeDateOf(ended) }
+  return scope.sql
+    .insert(proEnds)
+    .values({ channelId, ...values })
+    .onConflictDoUpdate({ target: proEnds.channelId, set: values })
+}
+
 /** Ends the channel's subscription at `endedAt`, as the `deleted` webhook leaves it. */
 async function endSubscription(worker: WorkerDatabase, channelId: string): Promise<void> {
-  await worker.forChannel(channelId, (scope) =>
-    scope.sql
+  await worker.forChannel(channelId, async (scope) => {
+    await scope.sql
       .update(subscriptions)
-      .set({ status: 'canceled', purgeAfter: purgeDateOf(endedAt) })
-      .where(eq(subscriptions.channelId, channelId)),
-  )
+      .set({ status: 'canceled' })
+      .where(eq(subscriptions.channelId, channelId))
+    await setPurgeDate(scope, channelId, endedAt)
+  })
 }
 
 /**
@@ -60,9 +71,10 @@ async function stored(scope: Scoped<'channel'>, channelId: string) {
       status: subscriptions.status,
       customer: subscriptions.stripeCustomerId,
       subscription: subscriptions.stripeSubscriptionId,
-      purgeAfter: subscriptions.purgeAfter,
+      purgeAfter: proEnds.purgeAfter,
     })
     .from(subscriptions)
+    .leftJoin(proEnds, eq(proEnds.channelId, subscriptions.channelId))
     .where(eq(subscriptions.channelId, channelId))
   return { history, days, curves, curveReads, subscription }
 }
@@ -138,12 +150,7 @@ describe('seam 2: the history purge', () => {
     await endSubscription(worker, due)
     clock.set(dayAfterEnd(20))
     const ahead = await seedChannel(web, worker, 'purge-user-b')
-    await worker.forChannel(ahead, (scope) =>
-      scope.sql
-        .update(subscriptions)
-        .set({ purgeAfter: purgeDateOf(scope.now) })
-        .where(eq(subscriptions.channelId, ahead)),
-    )
+    await worker.forChannel(ahead, (scope) => setPurgeDate(scope, ahead, scope.now))
     const paid = await seedChannel(web, worker, 'purge-user-c')
     await worker.forChannel(paid, (scope) =>
       scope.sql

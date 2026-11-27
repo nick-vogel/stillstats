@@ -1,5 +1,6 @@
 import {
   memberships,
+  proEnds,
   type Scoped,
   type subscriptionPlans,
   subscriptions,
@@ -33,22 +34,36 @@ function isPaidStatus(status: StoredStatus): boolean {
   return paidStatuses.has(status)
 }
 
+/** The channel's own purge date, from its pro_ends row; null with no row or a cleared date. */
+async function storedPurgeDateOf(
+  tx: Scoped<'user' | 'channel'>,
+  channelId: string,
+  { lock = false } = {},
+): Promise<Date | null> {
+  const query = tx.sql
+    .select({ purgeAfter: proEnds.purgeAfter })
+    .from(proEnds)
+    .where(eq(proEnds.channelId, channelId))
+  const [ended] = await (lock ? query.for('update') : query)
+  return ended?.purgeAfter ?? null
+}
+
 /**
  * The channel's Entitlement: paid while its subscription is active or past due, free with any
- * other status or with none. A free channel carries its purge date while the scope's clock is
- * before it, the ended state. The scope's policies admit only a channel the user holds, or the
- * channel scope's own, so a channel outside them reads as free.
+ * other status or with none. A free channel carries its own purge date, on its pro_ends row,
+ * while the scope's clock is before it, the ended state. The scope's policies admit only a
+ * channel the user holds, or the channel scope's own, so a channel outside them reads as free.
  */
 export async function entitlementOf(
   tx: Scoped<'user' | 'channel'>,
   channelId: string,
 ): Promise<Entitlement> {
   const [subscription] = await tx.sql
-    .select({ status: subscriptions.status, purgeAfter: subscriptions.purgeAfter })
+    .select({ status: subscriptions.status })
     .from(subscriptions)
     .where(eq(subscriptions.channelId, channelId))
   if (subscription && isPaidStatus(subscription.status)) return { tier: 'paid', purgeDate: null }
-  const purgeAfter = subscription?.purgeAfter ?? null
+  const purgeAfter = await storedPurgeDateOf(tx, channelId)
   return { tier: 'free', purgeDate: purgeAfter && purgeAfter > tx.now ? purgeAfter : null }
 }
 
@@ -82,29 +97,29 @@ export async function portalCustomerOf(
 /**
  * Whether the channel's stored history is due for the purge: its purge date has come, at the same
  * instant `entitlementOf` stops answering it, and its subscription is not paid. Read in the purge's
- * channel scope, with the subscription row locked for the rest of the transaction, so a return
- * that record_subscription records at the same moment, which locks the same row, either clears the
- * date first and nothing is purged, or waits for the purge to end.
+ * channel scope, with the subscription row and then the channel's pro_ends row locked for the rest
+ * of the transaction, the order record_subscription locks them in (migration 0040), so a return it
+ * records at the same moment either clears the date first and nothing is purged, or waits for the
+ * purge to end.
  */
 export async function purgeDueOf(tx: Scoped<'channel'>, channelId: string): Promise<boolean> {
   const [subscription] = await tx.sql
-    .select({ status: subscriptions.status, purgeAfter: subscriptions.purgeAfter })
+    .select({ status: subscriptions.status })
     .from(subscriptions)
     .where(eq(subscriptions.channelId, channelId))
     .for('update')
-  if (!subscription?.purgeAfter || isPaidStatus(subscription.status)) return false
-  return subscription.purgeAfter <= tx.now
+  const purgeAfter = await storedPurgeDateOf(tx, channelId, { lock: true })
+  if (!purgeAfter || (subscription && isPaidStatus(subscription.status))) return false
+  return purgeAfter <= tx.now
 }
 
 /**
- * Clears the channel's purge date once its history is purged (#789). The row keeps its status and
- * its Stripe customer, so a later subscription buys as the same customer.
+ * Clears the channel's purge date once its history is purged (#789). Its pro_ends row keeps when
+ * the channel stopped being Pro, and its subscription row keeps its status and its Stripe
+ * customer, so a later subscription buys as the same customer.
  */
 export async function clearPurgeDate(tx: Scoped<'channel'>, channelId: string): Promise<void> {
-  await tx.sql
-    .update(subscriptions)
-    .set({ purgeAfter: null })
-    .where(eq(subscriptions.channelId, channelId))
+  await tx.sql.update(proEnds).set({ purgeAfter: null }).where(eq(proEnds.channelId, channelId))
 }
 
 // Stripe's two statuses of a subscription that will never charge again. Any other, `past_due`,
@@ -167,7 +182,10 @@ export interface SubscriptionFields {
   plan: Plan | null
   status: string | null
   periodEnd: Date | null
-  /** The purge date an end event sets; null for an event that ends nothing. */
+  /**
+   * The purge date an end event sets on the channel's pro_ends row, 30 days after the end;
+   * null for an event that ends nothing.
+   */
   purgeAfter: Date | null
   /** When Stripe created the event, which orders it against the others it sends unordered. */
   eventCreated: Date
@@ -183,8 +201,8 @@ const subscribedSlotSeconds = 10 * 60
 
 /**
  * Records what a Stripe event says of the channel's subscription, through the record_subscription
- * function (migrations 0030, 0033 and 0039), the one write the anonymous scope makes to
- * subscriptions: `unchanged` for an event that adds nothing, such as a repeated delivery, an event
+ * function (migrations 0030, 0033, 0039 and 0040), the one write the anonymous scope makes to
+ * subscriptions and to the channel's pro_ends row: `unchanged` for an event that adds nothing, such as a repeated delivery, an event
  * older than the newest the row holds, or a late event of an ended or an old subscription,
  * `no_channel` for a channel that does not exist, and `other_subscription` for a live subscription
  * other than the stored one of a paid channel, which it never records.

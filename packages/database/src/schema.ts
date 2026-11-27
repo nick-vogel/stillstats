@@ -31,6 +31,11 @@ export {
 } from './retention.ts'
 export { retentionCurveReads, retentionCurves } from './retention-curves.ts'
 export { sponsorReportFigureChoices } from './sponsor-report.ts'
-export { subscriptionPayments, subscriptionPlans, subscriptions } from './subscriptions.ts'
+export {
+  proEnds,
+  subscriptionPayments,
+  subscriptionPlans,
+  subscriptions,
+} from './subscriptions.ts'
 export { tips } from './tips.ts'
 export { quotaUsage, readCache, reportingJobs } from './youtube-gateway.ts'

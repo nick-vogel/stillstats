@@ -7,6 +7,7 @@ import {
   deletionLog,
   deletionRequests,
   preferences,
+  proEnds,
   reachHistory,
   reachHistoryDays,
   readCache,
@@ -163,6 +164,7 @@ describe('seam 1: user deletion', () => {
         status: 'canceled',
         updatedAt: tx.now,
       })
+      await tx.sql.insert(proEnds).values({ channelId, endedAt: tx.now, purgeAfter: null })
       await tx.sql.insert(reachHistory).values({
         channelId,
         videoId: 'end-state',

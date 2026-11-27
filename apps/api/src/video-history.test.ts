@@ -11,6 +11,7 @@ import {
   type VideoRow,
 } from '@creator-analytics/api-types'
 import {
+  proEnds,
   reachHistory,
   reachHistoryDays,
   subscriptions,
@@ -341,16 +342,20 @@ async function subscribe(
   channelId: string,
   { status = 'active', purgeAfter = null }: { status?: string; purgeAfter?: Date | null } = {},
 ): Promise<void> {
-  await worker.forChannel(channelId, (tx) =>
-    tx.sql.insert(subscriptions).values({
+  await worker.forChannel(channelId, async (tx) => {
+    await tx.sql.insert(subscriptions).values({
       channelId,
       stripeCustomerId: 'cus_video_history',
       stripeSubscriptionId: 'sub_video_history',
       status,
-      purgeAfter,
       updatedAt: tx.now,
-    }),
-  )
+    })
+    // The channel's own purge date, 30 days after it stopped being Pro.
+    if (purgeAfter) {
+      const endedAt = new Date(purgeAfter.getTime() - 30 * 24 * 60 * 60 * 1000)
+      await tx.sql.insert(proEnds).values({ channelId, endedAt, purgeAfter })
+    }
+  })
 }
 
 /**

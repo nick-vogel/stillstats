@@ -62,16 +62,16 @@ describe('tables with a channel id', () => {
     expect(rows.filter((row) => !row.forced).map((row) => row.table)).toEqual([])
   })
 
-  test('every one has policies for the web and worker roles, only memberships for the claim role, only the connection roster tables for the roster role, and only subscriptions and subscription payments for the billing role', async ({
+  test('every one has policies for the web and worker roles, only memberships for the claim role, only the connection roster tables for the roster role, and only subscriptions, subscription payments and pro ends for the billing role', async ({
     pool,
   }) => {
     const rows = await channelTables(pool)
+    const billingTables = ['subscriptions', 'subscription_payments', 'pro_ends']
+    expect(rows.map((row) => row.table)).toEqual(expect.arrayContaining(billingTables))
 
     const expected = (table: string) => {
       if (table === 'memberships') return 'app_claim,app_web,app_worker'
-      if (['subscriptions', 'subscription_payments'].includes(table)) {
-        return 'app_billing,app_web,app_worker'
-      }
+      if (billingTables.includes(table)) return 'app_billing,app_web,app_worker'
       if (['connections', 'connection_identifiers'].includes(table)) {
         return 'app_roster,app_web,app_worker'
       }

@@ -15,13 +15,12 @@ export const subscriptionPlans = ['monthly', 'annual'] as const
 
 /**
  * A channel's Subscription to Pro, at most one per channel: its Stripe customer and
- * subscription, its plan, Stripe's status of it, the end of its paid period and its purge date.
- * Stripe's webhook, signed in by no one, writes it only through the record_subscription function
- * (migration 0030), which runs as `app_billing` in the anonymous scope; the anonymous scope reads
- * and writes no row of it itself. The history purge's channel scope clears its purge date once it
- * has deleted the channel's history (#789). The plan and the period end stay null until the event that
- * carries them lands, since Stripe orders none of its events. It holds no email, name, card or
- * amount.
+ * subscription, its plan, Stripe's status of it and the end of its paid period. The channel's
+ * purge date is the channel's own, on `proEnds`. Stripe's webhook, signed in by no one, writes it
+ * only through the record_subscription function (migration 0030), which runs as `app_billing` in
+ * the anonymous scope; the anonymous scope reads and writes no row of it itself. The plan and the
+ * period end stay null until the event that carries them lands, since Stripe orders none of its
+ * events. It holds no email, name, card or amount.
  */
 export const subscriptions = channelOwned(
   'subscriptions',
@@ -32,7 +31,12 @@ export const subscriptions = channelOwned(
     /** Stripe's own status of the subscription, such as `active` or `past_due`. */
     status: text('status').notNull(),
     currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
-    /** When the channel's stored history is deleted after the subscription ends (#787). */
+    /**
+     * A copy of the channel's purge date for the previous release's images, which still read it
+     * here during and after a deploy (docs/deploy.md, "The release step"). Only
+     * record_subscription writes it (migration 0040), no code of this release reads it, and the
+     * remove release drops it. The channel's purge date is `proEnds.purgeAfter`.
+     */
     purgeAfter: timestamp('purge_after', { withTimezone: true }),
     /**
      * When Stripe created the newest event the row holds (#787), which orders the events it
@@ -49,6 +53,34 @@ export const subscriptions = channelOwned(
         sql`${t.plan} in (${sql.raw(subscriptionPlans.map((plan) => `'${plan}'`).join(', '))})`,
       ),
       pgPolicy('subscriptions_billing', {
+        to: billingRole,
+        using: inScope('anonymous'),
+        withCheck: inScope('anonymous'),
+      }),
+    ],
+  },
+)
+
+/**
+ * When a channel stopped being Pro and when its stored history is deleted, at most one row per
+ * channel (#787, stillstats#19). The channel owns it, not its subscription, so each channel a
+ * subscription covers can end Pro at its own time. Stripe's webhook writes it only through the
+ * record_subscription function (migration 0040), as `app_billing` in the anonymous scope: an end
+ * event sets the purge date 30 days after the end, and a paid status deletes the row, so a return
+ * before the date keeps the history. The history purge's channel scope clears the purge date once
+ * it has deleted the channel's history (#789), and keeps the end.
+ */
+export const proEnds = channelOwned(
+  'pro_ends',
+  {
+    endedAt: timestamp('ended_at', { withTimezone: true }).notNull(),
+    /** When the channel's stored history is deleted; null once the purge has deleted it. */
+    purgeAfter: timestamp('purge_after', { withTimezone: true }),
+  },
+  {
+    onePerChannel: true,
+    extraConfig: () => [
+      pgPolicy('pro_ends_billing', {
         to: billingRole,
         using: inScope('anonymous'),
         withCheck: inScope('anonymous'),

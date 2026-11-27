@@ -39,7 +39,8 @@ export async function enqueueHistoryPurges(tx: Scoped<'system'>): Promise<void> 
  * retention_curve_reads row, and its purge date is cleared, in one transaction. With its days gone
  * the history start goes too, and a later subscription's first download lists every report Google
  * still holds, as a first subscription does; with its reads gone, its curve refresh backfills
- * every video again. The channel, its connection, its reporting job and its subscription row stay.
+ * every video again. The channel, its connection, its reporting job, its subscription row and
+ * when it stopped being Pro stay.
  * Any other channel is left as it is.
  */
 export async function purgeEndedHistory(

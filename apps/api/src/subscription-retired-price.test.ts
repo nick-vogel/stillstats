@@ -4,10 +4,16 @@
 // The staging sandbox's subscription on the archived annual price (creator-analytics#813) is that
 // case on a real Stripe account.
 import { randomUUID } from 'node:crypto'
-import { subscriptionPayments, subscriptions, type WebDatabase } from '@creator-analytics/database'
+import {
+  proEnds,
+  subscriptionPayments,
+  subscriptions,
+  type WebDatabase,
+} from '@creator-analytics/database'
 import { test } from '@creator-analytics/database/testing'
 import { entitlementOf } from '@creator-analytics/entitlements'
 import { type FakeOpenPanel, startFakeOpenPanel } from '@creator-analytics/event-relay/testing'
+import { eq } from 'drizzle-orm'
 import { describe, expect } from 'vitest'
 import { channelsOf, connect, signIn, userIdOf } from '../test/flows.ts'
 import { type StartedApi, startApi } from '../test/start-api.ts'
@@ -76,9 +82,10 @@ function storedSubscription(web: WebDatabase, ownerId: string) {
         plan: subscriptions.plan,
         status: subscriptions.status,
         periodEnd: subscriptions.currentPeriodEnd,
-        purgeAfter: subscriptions.purgeAfter,
+        purgeAfter: proEnds.purgeAfter,
       })
-      .from(subscriptions),
+      .from(subscriptions)
+      .leftJoin(proEnds, eq(proEnds.channelId, subscriptions.channelId)),
   )
 }
 

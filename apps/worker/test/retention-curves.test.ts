@@ -10,6 +10,7 @@
 // and the schedules test reads back the stored schedule.
 import {
   connections,
+  proEnds,
   quotaUsage,
   retentionCurveReads,
   retentionCurves,
@@ -477,16 +478,16 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-ended', 'UC-curves-ended')
-    await worker.forChannel(channelId, (tx) =>
-      tx.sql.insert(subscriptions).values({
+    await worker.forChannel(channelId, async (tx) => {
+      await tx.sql.insert(subscriptions).values({
         channelId,
         stripeCustomerId: `cus_${channelId}`,
         stripeSubscriptionId: `sub_${channelId}`,
         status: 'canceled',
-        purgeAfter: daysAfter(30),
         updatedAt: tx.now,
-      }),
-    )
+      })
+      await tx.sql.insert(proEnds).values({ channelId, endedAt: tx.now, purgeAfter: daysAfter(30) })
+    })
     uploadsAt(google, 'UC-curves-ended', [published('v1', daysBefore(3))])
     await seedRead(worker, channelId, 'v1', daysBefore(1))
 

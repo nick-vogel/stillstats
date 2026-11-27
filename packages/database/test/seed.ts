@@ -5,6 +5,7 @@ import {
   connectionIdentifiers,
   connections,
   memberships,
+  proEnds,
   reachHistory,
   reachHistoryDays,
   readCache,
@@ -73,6 +74,8 @@ export async function seedChannel(
       status: 'canceled',
       updatedAt: scope.now,
     })
+    // Its end of Pro, with the purge date already cleared, as the history purge leaves it.
+    await scope.sql.insert(proEnds).values({ channelId, endedAt: scope.now, purgeAfter: null })
     await scope.sql.insert(reachHistory).values({
       channelId,
       videoId: 'fixture',
