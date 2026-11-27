@@ -1496,7 +1496,8 @@ describe('seam 1: count every video over a window after publish', () => {
 
   // The same 1,200 uploads and slices. The first slice's query asks the same 100 videos over the
   // same days in every window, so once first365 has read it, each later window reads every slice
-  // but that one: 12 of 13 in first90, first28 and first7, and 11 of 12 in first1.
+  // but that one: 12 of 13 in first90, first28 and first7, and 11 of 12 in first1. Five lists of
+  // 1,200 uploads take up to 6 seconds in CI beside the rest of the suite, past the default 5.
   test("after first365, the cache answers each later window's first slice", async ({
     web,
     clock,
@@ -1518,7 +1519,7 @@ describe('seam 1: count every video over a window after publish', () => {
     }
 
     expect(unitsOf).toEqual({ first90: 12, first28: 12, first7: 12, first1: 11 })
-  })
+  }, 20_000)
 
   // 300 uploads, one a day from 2024-01-02, whose first365 windows run over 7 slices. A video's
   // totals add every query that reads it, so a day two of its queries read would count twice.
