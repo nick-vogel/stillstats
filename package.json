@@ -21,11 +21,11 @@
     "fonts": "pnpm --filter @creator-analytics/visual-system fonts"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.15",
-    "@testcontainers/postgresql": "^12.2.0",
-    "@types/node": "^24.19.1",
-    "happy-dom": "^21.0.1",
+    "@biomejs/biome": "^2.6.9",
+    "@testcontainers/postgresql": "^12.2.2",
+    "@types/node": "^26.6.7",
+    "happy-dom": "^21.0.4",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.1"
   }
 }

@@ -16,7 +16,7 @@
     "@creator-analytics/visual-system": "workspace:*"
   },
   "devDependencies": {
-    "jsdom": "^30.1.2",
-    "wxt": "0.21.4"
+    "jsdom": "^31.0.1",
+    "wxt": "0.21.5"
   }
 }
