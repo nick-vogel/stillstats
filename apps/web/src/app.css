@@ -1,0 +1,3384 @@
+/* Tailwind's theme and utilities, without its Preflight reset: the visual system's sheet is the
+   reset (ADR 0014). The visual system's sheet and this one stay unlayered, so every rule here still
+   wins over any utility. Source detection starts at this folder, not at the working directory,
+   which is apps/web under `pnpm build` and the repository root under `pnpm test`. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(".");
+@import "@creator-analytics/visual-system/styles.css";
+
+/* Tailwind's and shadcn's names, each set to a visual system token, so a utility paints with the
+   token itself (`inline`) and follows its light and dark values, which the visual system's sheet
+   applies by data-theme on the root or, with no data-theme, by the system's preference; there is
+   still no `.dark` class. Each reset drops Tailwind's defaults in a namespace whose values carry a
+   colour, a keyframe, shadcn's radius, or a --font-mono that would overwrite the visual system's
+   own. No shadcn variable such as --accent is declared raw: --accent is already a visual system
+   token. */
+@theme inline {
+  --color-*: initial;
+  --color-background: var(--bg);
+  --color-card: var(--bg-end);
+  --color-foreground: var(--ink);
+  --color-muted-foreground: var(--ink-soft);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--on-accent);
+  --color-ring: var(--accent);
+
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --text-shadow-*: initial;
+  --animate-*: initial;
+
+  --radius-*: initial;
+  --radius-field: 0.75rem;
+  --radius-pill: 999px;
+
+  --font-*: initial;
+  --font-sans: var(--font-body);
+}
+
+/* The web app runs wider than the site's 68rem measure, which gives a video's breakdowns columns
+   room for their wider gap (Nick's browser walk, 2026-10-13). The measure holds the screens with
+   no sidebar beside them, centred as the site is; beside the sidebar the screen grows to
+   .app-signed-in's --screen-stop instead (creator-analytics issue 477). The reading width is the
+   site's own measure for long text (apps/site/src/styles.css, the legal pages and the principles),
+   which the notes, the paragraphs and Settings keep at every window size (creator-analytics
+   issue 477). */
+.app {
+  --measure: 76rem;
+  --reading-width: 44rem;
+  flex: 1;
+  display: grid;
+  align-content: start;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: clamp(2.5rem, 7vw, 5rem) var(--gutter);
+}
+
+.app h1 {
+  font-size: clamp(2.25rem, 6vw, 3.5rem);
+}
+
+/* The signed-in view, which carries the header, puts its wordmark as far down as the site header's
+   (apps/site/src/styles.css, .site-header's padding-block of 1.75rem), so the wordmark sits at the
+   same place on both. The header centers the wordmark beside the 2.5rem avatar, which moves it down
+   by half of the 1.125rem the avatar is taller, so the view starts that much higher. The signed-out
+   screen has no wordmark and keeps the larger space. */
+.app-signed-in {
+  padding-top: calc(1.75rem - (2.5rem - 1.375rem) / 2);
+}
+
+.app h2 {
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.app p {
+  max-width: min(100%, var(--reading-width));
+  margin: 0;
+}
+
+.app .button {
+  padding: 0.8rem 1.4rem;
+  font-size: 1rem;
+  justify-self: start;
+}
+
+.button-quiet {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+}
+
+.button-quiet:hover {
+  border-color: var(--accent);
+  background: transparent;
+}
+
+/* A disabled quiet button, such as "Clear all picks" with no pick (creator-analytics issue 1049),
+   takes the muted ink a disabled field does and no hover. */
+.button-quiet:disabled {
+  border-color: var(--line);
+  color: var(--ink-soft);
+  cursor: not-allowed;
+}
+
+.channels {
+  display: grid;
+  gap: 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.channel {
+  display: grid;
+  gap: 1.25rem;
+  padding: clamp(1.5rem, 4vw, 2.25rem);
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+}
+
+/* "What's new" keeps the reading width, as Settings does, and each highlight sits in a box
+   like a channel's on Settings (creator-analytics issue 577). */
+.whats-new,
+.whats-new-list {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.whats-new {
+  max-width: min(100%, var(--reading-width));
+}
+
+.whats-new-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.whats-new-item {
+  padding: clamp(1.5rem, 4vw, 2.25rem);
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+}
+
+.whats-new-item article {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.whats-new-item h2,
+.whats-new-links {
+  margin: 0;
+}
+
+/* The description is the release content package's HTML, so its first and last blocks keep no
+   margin outside the box's own gap. */
+.whats-new-description > :first-child {
+  margin-top: 0;
+}
+
+.whats-new-description > :last-child {
+  margin-bottom: 0;
+}
+
+.whats-new-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+
+/* The "What's new" banner: one plain line above the screen, in the line token's box with no fill,
+   no badge and no motion, so it never reads as an alarm (ADR 0011, creator-analytics issue 580).
+   The close is the support item's x, a 1.5rem target, at least WCAG 2.5.8's 24px. */
+.whats-new-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding: 0.75rem 0.75rem 0.75rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+}
+
+.whats-new-banner p {
+  margin: 0;
+}
+
+.whats-new-banner button {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.whats-new-banner button:hover {
+  color: var(--ink);
+}
+
+.whats-new-banner svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.channel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* The channel id's size and weight, in the body's face, as it names the channel. */
+.channel-name {
+  font: 500 1rem / 1.4 var(--font-body);
+  overflow-wrap: anywhere;
+}
+
+.channel-consent {
+  color: var(--ink-soft);
+  font-size: 0.9375rem;
+}
+
+.app-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+/* Within .app, so it keeps the measure and the gutter. */
+.app-header:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+}
+
+/* The feedback form keeps the reading width, as Settings does, its fields one column 1.5rem apart
+   (creator-analytics issue 582). The fields are native, so each takes the visual system's ink,
+   line and field radius here. */
+.feedback,
+.feedback-form {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.feedback {
+  max-width: min(100%, var(--reading-width));
+}
+
+.feedback-types,
+.feedback-text {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.feedback-types > span,
+.feedback-text label {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.feedback textarea,
+.feedback input[type="email"] {
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
+  background: transparent;
+  color: var(--ink);
+  font: 400 1rem / 1.5 var(--font-body);
+}
+
+.feedback textarea {
+  resize: vertical;
+}
+
+.feedback input[type="email"]:disabled {
+  color: var(--ink-soft);
+}
+
+.feedback input[aria-invalid="true"] {
+  border-color: var(--ink);
+}
+
+/* The counter's region holds its line's height while it is empty, so the form does not move as
+   the counter appears. */
+.feedback-counter {
+  min-height: 1.3em;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.feedback-reply {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.feedback-reply input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.feedback-reply input[type="email"] {
+  flex: 1 1 16rem;
+  width: auto;
+}
+
+.feedback-form .button {
+  justify-self: start;
+}
+
+/* The thank-you line takes focus when the form goes, so a screen reader reads it; no key put it
+   there, so it shows no ring. */
+.feedback-thanks {
+  margin: 0;
+}
+
+.feedback-thanks:focus {
+  outline: none;
+}
+
+/* Reset form sits under the thank-you line as a plain text button, as the sidebar's Hide control
+   does (creator-analytics issue 750). */
+.feedback-sent {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.feedback-reset {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  cursor: pointer;
+}
+
+.feedback-reset:hover {
+  text-decoration-color: var(--accent);
+}
+
+/* Nick's admin screen of the feedback messages (creator-analytics issue 583): the reading width, one
+   message to a block, each field a label above its value. The text keeps its line breaks. */
+.admin-feedback,
+.not-found {
+  display: grid;
+  gap: 1.5rem;
+  max-width: min(100%, var(--reading-width));
+}
+
+.admin-feedback-filter,
+.admin-feedback-done {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-feedback input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.admin-feedback-list {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-feedback-message {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
+}
+
+.admin-feedback-message dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem 1.5rem;
+  margin: 0;
+}
+
+.admin-feedback-message dt {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.admin-feedback-message dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-feedback-text {
+  grid-column: 1 / -1;
+}
+
+.admin-feedback-text dd {
+  white-space: pre-wrap;
+}
+
+.admin-feedback-pages {
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Centered beside the avatar, as the header's other items are (Nick, browser walk, F2.36). Its
+   size and line height of 1 make it 1.375rem tall, which .app-signed-in's top space counts on. */
+.app-header .wordmark {
+  font-size: 1.375rem;
+}
+
+.settings,
+.settings-section {
+  display: grid;
+  gap: 1.5rem;
+}
+
+/* Settings keeps the reading width, its channel boxes, switches and support section with it. */
+.settings {
+  max-width: min(100%, var(--reading-width));
+}
+
+/* The upgrade screen (creator-analytics issue 913), as the mock Nick approved on staging on 2026-11-19.
+   It keeps the reading width, which holds two 15rem cards in a row and so the feature cards two
+   to a row, the last one alone when the count is odd, and one column on a narrow screen. */
+.upgrade {
+  display: grid;
+  gap: 1.5rem;
+  max-width: min(100%, var(--reading-width));
+}
+
+.upgrade-intro {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.upgrade-eyebrow {
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.upgrade-features,
+.upgrade-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The translucent var(--bg) fill is a layer under the card's content at 60% opacity, since the
+   colour rules read a token or an oklch value and no mix of the two. */
+.upgrade-feature {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+
+.upgrade-feature::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--bg);
+  opacity: 0.6;
+}
+
+.upgrade-feature-next {
+  border-style: dashed;
+}
+
+.upgrade-feature h2,
+.upgrade-plan h2 {
+  font-size: 1.125rem;
+  letter-spacing: -0.01em;
+}
+
+.upgrade-feature p,
+.upgrade-plan-detail,
+.upgrade-prices-note {
+  font-size: 0.9375rem;
+}
+
+.upgrade-comparisons {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.upgrade-ready {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* The badge sits over the card's top right edge, so the card is its containing block. */
+.upgrade-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--bg-end);
+}
+
+/* The recommended card's border is 1px wider, so its padding is 1px less and its content sits
+   where the other card's does. */
+.upgrade-plan-recommended {
+  padding: calc(1.5rem - 1px);
+  border: 2px solid var(--accent);
+}
+
+.upgrade-badge {
+  position: absolute;
+  top: 0;
+  right: 1.25rem;
+  transform: translateY(-50%);
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.upgrade-price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.375rem;
+}
+
+.upgrade-amount {
+  font: 700 2.25rem / 1 var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.upgrade-period {
+  color: var(--ink-soft);
+  font-size: 1rem;
+}
+
+.upgrade-plan-detail {
+  color: var(--ink-soft);
+}
+
+/* The button spans the card at its foot, so the two cards' buttons line up when their lines
+   differ. */
+.upgrade-plan .button {
+  margin-top: auto;
+}
+
+/* The outline button: the filled .button's size and shape, in the accent colour on no fill. The
+   ring is an inset shadow, not a border, so it is exactly as tall as the filled one. */
+.button-outline,
+.button-outline:hover {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  color: var(--accent);
+}
+
+.button-outline:hover {
+  box-shadow: inset 0 0 0 1.5px var(--accent-hover);
+  color: var(--accent-hover);
+}
+
+.upgrade-prices-note {
+  color: var(--ink-soft);
+}
+
+/* The heading a screen focuses when it opens, and the video list's table a pager link focuses, or
+   the refusal message in its place when that page's read is refused (tabIndex -1, outside the tab
+   order), show no ring: focus goes there so a screen reader starts at the new screen or page, and
+   no key put it there. */
+.settings h1:focus,
+.video-detail-head h1:focus,
+.consent h2:focus,
+.video-list-scroll table:focus,
+.video-list > p[role="alert"]:focus {
+  outline: none;
+}
+
+.figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2.5rem;
+  margin: 0;
+}
+
+.figures dt {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.figures dd {
+  margin: 0;
+  font: 500 1.75rem / 1.2 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.figures-smaller dd {
+  font-size: 1.125rem;
+}
+
+/* The place a card's number keeps: two lines at its least 1.125rem, at its line height of 1.2.
+   A card's place: its padding and border around its label and the gap under it, its number's
+   place, and the two smaller lines under that with the gap above each, the views line and the
+   ratio line's place of two lines (.card .card-detail + .card-detail). Every card keeps it as its
+   least height, and the card placeholder is that tall, so a row of cards is as tall as its
+   placeholders however the grid wraps (creator-analytics issue 119, W24). */
+.cards {
+  --card-number-place: calc(2 * 1.125rem * 1.2);
+  --card-ratio-place: calc(2 * 0.9375rem * 1.4);
+  --card-head-place: calc(2rem + 2px + 0.875rem * 1.6 + 0.25rem);
+  --card-details-place: calc(0.25rem + 0.9375rem * 1.4 + 0.25rem + var(--card-ratio-place));
+  --card-place: calc(var(--card-head-place) + var(--card-number-place) + var(--card-details-place));
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 1rem;
+  margin: 0;
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  min-height: var(--card-place);
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  /* The number's size is a share of the card's width. */
+  container-type: inline-size;
+}
+
+.card dt {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.card dd {
+  margin: 0;
+  font: 500 1.75rem / 1.2 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A number too long for the card at 1.75rem, such as "UZS 62,193,167.99", shrinks to fit its width:
+   JetBrains Mono advances 0.6em a character, so --chars characters take --chars * 0.6em. At its
+   1.125rem least it may break after the currency, the one ordinary space in the text, never inside
+   the amount (wrappableMoneyTextOf). Every number keeps the place of those two lines, so a card is
+   as tall whatever its amount, and the card placeholder holds the place before the amount is known
+   (creator-analytics issue 119, W24). */
+.card .card-number {
+  min-height: var(--card-number-place);
+  font-size: clamp(1.125rem, calc(100cqi / (var(--chars, 1) * 0.6)), 1.75rem);
+}
+
+.card .card-detail {
+  color: var(--ink-soft);
+  font: 400 0.9375rem / 1.4 var(--font-mono);
+}
+
+/* The ratio line, the engaged views card's second smaller line, wraps on a card narrower than about
+   18rem, so it keeps the place of two lines on any card, and the card is as tall whether it wraps
+   or not (creator-analytics issue 242). */
+.card .card-detail + .card-detail {
+  min-height: var(--card-ratio-place);
+}
+
+/* On a screen too small to stack the charts, a card that chooses its chart: the label's button
+   stretches over the whole card, so the card is one tap target, and its ring and the chosen card's
+   border take the accent. The revenue card's RPM line is a second target inside it
+   (`.card-choose-detail`), which chooses the RPM chart (creator-analytics issue 356). The card's own
+   stacking context holds that line's z-index inside the card: in the page's stacking context it
+   matched the sticky controls bar's z-index 1, and the card comes later in the page, so a line
+   scrolled under the stuck bar painted over it (creator-analytics issue 268). */
+.card-chooser {
+  position: relative;
+  z-index: 0;
+}
+
+.card-chooser:hover {
+  border-color: var(--accent);
+}
+
+/* Twice the hover's width, so the chosen card reads apart from the one under the pointer. */
+.card-chosen {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.card-choose {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.card-choose::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 1rem;
+}
+
+.card-choose:focus-visible {
+  outline: none;
+}
+
+.card-choose:focus-visible::after {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* The revenue card's RPM line as its own button, raised above the label's stretched ::after, which
+   would otherwise take its press. Pressed, it is underlined, so the choice does not read by the
+   card's accent border alone, which either chart chosen gives the card. */
+.card-choose-detail {
+  position: relative;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.card-choose-detail:hover {
+  text-decoration-line: underline;
+}
+
+.card-choose-detail[aria-pressed="true"] {
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 0.2em;
+}
+
+.card-choose-detail:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 0.25rem;
+}
+
+/* A sentence in place of the number, such as why there is no revenue, and its link. */
+.card .card-message {
+  font: 400 1rem / 1.5 var(--font-body);
+}
+
+/* A note or a warning: a tinted background behind the text sets it apart from the body text. The
+   text takes the body's ink, as the soft ink on the tint read dim in dark mode (about 5.7:1, against
+   about 9:1 with the ink). It has no border, so it stays different from the status notice below.
+   Nick chose this look over an accent rule in the browser walk (creator-analytics issue 119, W7).
+   Change it only with Nick. */
+.note {
+  justify-self: start;
+  width: fit-content;
+  max-width: min(100%, var(--reading-width));
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--bg-glow);
+  color: var(--ink);
+  font-size: 0.9375rem;
+}
+
+/* A message an action leaves, such as the one after "Delete me" on the signed-out screen: a box
+   with a border and a tinted background. Nick approves this look in the browser (creator-analytics
+   issue 119, W27). Change it only with Nick. */
+.status-notice {
+  justify-self: start;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.75rem;
+  background: var(--bg-glow);
+  color: var(--ink);
+}
+
+.video-list {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.controls,
+.controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem 1.5rem;
+}
+
+/* A native checkbox, so the keyboard, the tab stop and the switch role's checked state stay the
+   browser's. */
+.list-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-block: 0.6rem;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.list-switch input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* A switch with a hint, such as the RPM switch on Settings: the hint under the label's text. */
+.hinted-switch {
+  justify-self: start;
+}
+
+.switch-hint {
+  margin: -0.4rem 0 0;
+  /* The input's width and the label's gap, so the hint lines up with the label's text. */
+  padding-inline-start: 1.6rem;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+/* The column switches: the group's name as a quiet label over the switches. */
+.column-switches {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.column-switches legend {
+  padding: 0;
+}
+
+.column-switches-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.25rem;
+}
+
+/* A grid item of the signed-in screen (or of a video's screen), so it sticks the length of the
+   page. Above the numbers table's sticky heading row, and below the account menu's popup (z-index
+   2, in components/ui/dropdown-menu.tsx). An inset panel inside the screen's column, on the page's
+   background: padding on every side, so the controls stand clear of its edges, and a line all
+   round with the cards' 0.75rem radius, since a bottom line alone on rounded corners reads as cut
+   off. It no longer runs into the gutter, on either side or beside the sidebar (creator-analytics
+   issue 350). The bar's own box stays square, so its fill hides what scrolls under its corners
+   once it sticks: a rounded box paints nothing outside its curve, and the page showed through
+   there. The rounded line is the ::before below, and the padding's extra 1px is the width the line
+   would take as the box's own border, so the controls sit where they did (creator-analytics issue
+   461). */
+.controls-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: calc(0.75rem + 1px) calc(1rem + 1px);
+  background: var(--bg);
+}
+
+/* Over the bar's square fill and under its controls: the bar's sticky position and z-index make it
+   the stacking context this -1 paints inside, and its position the box the inset fills. */
+.controls-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  pointer-events: none;
+}
+
+/* On a narrow screen the table scrolls sideways under its headings, the video column fixed at the
+   left. As the page scrolls past the list, a script holds the heading rows under the controls bar
+   (heading-hold.ts). Its own stacking context keeps the fixed column's layer and the moved heading
+   rows below the sticky controls bar. */
+.video-list-scroll {
+  position: relative;
+  z-index: 0;
+  overflow-x: auto;
+}
+
+/* Separate borders: a collapsed border belongs to the table, so the line under the heading rows
+   would stay behind as they move. */
+.video-list table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.9375rem;
+}
+
+.video-list th,
+.video-list td {
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  border-inline-start: 1px solid var(--line);
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Every heading cell moves down by the offset heading-hold.ts writes on the table, so both heading
+   rows and the cells spanning them move as one, on the page's background above the body's rows and
+   their fixed video column. Sideways they still move with their columns. No transition, so the
+   rows never trail the page. */
+.video-list thead th {
+  position: relative;
+  z-index: 2;
+  background: var(--bg);
+  color: var(--ink-soft);
+  font: 500 0.8125rem / 1.3 var(--font-body);
+  transform: translateY(var(--heading-offset, 0px));
+}
+
+.sortable-heading {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.sortable-heading:hover {
+  color: var(--ink);
+}
+
+.video-list td {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Opaque, so the cells scrolling under the fixed column do not show through, and above them. The
+   first heading row's first cell only: with the revenue sources shown, the second heading row's
+   first cell is Ads. Every other column heading and its cells are centered; the video column stays
+   at the start. The second column's line slides under the fixed column as the list scrolls
+   sideways, so the fixed column draws the line after it as a shadow, which lies over that line's
+   pixel at rest and adds no width to the column the thumbnail sizes are worked out from. */
+.video-list thead tr:first-child th:first-child,
+.video-list .video-list-video {
+  text-align: start;
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--bg);
+  box-shadow: 1px 0 0 var(--line);
+}
+
+/* The top left heading cell stays sticky, its selector outranking `.video-list thead th`, and sits
+   above the body's fixed video cells it covers as it moves and the heading cells scrolling under
+   it sideways. */
+.video-list thead tr:first-child th:first-child {
+  z-index: 3;
+}
+
+/* The flex sits on a wrapper, so the cell stays a table cell and sticks. */
+.video-list .video-list-video {
+  min-width: 16rem;
+  font-weight: 500;
+}
+
+.video-list-video-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* A click anywhere on a row opens its video; its text stays selectable. */
+.video-list-row {
+  cursor: pointer;
+}
+
+.video-list-row:hover > *,
+.video-list-row.video-list-row-marked > * {
+  background: var(--line);
+}
+
+/* The box a thumbnail and its length mark share; the class beside it sets its width and corners. */
+.thumbnail-frame {
+  position: relative;
+  display: block;
+  overflow: hidden;
+}
+
+.thumbnail {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+/* The video's length at the thumbnail's bottom right, as YouTube shows it. */
+.thumbnail-length {
+  position: absolute;
+  inset-inline-end: 0.25rem;
+  bottom: 0.25rem;
+  padding: 0.0625rem 0.25rem;
+  border-radius: 0.25rem;
+  background: var(--ink);
+  color: var(--bg);
+  font: 500 0.6875rem / 1.2 var(--font-mono);
+}
+
+/* A video with no thumbnail, or one that fails to load, keeps the thumbnail's place, so the rows
+   stay even. */
+.thumbnail-empty {
+  background: var(--line);
+}
+
+/* Its widths here and below 40rem are listThumbnailSizes in thumbnail.ts: keep them in step. */
+.video-list-thumbnail {
+  flex: none;
+  width: 6rem;
+  border-radius: 0.5rem;
+}
+
+.video-list-privacy,
+.video-list-partial {
+  display: block;
+  color: var(--ink-soft);
+  font: 400 0.8125rem / 1.3 var(--font-body);
+}
+
+/* The swatch of a row's launch chart line color, before its title, so the list is the chart's
+   legend. A rect's fill paints it, from its data-launch-position, as the token may be warm-hued. */
+.launch-swatch {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-inline-end: 0.4em;
+  vertical-align: -0.05em;
+  border-radius: 0.15em;
+}
+
+.launch-swatch rect {
+  fill: var(--launch-line);
+}
+
+.video-list .video-list-not-processed,
+.video-list .video-list-no-data {
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+}
+
+.video-list .video-list-not-processed {
+  white-space: normal;
+}
+
+.video-list-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  color: var(--ink-soft);
+}
+
+/* On a narrow screen "Page N of M" takes its own line above the links (Nick, 2026-10-19). `order`
+   moves only the drawing: a screen reader still reads First, Previous, Page N of M, Next, Last. */
+@media (max-width: 40rem) {
+  .video-list-pager .video-list-pager-place {
+    order: -1;
+    flex-basis: 100%;
+  }
+}
+
+/* Views with its switch off: a wide screen leaves it out, and a narrow one shows it on every row. */
+.video-list .video-list-narrow-only {
+  display: none;
+}
+
+/* A narrower fixed column, so at 375 pixels it leaves room for the numbers scrolling beside it. The
+   thumbnail stacks above the title and takes the column's width, as on the video page, so the
+   title has the whole column and wraps to fewer lines (Nick, browser walk, 2026-10-11). */
+@media (max-width: 40rem) {
+  .video-list .video-list-video {
+    min-width: 10rem;
+  }
+
+  .video-list .video-list-narrow-only {
+    display: table-cell;
+  }
+
+  .video-list-video-cell {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .video-list-thumbnail {
+    width: 100%;
+  }
+}
+
+.video-detail {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.video-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 1rem;
+}
+
+.video-detail-head > div {
+  display: grid;
+  flex: 1 1 14rem;
+  gap: 0.5rem;
+}
+
+/* The title's column, beside the thumbnail or under it, whose width the title's place reads. The
+   thumbnail's placeholder is a div of the head too, and not the column. */
+.video-detail-head > div:not(.placeholder) {
+  container: head-text / inline-size;
+}
+
+/* The video's title is the screen's h1, at the size of the app's h2. */
+.video-detail-head h1 {
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+/* Its widths here and below 40rem are detailThumbnailSizes in thumbnail.ts: keep them in step. */
+.video-detail-thumbnail {
+  flex: none;
+  width: 10rem;
+  max-width: 100%;
+  border-radius: 0.75rem;
+}
+
+/* On a narrow screen, a content width of about 36rem, the thumbnail stacks above the title and
+   takes the whole width. */
+@media (max-width: 40rem) {
+  .video-detail-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* A definite width: the column is a size container, whose width its content cannot give, and
+     Chrome found a stacked column's height at no width, as tall as a title of one word a line,
+     until it had one (creator-analytics issue 477). */
+  .video-detail-head > div {
+    flex: none;
+    width: 100%;
+  }
+
+  .video-detail-thumbnail {
+    width: 100%;
+  }
+}
+
+/* The landed sections' one element, which the placeholders' takes the place of while a step is
+   read (VideoDetailScreen). Its sections are the screen's grid items, at its 1.5rem gap. */
+.video-detail-sections {
+  display: contents;
+}
+
+.video-detail-section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* The audience retention section below its heading: the video player, when the video
+   has one, then the pair of retention charts, a grid at the section's gap, so stacked they space
+   as the section does. The player stands 1.5rem from the pair, above it or beside it, so it reads
+   apart from the first plot (creator-analytics issue 685). Both are always in the page, so the
+   player's place never changes and its frame never reloads (creator-analytics issue 645). */
+.retention-body {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.retention-pair {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+/* From the width the stacked charts show at (stacked-charts.ts), the player takes a column beside
+   the pair, so the video and both plots are in view together; below it, the player sits above
+   the pair (creator-analytics issue 648). The player's column is half the body less half the gap,
+   never wider than the player's own 40rem cap, and the charts take the rest: equal columns alone
+   left a wide gap beside the capped player on a 2560px window (creator-analytics issue 685). */
+@media (min-width: 60rem) {
+  .retention-body-with-player {
+    grid-template-columns: minmax(0, min(40rem, calc(50% - 0.75rem))) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+/* Where the stacked charts show, the player sticks in its column as the page scrolls, so it stays
+   in view beside the relative retention plot whose click moves it (creator-analytics issue 685).
+   It sticks 1rem under the controls bar, which sticks at the top over everything below it, so the
+   bar is never drawn over the player: the video screen writes the bar's height, which wraps on a
+   narrow window (bar-height.ts). Until it has, the property is unset, top falls back to
+   auto and the player does not stick. Only from 45rem tall, so the player never sticks with its
+   foot below the window: a video's box is at most 22.5rem tall (40rem at 16:9) and a Short's at
+   most 60% of the window's height, which leaves at least 17rem above it for the bar and the 1rem.
+   The bar measured 94px, under 6rem, in Chrome at 960px, 1280px and 2560px wide. */
+@media (min-width: 60rem) and (min-height: 45rem) {
+  .retention-body-with-player > .video-player {
+    position: sticky;
+    top: calc(var(--controls-bar-height) + 1rem);
+  }
+}
+
+/* The video player's box, one element before and after the player is ready, so the player shows
+   where its thumbnail stood and nothing moves (creator-analytics issues 645 and 684). Its widths are playerThumbnailSizes
+   in thumbnail.ts: keep them in step. It is never smaller than 200 by 200 pixels, Google's minimum
+   for an embedded player: a narrower box grows taller than 16:9, and YouTube letterboxes the video
+   (creator-analytics issue 648). */
+.video-player {
+  position: relative;
+  width: 100%;
+  max-width: 40rem;
+  min-width: 200px;
+  min-height: 200px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: var(--line);
+}
+
+/* A Short's box is 9:16, its height stopping at 60% of the window's, centred in its column. On a
+   window too short for that, Google's 200 by 200 minimum wins and the box grows wider than 9:16
+   (creator-analytics issue 648). */
+.video-player-short {
+  aspect-ratio: 9 / 16;
+  width: min(100%, calc(60vh * 9 / 16));
+  max-height: 60vh;
+  margin-inline: auto;
+}
+
+/* The player's frame and the thumbnail each fill the whole box. The thumbnail comes after the frame,
+   so it is drawn over it until the player is ready, and then goes (creator-analytics issue 684). */
+.video-player-thumbnail,
+.video-player-frame,
+.video-player-frame > iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.video-player-thumbnail > .thumbnail {
+  height: 100%;
+}
+
+.video-player-frame > iframe {
+  border: 0;
+}
+
+/* The line and the Watch on YouTube link for a video that cannot play, on a panel inside the box
+   over the thumbnail's foot, so they add nothing to the box's height. */
+.video-player-cannot-play {
+  position: absolute;
+  inset-inline: 0.75rem;
+  bottom: 0.75rem;
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 0.8125rem / 1.4 var(--font-body);
+}
+
+/* Traffic sources and the subscriber split, which share a row: each column at least 18rem, so the
+   two sit side by side on a wide screen and stack on a narrow one (creator-analytics issues 158 and
+   192). auto-fit lets the other take the row when a section shows nothing. Stacked, the sections
+   keep the page's 1.5rem gap; side by side, the columns take twice it, so each reads as its own
+   section. */
+.video-detail-breakdowns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  row-gap: 1.5rem;
+  column-gap: 3rem;
+  align-items: start;
+}
+
+/* A breakdowns column, whose width its heading's place reads, so the place follows the column and
+   not the window or the sidebar (creator-analytics issue 512). */
+.video-detail-breakdowns > .video-detail-section {
+  container: video-breakdown / inline-size;
+}
+
+/* The Audience screen's eight sections, each in a Card (components/ui/card.tsx), packed by height
+   into one container per column (audience-columns.ts, Audience.tsx). The count is the breakdowns'
+   18rem column rule above, as many 18rem columns as fit with 1rem between them and at least one,
+   and each flex column takes an equal share, so a column is as wide as the CSS columns of
+   creator-analytics issue 689 made it and every audience-card breakpoint holds. Bordered cards
+   need less room between them than the breakdowns' borderless columns, so 1rem between the columns
+   and the cards, the channel summary cards' gap. In one column the cards keep the DOM order. In two
+   or more the tallest card goes first, each into the column shortest at that moment, the leftmost
+   on a tie, and each column keeps the DOM order, so a short card no longer sits alone in a mostly
+   blank column (creator-analytics issue 711, at a 1512px window on staging). Each column is a
+   container of its own, so the reading and focus order runs down the first column, then the next,
+   and no card is absolutely positioned. The placeholder packs to the same columns only while each
+   place is as tall as its card (creator-analytics issue 510), since a taller or shorter place can
+   move a card to another column. */
+.audience-grid {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.audience-column {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* A card's content box, whose width its notes' places read. */
+.audience-column > [data-slot="card"] {
+  container: audience-card / inline-size;
+}
+
+/*
+ * The previous and next video, in the head and after the last section: two fixed places, previous
+ * at the start and next at the end, so a missing link's place is held and the other link stays.
+ */
+.video-stepper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.video-stepper-next {
+  justify-self: end;
+}
+
+.video-stepper-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* A refused list page holding the video fails both places, so its one failure spans the stepper. */
+.video-stepper-whole {
+  grid-column: 1 / -1;
+}
+
+/* In the head, under the thumbnail and the title at the head's whole width. */
+.video-detail-head > .video-stepper {
+  flex: none;
+  width: 100%;
+}
+
+/* A section's heading, as the visual system writes an h3, and smaller than the app's h2. */
+.video-detail-section h2 {
+  font-size: 1.125rem;
+  letter-spacing: -0.03em;
+}
+
+/* A sub-header inside a section, such as "Relative retention", in the body's font, a step apart
+   from the chart above. */
+.video-detail-section h3 {
+  margin: 0.75rem 0 0;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: inherit;
+  letter-spacing: normal;
+  text-wrap: wrap;
+}
+
+/* The SVG stretches to the chart's box; each stroke keeps its width as it stretches. */
+.chart {
+  position: relative;
+  padding-inline-start: 3rem;
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  height: 10rem;
+  overflow: visible;
+}
+
+.chart-label {
+  position: absolute;
+  left: 0;
+  transform: translateY(-50%);
+  color: var(--ink-soft);
+  font: 400 0.75rem / 1 var(--font-mono);
+}
+
+/* The plot a chart's hover card sits over. */
+.chart-plot {
+  position: relative;
+}
+
+/* The card inside the library's tooltip, which places it beside the line at the card's point. Its
+   max-width is the tooltip's width, which `.cursor-plot .ts-chart-tooltip` holds inside the plot,
+   so a card wider than the plot, such as the relative card at 375px, wraps inside it. */
+.chart-hover-card {
+  width: max-content;
+  max-width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.375rem;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.chart-hover-card p {
+  margin: 0;
+}
+
+.chart-hover-title {
+  color: var(--ink-soft);
+}
+
+.chart-hover-title,
+.chart-hover-value {
+  font-family: var(--font-mono);
+}
+
+/* A wrapping card breaks between a label and its value, never inside the value. */
+.chart-hover-value {
+  white-space: nowrap;
+}
+
+/* A plot TanStack Charts draws: as tall as the hand-drawn plot, with its tooltip a bare surface,
+   since the card inside it draws its own border and background. */
+.cursor-plot {
+  height: 10rem;
+  --ts-chart-tooltip-background: transparent;
+  --ts-chart-tooltip-border: none;
+  --ts-chart-tooltip-padding: 0;
+  --ts-chart-tooltip-shadow: none;
+  --ts-chart-tooltip-font: inherit;
+}
+
+/* The library sets max-width: none on the tooltip's own style whenever a custom body renders, so
+   the card's max-width would measure a box only as wide as the card. The library keeps a tooltip
+   8px from each edge of the plot (its placement's edge), so a tooltip no wider than the plot less
+   16px is always placed wholly inside it. */
+.cursor-plot .ts-chart-tooltip {
+  /* biome-ignore lint/complexity/noImportantStyles: the library sets max-width: none on the element's own style. */
+  max-width: calc(100% - 16px) !important;
+}
+
+.cursor-plot-chart {
+  height: 100%;
+}
+
+/* The playhead on a retention plot, at the time the video player is at: a thin line the full
+   height of the plot, centred on its x, which the app sets as its left. It comes before the
+   library's positioned host in the plot, so the crosshair and the card paint over it, and it takes
+   no pointer, so a mouse, a pen and a tap reach the plot under it. It moves in steps, as the
+   player's time is read, with no motion between them. */
+.retention-playhead {
+  position: absolute;
+  inset-block: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--accent);
+  pointer-events: none;
+}
+
+/* An upload day's line on a metric plot, at the day's x, which the app sets as its left: a faint
+   dashed line the full height of the plot in the axis's ink, through `text-muted-foreground`. It
+   comes before the library's positioned host in the plot, so the series and the cursor paint over
+   it, and it takes no pointer, so a mouse, a pen and a tap reach the plot under it. */
+.upload-day-line {
+  position: absolute;
+  inset-block: 0;
+  width: 0;
+  border-inline-start: 1px dashed currentColor;
+  opacity: 0.35;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* The history start on the impressions and CTR plots, at the first held day's x, which the app
+   sets as its left: a solid line the full height of the plot in the axis's ink, with its short
+   label at the top, after it. Like an upload day's line it sits under the series and the cursor
+   and takes no pointer. */
+.history-start-line {
+  position: absolute;
+  inset-block: 0;
+  width: 0;
+  border-inline-start: 1px solid currentColor;
+  opacity: 0.6;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.history-start-label {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0.25rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* The charts stack on one x axis. */
+.metric-chart {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.metric-chart ~ .metric-chart {
+  margin-block-start: 0.75rem;
+}
+
+/* Each list row's swatch, and each row's swatch in the launch chart's card, takes its row
+   position's color, from the shared sheet's tokens, through data-launch-position: no inline color
+   style, so the content security policy holds. The chart's lines take the same tokens in
+   launch-plot.ts. */
+[data-launch-position="1"] {
+  --launch-line: var(--launch-line-1);
+}
+
+[data-launch-position="2"] {
+  --launch-line: var(--launch-line-2);
+}
+
+[data-launch-position="3"] {
+  --launch-line: var(--launch-line-3);
+}
+
+[data-launch-position="4"] {
+  --launch-line: var(--launch-line-4);
+}
+
+[data-launch-position="5"] {
+  --launch-line: var(--launch-line-5);
+}
+
+[data-launch-position="6"] {
+  --launch-line: var(--launch-line-6);
+}
+
+[data-launch-position="7"] {
+  --launch-line: var(--launch-line-7);
+}
+
+[data-launch-position="8"] {
+  --launch-line: var(--launch-line-8);
+}
+
+[data-launch-position="9"] {
+  --launch-line: var(--launch-line-9);
+}
+
+[data-launch-position="10"] {
+  --launch-line: var(--launch-line-10);
+}
+
+/* The launch chart's card lists every drawn video at the day, one line a row: the swatch, the
+   title cut short with an ellipsis, as the list beside it holds the full titles, and the number
+   at the right. The card sits under the plot rather than over it, as with ten rows it is taller
+   than the plot: the library's tooltip places it there (launch-plot.ts). */
+.launch-card-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The library's tooltip shifts a box taller than the plot back inside it, over the lines, so the
+   launch chart's card is held under the plot here, over the top the library sets on the element.
+   The library still sets its left, beside the selected day. */
+.launch-chart .ts-chart-tooltip {
+  /* biome-ignore lint/complexity/noImportantStyles: the library sets the top on the element's own style. */
+  top: calc(100% + 0.25rem) !important;
+}
+
+.launch-card-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 0.75em;
+}
+
+.launch-card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.launch-card-row-selected {
+  font-weight: 700;
+}
+
+/* "No data" reads muted, as the list shows a missing value. */
+.launch-card-no-data {
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+}
+
+/* A swatch in the card keeps its own size, over the chart's rule that stretches its SVG. */
+.chart .launch-swatch {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-inline-end: 0;
+}
+
+/* The two lines differ in dash as well as colour, so neither depends on colour alone. */
+.views-chart-engaged {
+  stroke: var(--accent);
+}
+
+.views-chart-views {
+  stroke: var(--ink-soft);
+  stroke-dasharray: 6 4;
+}
+
+.views-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+}
+
+.views-chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.views-chart-key {
+  display: inline-block;
+  width: 1.5rem;
+}
+
+.views-chart-key-engaged {
+  border-top: 2px solid var(--accent);
+}
+
+.views-chart-key-views {
+  border-top: 2px dashed var(--ink-soft);
+}
+
+.metric-charts-modes {
+  display: flex;
+  gap: 0.5rem;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.app .metric-charts-modes .button {
+  padding: 0.5rem 1rem;
+  font-size: 0.9375rem;
+}
+
+.metric-charts-modes .button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Each retention chart's explanation, under its time axis: muted text with no tint, so the plots
+   start at the section's heading, level with the video player beside them. Nick chose a caption
+   over the note above each chart (creator-analytics issue 637, 2026-11-12). The video screen's
+   "stored up to" line under its impressions table is the same caption, not a note
+   (creator-analytics issue 1042). */
+.retention-caption,
+.traffic-reach-caption {
+  max-width: var(--reading-width);
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+/* The retention comparison (creator-analytics issue 951): the intro with its note at half the
+   screen's gap, the chart over its legend, then the picker. The legend lists its entries, each a
+   swatch of its line's colour, the video's title and its read date, muted; a long title wraps
+   rather than widening the page at 375px. The empty chart holds the plot's height, and the
+   legend's place holds 5 one-line entries, so a pick moves nothing below them
+   (creator-analytics issue 1049). */
+.comparison-header {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.comparison-intro,
+.comparison-note,
+.comparison-limit {
+  max-width: var(--reading-width);
+}
+
+.comparison-note,
+.comparison-limit {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.comparison-chart-section,
+.comparison-picker {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.comparison-chart-empty {
+  display: grid;
+  place-items: center;
+  height: 10rem;
+  margin: 0;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.comparison-legend-place {
+  min-height: calc(5 * 1lh + 4 * 0.5rem);
+  font-size: 0.9375rem;
+}
+
+.comparison-legend {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comparison-legend li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.comparison-legend-detail {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.comparison-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem 1.5rem;
+}
+
+.comparison-videos {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.comparison-videos li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-block: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.comparison-videos label {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.comparison-video-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+/* The retention charts' time axis shares the metric charts', lined up under the plot. */
+.metric-charts-axis,
+.retention-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-inline-start: 3rem;
+  color: var(--ink-soft);
+  font: 400 0.75rem / 1 var(--font-mono);
+}
+
+/* The upload markers under the metric charts' axis, lined up with the plots after the scale
+   labels' 3rem, each at its day's place across the plot (a React style `left`). Every marker
+   draws in the axis's ink, so shape is the cue, not colour. The `.upload-marker` rule paints that
+   ink itself: the visual system's unlayered `a { color: inherit }` outranks a utility on a single
+   upload's `<a>`. */
+.upload-markers {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  padding-inline-start: 3rem;
+  border: 0;
+}
+
+.upload-markers-track {
+  position: relative;
+  height: 1.5rem;
+}
+
+/* Every marker, a single upload's and a tile, is one framed rounded square in its own ink, so it
+   reads as a control. The width is `uploadMarkerRem`, the width the markers join at. */
+.upload-marker {
+  position: absolute;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: 0.25rem;
+  color: var(--ink-soft);
+  background: none;
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+
+/* A hovered marker's frame darkens to the body's ink, over the faint fill the app hovers in. */
+.upload-marker:hover {
+  border-color: var(--ink);
+  background: var(--line);
+}
+
+.upload-marker:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.upload-marker-shape {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+/* A day of more uploads, or markers on nearby days that would overlap: their count in the
+   marker's own frame, with no second border inside it. */
+.upload-marker-tile {
+  font: 400 0.6875rem / 1 var(--font-mono);
+}
+
+.upload-marker-card ul {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upload-marker-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 0.5rem;
+  color: var(--ink);
+  font-size: 0.875rem;
+}
+
+.upload-marker-date {
+  grid-column: 2;
+  color: var(--ink-soft);
+  font: 400 0.75rem / 1.4 var(--font-mono);
+}
+
+.bars {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 1rem;
+  font-size: 0.9375rem;
+}
+
+/* A bar's name keeps to one line, cut short with an ellipsis, in every bar list: a publish day
+   title, as the launch chart card's titles are and as the list under the summary holds the full
+   titles, and a country, US state, city, traffic source or any other name, which a screen reader
+   still hears whole. Its place shows before any name is known and holds one line, so a name that
+   wrapped would make its row taller than its place and move what is under the bars: "South Georgia
+   & South Sandwich Islands" took two lines in an Audience card at 320px to 1440px
+   (creator-analytics issues 469 and 511). The name's column above may be narrower than the name,
+   or a grid item's automatic minimum width keeps it at the name's. */
+.bars-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bars-number {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-track {
+  display: block;
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 0.5rem;
+}
+
+.bar {
+  fill: var(--accent);
+}
+
+.bar-rest {
+  fill: var(--line);
+}
+
+.numbers-table table,
+.since-publish table,
+.traffic-reach table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.numbers-table table th,
+.numbers-table table td,
+.since-publish table th,
+.since-publish table td,
+.traffic-reach table th,
+.traffic-reach table td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  border-inline-start: 1px solid var(--line);
+  text-align: start;
+}
+
+/* A line between every pair of columns, in every table: each cell draws the line before it, so a
+   sticky row or column keeps its lines as it moves, and the first column has none. Only the first
+   heading row's first cell starts the first column: with the revenue sources shown, the second
+   heading row's first cell is the first source, after Revenue or RPM. */
+.video-list tbody tr > :first-child,
+.numbers-table tbody tr > :first-child,
+.numbers-table tfoot tr > :first-child,
+.since-publish tbody tr > :first-child,
+.traffic-reach tbody tr > :first-child,
+.video-list thead tr:first-child > :first-child,
+.numbers-table thead tr:first-child > :first-child,
+.since-publish thead tr:first-child > :first-child,
+.traffic-reach thead tr:first-child > :first-child {
+  border-inline-start: 0;
+}
+
+/* Every column heading and the numbers under it are centered; the first column, the date or the
+   stage, stays at the start. */
+.numbers-table thead th,
+.numbers-table table td,
+.since-publish thead th,
+.since-publish table td,
+.traffic-reach thead th,
+.traffic-reach table td {
+  text-align: center;
+}
+
+.numbers-table thead tr:first-child th:first-child {
+  text-align: start;
+}
+
+.numbers-table thead th,
+.since-publish thead th,
+.traffic-reach thead th {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.numbers-table tbody th,
+.since-publish tbody th,
+.traffic-reach tbody th {
+  font-weight: 400;
+}
+
+.numbers-table table td,
+.since-publish table td,
+.traffic-reach table td {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The charts' numbers: exactly its heading rows, ten body rows and the total row tall (--rows,
+   numbersTableBoxRowsOf), each a row of its 0.875rem text at line height 1.4, its
+   0.4rem padding above and below and its 1px line, and its 1px border. A window of fewer days is as
+   tall as its rows. A heading that wraps takes a second line, and the box then shows a little less
+   than ten body rows. */
+/* Its own stacking context keeps the sticky heading and total rows below the sticky controls bar,
+   which comes first in the page at the same z-index. */
+.numbers-table {
+  position: relative;
+  z-index: 0;
+  max-height: calc(var(--rows) * (0.875rem * 1.4 + 0.8rem + 1px) + 2px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+
+/* Separate borders: a collapsed border belongs to the table, so the line under the sticky heading row would scroll away. */
+.numbers-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+  line-height: 1.4;
+}
+
+.numbers-table table th,
+.numbers-table table td {
+  padding-inline: 0.75rem;
+}
+
+/* The heading rows stay in view at the top while the days scroll, and the total row at the
+   bottom, each on the page's own background, as the controls bar is. */
+.numbers-table thead,
+.numbers-table tfoot {
+  position: sticky;
+  z-index: 1;
+}
+
+.numbers-table thead {
+  top: 0;
+}
+
+.numbers-table tfoot {
+  bottom: 0;
+}
+
+.numbers-table thead th,
+.numbers-table tfoot th,
+.numbers-table tfoot td {
+  background: var(--bg);
+}
+
+/* Its line above it, as the line under the last day scrolls away behind it. */
+.numbers-table tfoot th,
+.numbers-table tfoot td {
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+  font-weight: 500;
+}
+
+/* A still block where an answer will show, about the size of what it stands in for. It never
+   animates and has no transition (creator-analytics#71), and its one colour is a visual system
+   token. */
+.placeholder {
+  border-radius: 0.5rem;
+  background: var(--line);
+}
+
+/* One card's place (.cards --card-place), which every card keeps as its least height, so a row of
+   cards is as tall as its placeholders at any width. */
+.placeholder-card {
+  height: var(--card-place);
+  border-radius: 1rem;
+}
+
+/* A figure's label above its 1.75rem number, or its 1.125rem number among the smaller figures. */
+.placeholder-figure {
+  width: 8rem;
+  height: calc(0.875rem * 1.6 + 1.75rem * 1.2);
+}
+
+.figures-smaller .placeholder-figure {
+  height: calc(0.875rem * 1.6 + 1.125rem * 1.2);
+}
+
+/* A line of a section's heading: `.video-detail-section h2`'s 1.125rem at the visual system's h2
+   line height 1.05, so each section holds still when its answer lands (creator-analytics issue
+   468). The video head's title place below overrides it with the h1's lines, and the Audience
+   cards' headings and a video's subscriber split heading have their own places further down. */
+.placeholder-heading {
+  width: min(12rem, 100%);
+  height: calc(1.125rem * 1.05);
+}
+
+/* The charts' mode buttons: their 0.9375rem text at line height 1, their padding and border. */
+.placeholder-toolbar {
+  width: min(14rem, 100%);
+  height: calc(0.9375rem + 1rem + 2px);
+}
+
+/* The engaged views chart's legend, a line of its 0.9375rem text. */
+.placeholder-legend {
+  width: min(14rem, 100%);
+  height: calc(0.9375rem * 1.6);
+}
+
+.placeholder-chart {
+  height: 10rem;
+}
+
+.placeholder-axis {
+  height: 0.75rem;
+}
+
+/* The charts' numbers table: a row of its 0.875rem text at line height 1.4, its 0.4rem padding
+   above and below and its 1px line, for each row the window is expected to show (--rows,
+   numbersTableRowsOf, at most the box's own), and its 1px border, as .numbers-table. */
+.placeholder-table {
+  height: calc(var(--rows) * (0.875rem * 1.4 + 0.8rem + 1px) + 2px);
+  border-radius: 0.75rem;
+}
+
+/* The since publish table: a row of its 0.875rem text at the body's line height 1.6, its 0.4rem
+   padding above and below and its 1px line, for each row (--rows). It has no box, so no border. */
+.placeholder-since-publish-table {
+  height: calc(var(--rows) * (0.875rem * 1.6 + 0.8rem + 1px));
+}
+
+.placeholder-thumbnail {
+  flex: none;
+  width: 6rem;
+  aspect-ratio: 16 / 9;
+}
+
+/* As .video-list-thumbnail stacks above the title on a narrow screen. The title's place holds the
+   3 lines of the table's 0.9375rem text at line height 1.6 that most titles wrap to in the 10rem
+   column: measured 2026-10-11 in headless Chromium with the built stylesheet and its fonts, no
+   scrollbar, seventeen titles of 48 to 58 characters, 3 lines for fourteen and 4 for three at every
+   width from 320px to 640px, since the column keeps its least width there. */
+@media (max-width: 40rem) {
+  .video-list .placeholder-thumbnail {
+    width: 100%;
+  }
+
+  .video-list .placeholder-line {
+    width: 100%;
+    height: calc(3 * 0.9375rem * 1.6);
+  }
+}
+
+.placeholder-line {
+  width: min(16rem, 100%);
+  height: 1rem;
+}
+
+/* Its own flex: none, since `.video-detail-head > div`, the text column's rule, matches it too and
+   outranks `.placeholder-thumbnail`. */
+.video-detail-head .placeholder-thumbnail {
+  flex: none;
+  width: 10rem;
+  max-width: 100%;
+  border-radius: 0.75rem;
+}
+
+/* Stacked above the title on a narrow screen, as .video-detail-thumbnail. */
+@media (max-width: 40rem) {
+  .video-detail-head .placeholder-thumbnail {
+    width: 100%;
+  }
+}
+
+/* Every placeholder below that holds the lines a text wraps to holds them in the box the text
+   wraps in, a size container, so its lines follow that box's width and not the window's: the
+   same beside the open 14rem sidebar, the collapsed 3rem one and none. The steps are each
+   container's width, measured on 2026-11-06 in headless Chrome with Switzer and the built
+   stylesheet, with no scrollbar taking width, at every window width from 320px to 2560px in 1px
+   steps and at 3000px, beside the open sidebar and the collapsed one
+   (docs/reviews/creator-analytics-268/repro/collapsed-sidebar-placeholders.sh, which prints each
+   step and the roundest breakpoint between the widths measured either side of it, taken down or
+   to the nearest 64th of a px, the grain Chrome compares a container's width at,
+   creator-analytics issue 477). A classic scrollbar, as on Windows, narrows a container and the
+   text in it alike, so a place still holds its text's lines there.
+
+   The head's title, lines of the h1's 1.5rem at line height 1.05, and its Watch on YouTube link, a
+   line of body text. The title holds the lines half of sixteen typical titles of 48 to 58
+   characters fit in, five of the channel's own and eleven in their style, which the repro script
+   holds. In the head's text column, beside the 10rem thumbnail or stacked under it: 3 lines below
+   298px (18.625rem), 2 from it and 1 from 541.12px (33.82rem). */
+.video-detail-head .placeholder-heading {
+  --lines: 3;
+  height: calc(var(--lines) * 1.5rem * 1.05);
+}
+
+@container head-text (min-width: 18.625rem) {
+  .video-detail-head .placeholder-heading {
+    --lines: 2;
+  }
+}
+
+@container head-text (min-width: 33.82rem) {
+  .video-detail-head .placeholder-heading {
+    --lines: 1;
+  }
+}
+
+.video-detail-head .placeholder-line {
+  height: calc(1.0625rem * 1.6);
+}
+
+/* A quiet button's place, such as "Show revenue sources": its 1rem text at line height 1, its
+   padding and its border, as .app .button sets them. 13.5rem wide: "Show revenue sources", the
+   wider of its two labels, measured 216px in headless Chromium with the built stylesheet and its
+   fonts on 2026-10-10, and "Hide revenue sources" 208px. */
+.placeholder-button {
+  width: min(13.5rem, 100%);
+  height: calc(1rem + 1.6rem + 2px);
+  border-radius: 999px;
+}
+
+/* A note's place: lines of its 0.9375rem text at line height 1.6, as many as the note wraps to in
+   the signed-in screen, and the 0.5rem padding above and below them. Past the 44rem reading width
+   a note stops widening, so each holds the lines it takes there from then on.
+   .placeholder-note holds the note on how current the numbers are, under the charts, as many
+   lines as the longest of them, the 106 character note of September 30: 4 lines in a screen below
+   293px (18.3125rem), 3 from it and 2 from 399px (24.9375rem); at the reading width it still wraps
+   to 2. A shorter month can drop a line just short of a step, so what follows can move up a line
+   there.
+   .placeholder-total-note holds the 93 character running total note under the charts: 3 lines
+   below 321px (20.0625rem), 2 from it and 1 from 616px (38.5rem). */
+.placeholder-note,
+.placeholder-total-note {
+  width: min(24rem, 100%);
+  height: calc(var(--lines) * 0.9375rem * 1.6 + 1rem);
+}
+
+.placeholder-note {
+  --lines: 4;
+}
+
+.placeholder-total-note {
+  --lines: 3;
+}
+
+@container signed-in-screen (min-width: 18.3125rem) {
+  .placeholder-note {
+    --lines: 3;
+  }
+}
+
+@container signed-in-screen (min-width: 20.0625rem) {
+  .placeholder-total-note {
+    --lines: 2;
+  }
+}
+
+@container signed-in-screen (min-width: 24.9375rem) {
+  .placeholder-note {
+    --lines: 2;
+  }
+}
+
+@container signed-in-screen (min-width: 38.5rem) {
+  .placeholder-total-note {
+    --lines: 1;
+  }
+}
+
+/* The launch chart's first-10 note's place, under its axis when the page size holds more than 10
+   rows: lines of the 65 character note "The chart shows the first 10 videos on this page that have
+   data.", as .placeholder-note sizes a line, 2 lines in a screen below 445px (27.8125rem) and 1
+   from it, measured with the notes above (creator-analytics issues 314, 311 and 477). */
+.placeholder-first-rows-note {
+  --lines: 2;
+  width: min(28rem, 100%);
+  height: calc(var(--lines) * 0.9375rem * 1.6 + 1rem);
+}
+
+@container signed-in-screen (min-width: 27.8125rem) {
+  .placeholder-first-rows-note {
+    --lines: 1;
+  }
+}
+
+/* The launch chart's running total note's place, under its axis in running total mode: lines of
+   the 99 character note "The running total adds the daily numbers, so its last point can differ
+   from the totals in the list.", as .placeholder-note sizes a line, 3 lines in a screen below 334px
+   (20.875rem), 2 from it and 1 from 633px (39.5625rem), measured with the notes above
+   (creator-analytics issues 324 and 477). */
+.placeholder-launch-total-note {
+  --lines: 3;
+  width: min(24rem, 100%);
+  height: calc(var(--lines) * 0.9375rem * 1.6 + 1rem);
+}
+
+@container signed-in-screen (min-width: 20.875rem) {
+  .placeholder-launch-total-note {
+    --lines: 2;
+  }
+}
+
+@container signed-in-screen (min-width: 39.5625rem) {
+  .placeholder-launch-total-note {
+    --lines: 1;
+  }
+}
+
+/* The revenue sources' other sources note's place, under the numbers table once a revenue sources
+   choice is saved: lines of the 53 character note "Other sources include channel memberships and
+   Supers.", as .placeholder-note sizes a line, 2 lines in a screen below 411px (25.6875rem) and 1
+   from it, measured with the notes above (creator-analytics issue 509). */
+.placeholder-other-sources-note {
+  --lines: 2;
+  width: min(25.5rem, 100%);
+  height: calc(var(--lines) * 0.9375rem * 1.6 + 1rem);
+}
+
+@container signed-in-screen (min-width: 25.6875rem) {
+  .placeholder-other-sources-note {
+    --lines: 1;
+  }
+}
+
+/* The Audience screen's notes' places, each as a note's place above, in the content box of its
+   card, which the 18rem columns keep under 37rem whatever the window, so under the
+   reading width. Measured with the notes above, a card's content box from 238px to 549.56px. The
+   countries note takes 4 lines below 262.56px (16.41rem), 3 from it and 2 from 374.08px
+   (23.38rem). The US states note takes 4 below 259.04px (16.19rem), 3 from it and 2 from 376.64px
+   (23.54rem). The cities note takes 4 below 250.24px (15.64rem), 3 from it and 2 from 346.48px
+   (21.655rem). The every format note, under the US states and the cities, takes 2 below 263.8448px
+   (16.4903rem) and 1 from it. The gender note takes 3 below 246px (15.375rem), 2 from it and 1 from
+   448.48px (28.03rem) (creator-analytics issues 326, 350 and 477). */
+.placeholder-countries-note,
+.placeholder-us-states-note,
+.placeholder-cities-note,
+.placeholder-every-format-note,
+.placeholder-gender-note {
+  width: min(24rem, 100%);
+  height: calc(var(--lines) * 0.9375rem * 1.6 + 1rem);
+}
+
+.placeholder-countries-note,
+.placeholder-us-states-note,
+.placeholder-cities-note {
+  --lines: 4;
+}
+
+.placeholder-gender-note {
+  --lines: 3;
+}
+
+.placeholder-every-format-note {
+  --lines: 2;
+}
+
+@container audience-card (min-width: 15.375rem) {
+  .placeholder-gender-note {
+    --lines: 2;
+  }
+}
+
+@container audience-card (min-width: 15.64rem) {
+  .placeholder-cities-note {
+    --lines: 3;
+  }
+}
+
+@container audience-card (min-width: 16.19rem) {
+  .placeholder-us-states-note {
+    --lines: 3;
+  }
+}
+
+@container audience-card (min-width: 16.41rem) {
+  .placeholder-countries-note {
+    --lines: 3;
+  }
+}
+
+@container audience-card (min-width: 16.4903rem) {
+  .placeholder-every-format-note {
+    --lines: 1;
+  }
+}
+
+@container audience-card (min-width: 21.655rem) {
+  .placeholder-cities-note {
+    --lines: 2;
+  }
+}
+
+@container audience-card (min-width: 23.38rem) {
+  .placeholder-countries-note {
+    --lines: 2;
+  }
+}
+
+@container audience-card (min-width: 23.54rem) {
+  .placeholder-us-states-note {
+    --lines: 2;
+  }
+}
+
+@container audience-card (min-width: 28.03rem) {
+  .placeholder-gender-note {
+    --lines: 1;
+  }
+}
+
+/* The Audience screen's headings' places: lines of the section heading's 1.125rem text at the h2's
+   line height 1.05, in the content box of its card, as the notes' places above. Measured in
+   headless Chrome on 2026-11-06 with Cabinet Grotesk and the built sheet, no scrollbar, by
+   docs/reviews/creator-analytics-268/repro/collapsed-sidebar-placeholders.sh, at every window
+   width from 320px to 2560px and at 3000px, beside the open sidebar and the collapsed one, a card's
+   content box from 238px to 549.56px. The countries, US states, cities, age, devices headings take
+   1 line at every width. The gender heading takes 2 below 265.776px (16.611rem) and 1 from it. The
+   operating systems heading takes 2 below 265.312px (16.582rem) and 1 from it. The subscriber
+   split's heading takes 2 below 373px (23.3125rem) and 1 from it (creator-analytics issues 326, 350
+   and 463). */
+.placeholder-countries-heading,
+.placeholder-us-states-heading,
+.placeholder-cities-heading,
+.placeholder-age-heading,
+.placeholder-gender-heading,
+.placeholder-devices-heading,
+.placeholder-operating-systems-heading,
+.placeholder-subscribers-heading {
+  width: min(12rem, 100%);
+  height: calc(var(--lines) * 1.125rem * 1.05);
+}
+
+.placeholder-countries-heading,
+.placeholder-us-states-heading,
+.placeholder-cities-heading,
+.placeholder-age-heading,
+.placeholder-devices-heading {
+  --lines: 1;
+}
+
+.placeholder-gender-heading,
+.placeholder-operating-systems-heading,
+.placeholder-subscribers-heading {
+  --lines: 2;
+}
+
+@container audience-card (min-width: 16.582rem) {
+  .placeholder-operating-systems-heading {
+    --lines: 1;
+  }
+}
+
+@container audience-card (min-width: 16.611rem) {
+  .placeholder-gender-heading {
+    --lines: 1;
+  }
+}
+
+@container audience-card (min-width: 23.3125rem) {
+  .placeholder-subscribers-heading {
+    --lines: 1;
+  }
+}
+
+/* The subscriber split's heading's place on a video's page: lines of the section heading's 1.125rem
+   text at the h2's line height 1.05, in its breakdowns column, the grid's track at least 18rem
+   (creator-analytics issue 512). Measured in headless Chrome on 2026-11-08 with Cabinet Grotesk and
+   the built sheet, no scrollbar, by
+   docs/reviews/creator-analytics-268/repro/collapsed-sidebar-placeholders.sh, at every window
+   width from 320px to 2560px and at 3000px, beside the open sidebar and the collapsed one, a column
+   from 280px to 1192px. The heading takes 2 lines below 372.91px and 1 from it, and in an Audience
+   card it still took 2 at 372.67px, so the step is 23.3rem (372.8px), which holds both. Traffic
+   sources' heading beside it, and every other section heading on the page, takes 1 line at every
+   width, so their places stay `.placeholder-heading`. */
+.placeholder-video-subscribers-heading {
+  --lines: 2;
+  width: min(12rem, 100%);
+  height: calc(var(--lines) * 1.125rem * 1.05);
+}
+
+@container video-breakdown (min-width: 23.3rem) {
+  .placeholder-video-subscribers-heading {
+    --lines: 1;
+  }
+}
+
+/* The place of the paragraph a video Google has not processed answers with: lines of the body's
+   1.0625rem text at line height 1.6, as many as the 106 character text wraps to in the signed-in
+   screen, measured with the notes above: 4 lines below 283px (17.6875rem), 3 from it and 2 from
+   413px (25.8125rem); at the 44rem reading width, as wide as the paragraph gets, it still wraps to
+   2. placeholder.test.ts holds the same widths (creator-analytics issues 166, 326 and 477). */
+.placeholder-not-processed {
+  --lines: 4;
+  width: min(100%, var(--reading-width));
+  height: calc(var(--lines) * 1.0625rem * 1.6);
+}
+
+@container signed-in-screen (min-width: 17.6875rem) {
+  .placeholder-not-processed {
+    --lines: 3;
+  }
+}
+
+@container signed-in-screen (min-width: 25.8125rem) {
+  .placeholder-not-processed {
+    --lines: 2;
+  }
+}
+
+/* A number in a list row's cell: a line of its 0.9375rem text at line height 1.6. The thumbnail
+   beside the title sets the row's height. */
+.placeholder-text {
+  width: 4rem;
+  height: calc(0.9375rem * 1.6);
+}
+
+/* The empty text's places, where a section the same read answered with no bar shows it: lines of
+   the body's 1.0625rem text at line height 1.6, as many as the text wraps to, measured with the
+   notes above. "YouTube has no numbers for this window." under an Audience heading takes 2 lines in
+   a card's content box below 315.52px (19.72rem) and 1 from it; "YouTube has not processed a
+   publish day for any video yet." under the publish day top's heading takes 2 lines in the screen
+   below 448px (28rem) and 1 from it. placeholder.test.ts holds the same widths (creator-analytics
+   issue 510). */
+.placeholder-audience-empty-text,
+.placeholder-publish-day-empty-text {
+  width: min(20rem, 100%);
+  height: calc(var(--lines) * 1.0625rem * 1.6);
+}
+
+.placeholder-audience-empty-text {
+  --lines: 2;
+}
+
+.placeholder-publish-day-empty-text {
+  --lines: 2;
+}
+
+@container audience-card (min-width: 19.72rem) {
+  .placeholder-audience-empty-text {
+    --lines: 1;
+  }
+}
+
+@container signed-in-screen (min-width: 28rem) {
+  .placeholder-publish-day-empty-text {
+    --lines: 1;
+  }
+}
+
+.placeholder-bar {
+  height: 0.5rem;
+}
+
+/* A channel's box on Settings: its padding and border around its name's row and its consent
+   line's, each as tall as a quiet button, the 1rem text at line height 1 with its 0.8rem padding
+   and 1px border, and the 1.25rem between them. */
+.placeholder-channel {
+  height: calc(2 * clamp(1.5rem, 4vw, 2.25rem) + 2 * (1rem + 1.6rem + 2px) + 1.25rem + 2px);
+  border-radius: 1.25rem;
+}
+
+.placeholder-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+}
+
+.placeholders {
+  display: grid;
+  gap: 1.5rem;
+}
+
+/* The charts stack only on a screen large enough for all of them, as stackedChartsQuery in
+   stacked-charts.ts says, which a test holds this query equal to; a smaller one shows one chart, which has the engaged views legend only
+   when it is that card's. */
+.metric-chart.placeholder-stacked-only,
+.placeholder-legend.placeholder-stacked-only {
+  display: none;
+}
+
+@media (min-width: 60rem) and (min-height: 45rem) {
+  .metric-chart.placeholder-stacked-only {
+    display: grid;
+  }
+
+  .placeholder-legend.placeholder-stacked-only {
+    display: block;
+  }
+
+  /* Engaged views, the first chart of every stack, stays the primary chart at 10rem (Nick,
+     2026-11-04); each chart below it, and its place in the placeholder, takes 6rem, so four
+     stacked charts fit the 45rem the query asks. A chart shown alone has no sibling, so it keeps
+     10rem. Any later chart, since the upload marker row under the first plot can sit between
+     engaged views and watch hours. The svg is the library's, whose height="100%" the base `.chart svg` rule outranks; the
+     library's overlay svgs set an inline height of 100%, which outranks this rule. */
+  .metric-chart ~ .metric-chart .cursor-plot,
+  .metric-chart ~ .metric-chart .chart svg,
+  .metric-chart ~ .metric-chart .placeholder-chart {
+    height: 6rem;
+  }
+}
+
+/* The list's notes, rows and pager, which wait on a page's read while the controls above stay. */
+.video-list-rows {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.placeholder-bar-row {
+  display: grid;
+  gap: 0.25rem;
+}
+
+/* A bar's name: a line of the bars' 0.9375rem text at the body's line height, which .bars li keeps,
+   so the place is as tall as the landed row (creator-analytics issue 450). The landed name keeps to
+   that one line, cut short where it is longer (.bars-name, creator-analytics issues 469 and 511). */
+.placeholder-bar-row .placeholder-line {
+  height: calc(0.9375rem * 1.6);
+}
+
+/* The since publish table: seven rows at most, so no box of its own; on a narrow screen it scrolls
+   sideways. */
+.since-publish {
+  overflow-x: auto;
+}
+
+/* A video's impressions and CTR by traffic source, from a paid channel's history
+   (creator-analytics issue 785), in a row of its own the whole width of the screen under the
+   breakdowns, so every column shows on a wide screen (creator-analytics issue 1048): as the since
+   publish table, it scrolls sideways on a narrow screen. */
+.traffic-reach {
+  overflow-x: auto;
+}
+
+.traffic-reach tbody th {
+  white-space: nowrap;
+}
+
+.since-publish tbody th {
+  white-space: nowrap;
+}
+
+/* In the numbers table, the last day draws no line under it: the sticky total row keeps its line
+   apart from the day's, which the separate borders would otherwise stack, and Chrome drew the two
+   as a 2px line on 2026-10-10. */
+.numbers-table tbody tr:last-child th,
+.numbers-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.since-publish-note {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+/* The signed-in view's children join the .app grid; [hidden] still hides it behind a consent screen. */
+.signed-in-view:not([hidden]) {
+  display: contents;
+}
+
+/* The sidebar and the screen beside it. Below the tablet width they stack, the sidebar's links in a
+   row under the header with no menu button; from it the sidebar is a column at the window's left
+   edge (sidebar-column.ts, creator-analytics issue 476). The screen lays out its children with the
+   1.5rem gap .app gives the rest of the page. */
+.signed-in-shell,
+.signed-in-screen {
+  display: grid;
+  align-content: start;
+  gap: 1.5rem;
+}
+
+/* The screen is the container its notes' and its paragraphs' places read, so they hold the same
+   lines beside the open sidebar, the collapsed one and none. Its inline-size containment also
+   applies layout containment, so the screen is a stacking context and the containing block of a
+   fixed descendant: the account menu, the tooltips and the toast are portaled to the body, so the
+   screen holds none of them, and the toast's own rule below centres it on the screen's place, the
+   fixed sidebar is the screen's sibling, and the date range bar's stick still follows the window,
+   which stays the scroller (creator-analytics issues 477 and 508). */
+.signed-in-screen {
+  container: signed-in-screen / inline-size;
+}
+
+/* The sidebar's column, open and collapsed to its icons, in shadcn's names, which the sidebar and
+   the screen's offset beside it both read. The stylesheet holds them, not an inline style, so the
+   content security policy has nothing to allow (creator-analytics issue 417). 14rem open and 3rem
+   collapsed are creator-analytics issue 476's, and 3rem holds the 2.5rem avatar. Beside the
+   sidebar the whole .app box, the sidebar's offset and the gutters included, grows to the screen
+   stop, 2560px at the 16px root: a 27-inch Studio Display shows 2560 CSS pixels at its default
+   scale, and creators edit on large displays (creator-analytics issue 477). The toast's viewport
+   reads them too: Base UI portals it to the body, outside .app, where nothing else declares them
+   (creator-analytics issue 508). */
+.app-signed-in,
+[data-slot="toast-viewport"] {
+  --sidebar-width: 14rem;
+  --sidebar-width-icon: 3rem;
+  --screen-stop: 160rem;
+}
+
+/* The sidebar renders only as the column, whose media rule below lays its list out. */
+.sidebar ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sidebar a {
+  text-decoration: none;
+}
+
+.sidebar a:hover,
+.sidebar a[aria-current="page"] {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}
+
+.sidebar a[aria-current="page"] {
+  font-weight: 600;
+}
+
+/* The "Thumbnail preview" item's "opens in a new window" icon after its text: 14px, dimmed in the
+   soft ink (creator-analytics issue 890). Unlayered, so it outranks the button's 1rem svg size in
+   the utilities layer. */
+.sidebar-external-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: var(--ink-soft);
+}
+
+/* The support item and the "Upgrade" item (creator-analytics issue 907): below the column, in the
+   header's Menu panel, the Hide control a plain text button on the item's row. No badge, count,
+   transition or animation (ADR 0011). */
+.sidebar-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}
+
+.sidebar-prompt a {
+  color: inherit;
+}
+
+.sidebar-prompt button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  cursor: pointer;
+}
+
+.sidebar-prompt button:hover {
+  text-decoration-color: var(--accent);
+}
+
+/* The header's Menu panel lies over the page from the header's bottom edge, so the page keeps its
+   place as it opens (creator-analytics issue 891). */
+.app-header {
+  position: relative;
+}
+
+/* Its button, the visual system's quiet button, and what follows it, the avatar, sit at the row's
+   end. The channel picker is in its panel, as a 375px row has no room for it (issue 891). */
+.header-menu-button {
+  margin-inline-start: auto;
+}
+
+.header-menu-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Opaque, at the header's width, framed in the line. Z-index 2: above the sticky controls bar's 1,
+   which a 1 would tie and, later in the page, lose to (the browser walk pressed the date range
+   select through the panel), and the numbers table's own stacking context at 0; level with the
+   popups (components/ui), which Base UI portals to the body's end, so one opened later shows
+   above it; below the toast's 3. No transition or animation (ADR 0011). */
+.header-menu-panel:not([hidden]) {
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  z-index: 2;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--bg);
+}
+
+.header-menu-panel ul {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Each item a 2.5rem row, its icon before its text, as the column's are. */
+.header-menu-panel a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.header-menu-panel a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}
+
+.header-menu-panel a > svg {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+}
+
+.header-menu-panel a > .sidebar-external-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* The current screen is filled as the column's current link is. */
+.header-menu-panel a[aria-current="page"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.header-menu-panel hr {
+  margin: 0.5rem 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+/* The support link and the "Upgrade" link take their rows and their Hide sits at the end, in the
+   soft ink. */
+.header-menu-panel .sidebar-prompt {
+  align-items: center;
+  color: var(--ink-soft);
+}
+
+/* The link takes the soft ink only when it is not the current screen. On the upgrade screen the
+   "Upgrade" link keeps the current item's on-accent ink on the accent fill, as the panel's other
+   current links do (creator-analytics issue 918). */
+.header-menu-panel .sidebar-prompt > a {
+  flex: 1;
+}
+
+.header-menu-panel .sidebar-prompt > a:not([aria-current="page"]) {
+  color: inherit;
+}
+
+.header-menu-panel .sidebar-prompt button {
+  padding-inline-end: 0.75rem;
+}
+
+/* The channel picker, last, set in from the edge as the rows' text is. Its select shrinks to the
+   panel's width and cuts a long channel name with an ellipsis rather than overflow. */
+.header-menu-channel {
+  margin-top: 0.5rem;
+  padding-inline: 0.75rem;
+}
+
+.header-menu-channel select {
+  max-width: 100%;
+}
+
+@media (min-width: 48rem) and (min-height: 38rem) {
+  /* The screen starts right of the sidebar, open or collapsed, and fills the window beside it with
+     the gutter, up to the screen stop; past a 2560px window the extra width falls to its right
+     (creator-analytics issue 477). Its top space is the site header's, as the sidebar's
+     wordmark's is, with no header above it. Behind a consent screen the sidebar is hidden, and the
+     consent screen keeps the page's own place. */
+  .app-signed-in:has(> .signed-in-view:not([hidden]) .sidebar) {
+    --sidebar-offset: var(--sidebar-width);
+    max-width: var(--screen-stop);
+    margin-inline-start: 0;
+    padding-top: 1.75rem;
+    padding-inline-start: calc(var(--sidebar-offset) + var(--gutter));
+  }
+
+  .app-signed-in:has(> .signed-in-view:not([hidden]) .sidebar[data-collapsible="icon"]) {
+    --sidebar-offset: var(--sidebar-width-icon);
+  }
+
+  /* The toast centres in the screen beside the sidebar, open or collapsed, not in the window: its
+     insets are the screen's content box, the sidebar and the gutter at its left, and the gutter
+     inside the window or inside the screen stop, whichever is nearer, at its right, and its own
+     auto margins centre it between them. The viewport sits on the body, outside .app, so the rule
+     reads the sidebar from the body, on the same condition as the screen's offset: behind a
+     consent screen, or with no sidebar, the toast keeps its centre in the window. The rule is
+     outside Tailwind's layers, so it outranks the viewport's inset utility (creator-analytics
+     issue 508). */
+  body:has(.app-signed-in > .signed-in-view:not([hidden]) .sidebar) [data-slot="toast-viewport"] {
+    inset-inline-start: calc(var(--sidebar-width) + var(--gutter));
+    inset-inline-end: max(var(--gutter), 100% - var(--screen-stop) + var(--gutter));
+  }
+
+  body:has(.app-signed-in > .signed-in-view:not([hidden]) .sidebar[data-collapsible="icon"])
+    [data-slot="toast-viewport"] {
+    inset-inline-start: calc(var(--sidebar-width-icon) + var(--gutter));
+  }
+
+  /* shadcn's fixed panel: at the window's left edge, top to bottom, so the window stays the page's
+     scroller, which the date range bar's stick and heading-hold.ts follow, and the sidebar stays
+     where it is as the screen scrolls. The content takes the height the header and the footer
+     leave, so the footer's last item, the toggle, ends at the window's bottom. Each row's icon sits
+     1rem from the edge, open and collapsed, so the icons hold still as the column folds. */
+  .sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: var(--sidebar-width);
+    padding-block: 0;
+    padding-inline: 0.25rem;
+    border-inline-end: 1px solid var(--line);
+    background: var(--bg);
+  }
+
+  .sidebar[data-collapsible="icon"] {
+    width: var(--sidebar-width-icon);
+  }
+
+  .sidebar [data-slot="sidebar-header"] {
+    padding-top: 1.75rem;
+    padding-inline: 0.75rem;
+  }
+
+  .sidebar[data-collapsible="icon"] [data-slot="sidebar-header"] {
+    padding-inline: 0;
+  }
+
+  /* The size the header's wordmark has, so it holds the place it has across the site and the app. */
+  .sidebar .wordmark {
+    display: block;
+    font-size: 1.375rem;
+  }
+
+  .stillstats-mark {
+    display: block;
+    width: 1.375rem;
+    height: 1.375rem;
+    margin-inline: auto;
+    fill: var(--accent);
+  }
+
+  .sidebar [data-slot="sidebar-content"] {
+    flex: 1;
+  }
+
+  .sidebar ul {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  /* Each link and button of the column: a 2.5rem row, as tall as the avatar, its icon 0.75rem in. */
+  .sidebar [data-slot="sidebar-menu-button"] {
+    min-height: 2.5rem;
+    padding: 0 0.75rem;
+    border-radius: 0.5rem;
+    font: inherit;
+  }
+
+  .sidebar a[aria-current="page"] {
+    background: var(--accent);
+    color: var(--on-accent);
+    text-decoration-color: var(--on-accent);
+  }
+
+  /* Open, the "Thumbnail preview" item's text keeps one line (creator-analytics issue 890). */
+  .sidebar-tool > span {
+    white-space: nowrap;
+  }
+
+  /* Collapsed, each link and button shows its icon only; its text leaves the view and stays its
+     name. */
+  .sidebar[data-collapsible="icon"] [data-slot="sidebar-menu-button"] > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Collapsed, the "Thumbnail preview" item's external link icon goes, so the image icon shows
+     alone, as each other item's icon does. */
+  .sidebar[data-collapsible="icon"] .sidebar-external-icon {
+    display: none;
+  }
+
+  /* The footer's rows sit 1rem apart (creator-analytics issue 531). */
+  .sidebar [data-slot="sidebar-footer"] {
+    display: grid;
+    gap: 1rem;
+    font-size: 0.875rem;
+  }
+
+  /* The support item's link and the "Upgrade" item's take their rows, and the x sits at the end, a
+     1.5rem target, at least WCAG 2.5.8's 24px. */
+  .sidebar-prompt {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .sidebar-prompt > a {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sidebar-prompt button {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .sidebar-prompt button svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .sidebar-channel {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  /* The channel picker's button and the account row, each one button: a full-width row with
+     0.5rem inside, the links' radius, and the visual system's focus ring, as the links have. No
+     transition or animation (creator-analytics issue 531). */
+  .sidebar-picker,
+  .sidebar-account {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    padding: 0.5rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .sidebar-picker {
+    gap: 0.5rem;
+  }
+
+  .sidebar-account {
+    gap: 0.75rem;
+  }
+
+  /* Collapsed, the row is the avatar alone, and the 2.5rem avatar fills the 3rem column inside its
+     0.25rem inline padding. */
+  .sidebar[data-collapsible="icon"] .sidebar-account {
+    padding: 0;
+  }
+
+  /* The visual system's avatar fades its fill on a hover; in the row it holds still, as rule 3
+     asks of the row (creator-analytics issue 534). */
+  .sidebar-account .avatar {
+    flex-shrink: 0;
+    transition: none;
+  }
+
+  /* The chevron says the row opens a menu, at the row's end. */
+  .account-chevron {
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    margin-inline-start: auto;
+  }
+
+  /* While the session is read, the places of the column's rows (creator-analytics issue 507): each
+     link's and the toggle's a menu button's 2.5rem row with its radius, the links' 0.25rem apart,
+     and the account row's with the row's padding, gap and height, so the avatar's place sits
+     where the avatar lands, 0.75rem from the window's edge. Still, as every placeholder is. */
+  .placeholder-sidebar-row {
+    height: 2.5rem;
+    border-radius: 0.5rem;
+  }
+
+  .placeholder-sidebar-row + .placeholder-sidebar-row {
+    margin-top: 0.25rem;
+  }
+
+  .sidebar-account-place {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    gap: 0.75rem;
+  }
+
+  .sidebar-account-place .placeholder-avatar {
+    flex-shrink: 0;
+  }
+
+  /* The row's two lines, "Settings" over the email, at the page's 1.6 line height, are taller than
+     its 2.5rem avatar, so the line's place is as tall as both (creator-analytics issue 590). */
+  .sidebar-account-place .placeholder-line {
+    height: calc((0.75rem + 0.875rem) * 1.6);
+  }
+
+  /* A channel's two lines, in the picker's button and in each option of its list, and the account
+     row's, in the same sizes (creator-analytics issue 590): the handle, or "Settings", on top in a
+     smaller size, the name, or the email, under it at the footer's size, each on one line and cut
+     short with an ellipsis only where it does not fit. */
+  .picker-lines,
+  .account-lines {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .picker-handle,
+  .picker-name,
+  .account-heading,
+  .sidebar-email {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .picker-handle,
+  .account-heading {
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+  }
+
+  .picker-name,
+  .sidebar-email {
+    font-size: 0.875rem;
+  }
+
+  /* A hover on either row underlines its text in the accent, as it does a link's, and the avatar
+     takes its own hover. */
+  .sidebar-picker:hover .picker-lines,
+  .sidebar-account:hover .account-lines {
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+  }
+
+  .sidebar-account:hover .avatar {
+    background: var(--accent-hover);
+  }
+}
+
+/* The account menu's header, at every width, as the header's avatar opens the menu below 48rem
+   too: the avatar, then the email (creator-analytics issue 590). The avatar is a label here, not a
+   control, so it takes no pointer, no hover fill and no transition. */
+.account-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.account-menu-header .avatar {
+  flex-shrink: 0;
+  cursor: default;
+  transition: none;
+}
+
+.account-menu-header .avatar:hover {
+  background: var(--accent);
+}
+
+.consent {
+  display: grid;
+  gap: 1.25rem;
+}
+
+/* A video's sponsor report (creator-analytics issue 956): the actions, then the channel, the video's
+   head and its figures by window, a page made to print. */
+.sponsor-report {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.sponsor-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sponsor-report-channel {
+  color: var(--ink-soft);
+}
+
+.sponsor-report-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 1rem;
+}
+
+.sponsor-report-head > div {
+  display: grid;
+  flex: 1 1 14rem;
+  gap: 0.5rem;
+}
+
+.sponsor-report-head h1 {
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+/* The thumbnail at the detail screen's width, which detailThumbnailSizes in thumbnail.ts reads. */
+.sponsor-report-thumbnail {
+  flex: none;
+  width: 10rem;
+}
+
+.sponsor-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.sponsor-report-cell {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  text-align: end;
+  vertical-align: top;
+}
+
+/* The figure's label at each row's start, and the empty heading above them. */
+.sponsor-report-label {
+  text-align: start;
+}
+
+/* A partial window's days, under its heading. */
+.sponsor-report-days {
+  display: block;
+  font-weight: 400;
+}
+
+/* The figure checklist over the report (creator-analytics issue 957): the group's name as a quiet
+   label over the boxes, as the video list's column switches. It never prints. */
+.sponsor-report-choice {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.sponsor-report-choice legend {
+  padding: 0;
+}
+
+.sponsor-report-choice-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+}
+
+.sponsor-report-choice-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding-block: 0.3rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.sponsor-report-choice-options input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.video-detail-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
+/* A printed page, the sponsor report's "Save as PDF" among them, prints light whatever the theme,
+   from the visual system's print block. The shell, the grain and the report's own link back and
+   button, its figure checklist and a refused save of it stay off the page, and the report fits
+   one page (creator-analytics issues 956 and 957). The
+   header's selector matches the specificity of the rule that shows it, so this later one wins. */
+@media print {
+  .app-header:not([hidden]),
+  .sidebar,
+  .whats-new-banner,
+  [data-slot="toast-viewport"],
+  .sponsor-report-actions,
+  .sponsor-report-choice,
+  .sponsor-report-choice-failure,
+  body::before {
+    display: none;
+  }
+
+  /* The screen's offset beside the sidebar, open or collapsed, goes with the sidebar. */
+  .app-signed-in:has(> .signed-in-view:not([hidden]) .sidebar),
+  .app-signed-in:has(> .signed-in-view:not([hidden]) .sidebar[data-collapsible="icon"]) {
+    --sidebar-offset: 0rem;
+    padding-top: 0;
+  }
+
+  .sponsor-report-table {
+    break-inside: avoid;
+  }
+}
+
+@page {
+  margin: 1.5cm;
+}

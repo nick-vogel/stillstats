@@ -1,0 +1,77 @@
+/** A CSS variable shadcn's default theme sets, and the value it sets it to. */
+export type ThemeValue = { variable: string; value: string }
+
+// Every :root and .dark value of the default `neutral` base colour on
+// https://ui.shadcn.com/docs/theming, fetched 2026-11-02, for shadcn 4.23.0 (the CLI the web app
+// pins). ADR 0014's rule 3 fails the build on any of them in the CSS it emits. When the pinned
+// shadcn moves, read the page again and update the list and the version here.
+const lightScheme: ThemeValue[] = [
+  { variable: '--radius', value: '0.625rem' },
+  { variable: '--background', value: 'oklch(1 0 0)' },
+  { variable: '--foreground', value: 'oklch(0.145 0 0)' },
+  { variable: '--card', value: 'oklch(1 0 0)' },
+  { variable: '--card-foreground', value: 'oklch(0.145 0 0)' },
+  { variable: '--popover', value: 'oklch(1 0 0)' },
+  { variable: '--popover-foreground', value: 'oklch(0.145 0 0)' },
+  { variable: '--primary', value: 'oklch(0.205 0 0)' },
+  { variable: '--primary-foreground', value: 'oklch(0.985 0 0)' },
+  { variable: '--secondary', value: 'oklch(0.97 0 0)' },
+  { variable: '--secondary-foreground', value: 'oklch(0.205 0 0)' },
+  { variable: '--muted', value: 'oklch(0.97 0 0)' },
+  { variable: '--muted-foreground', value: 'oklch(0.556 0 0)' },
+  { variable: '--accent', value: 'oklch(0.97 0 0)' },
+  { variable: '--accent-foreground', value: 'oklch(0.205 0 0)' },
+  { variable: '--destructive', value: 'oklch(0.577 0.245 27.325)' },
+  { variable: '--border', value: 'oklch(0.922 0 0)' },
+  { variable: '--input', value: 'oklch(0.922 0 0)' },
+  { variable: '--ring', value: 'oklch(0.708 0 0)' },
+  { variable: '--chart-1', value: 'oklch(0.646 0.222 41.116)' },
+  { variable: '--chart-2', value: 'oklch(0.6 0.118 184.704)' },
+  { variable: '--chart-3', value: 'oklch(0.398 0.07 227.392)' },
+  { variable: '--chart-4', value: 'oklch(0.828 0.189 84.429)' },
+  { variable: '--chart-5', value: 'oklch(0.769 0.188 70.08)' },
+  { variable: '--sidebar', value: 'oklch(0.985 0 0)' },
+  { variable: '--sidebar-foreground', value: 'oklch(0.145 0 0)' },
+  { variable: '--sidebar-primary', value: 'oklch(0.205 0 0)' },
+  { variable: '--sidebar-primary-foreground', value: 'oklch(0.985 0 0)' },
+  { variable: '--sidebar-accent', value: 'oklch(0.97 0 0)' },
+  { variable: '--sidebar-accent-foreground', value: 'oklch(0.205 0 0)' },
+  { variable: '--sidebar-border', value: 'oklch(0.922 0 0)' },
+  { variable: '--sidebar-ring', value: 'oklch(0.708 0 0)' },
+]
+
+const darkScheme: ThemeValue[] = [
+  { variable: '--background', value: 'oklch(0.145 0 0)' },
+  { variable: '--foreground', value: 'oklch(0.985 0 0)' },
+  { variable: '--card', value: 'oklch(0.205 0 0)' },
+  { variable: '--card-foreground', value: 'oklch(0.985 0 0)' },
+  { variable: '--popover', value: 'oklch(0.205 0 0)' },
+  { variable: '--popover-foreground', value: 'oklch(0.985 0 0)' },
+  { variable: '--primary', value: 'oklch(0.922 0 0)' },
+  { variable: '--primary-foreground', value: 'oklch(0.205 0 0)' },
+  { variable: '--secondary', value: 'oklch(0.269 0 0)' },
+  { variable: '--secondary-foreground', value: 'oklch(0.985 0 0)' },
+  { variable: '--muted', value: 'oklch(0.269 0 0)' },
+  { variable: '--muted-foreground', value: 'oklch(0.708 0 0)' },
+  { variable: '--accent', value: 'oklch(0.269 0 0)' },
+  { variable: '--accent-foreground', value: 'oklch(0.985 0 0)' },
+  { variable: '--destructive', value: 'oklch(0.704 0.191 22.216)' },
+  { variable: '--border', value: 'oklch(1 0 0 / 10%)' },
+  { variable: '--input', value: 'oklch(1 0 0 / 15%)' },
+  { variable: '--ring', value: 'oklch(0.556 0 0)' },
+  { variable: '--chart-1', value: 'oklch(0.488 0.243 264.376)' },
+  { variable: '--chart-2', value: 'oklch(0.696 0.17 162.48)' },
+  { variable: '--chart-3', value: 'oklch(0.769 0.188 70.08)' },
+  { variable: '--chart-4', value: 'oklch(0.627 0.265 303.9)' },
+  { variable: '--chart-5', value: 'oklch(0.645 0.246 16.439)' },
+  { variable: '--sidebar', value: 'oklch(0.205 0 0)' },
+  { variable: '--sidebar-foreground', value: 'oklch(0.985 0 0)' },
+  { variable: '--sidebar-primary', value: 'oklch(0.488 0.243 264.376)' },
+  { variable: '--sidebar-primary-foreground', value: 'oklch(0.985 0 0)' },
+  { variable: '--sidebar-accent', value: 'oklch(0.269 0 0)' },
+  { variable: '--sidebar-accent-foreground', value: 'oklch(0.985 0 0)' },
+  { variable: '--sidebar-border', value: 'oklch(1 0 0 / 10%)' },
+  { variable: '--sidebar-ring', value: 'oklch(0.556 0 0)' },
+]
+
+export const shadcnDefaultTheme: readonly ThemeValue[] = [...lightScheme, ...darkScheme]

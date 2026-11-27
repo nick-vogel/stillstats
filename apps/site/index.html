@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- include partials/head.html -->
+    <title>Stillstats: privacy-first YouTube analytics for creators</title>
+    <meta name="description" content="Calm, privacy-first YouTube analytics. See engaged views, views and revenue for your own channel, with no ad pixels and no AI processors." />
+  </head>
+  <body>
+    <!-- include partials/header.html -->
+    <main>
+      <section class="hero" id="hero">
+        <h1>Calm analytics for YouTube creators.</h1>
+        <p class="lede">
+          Stillstats shows you the numbers about your own channel that still mean something. It
+          stores only what a feature needs, and it never sells or shares your data.
+        </p>
+        <p role="alert" data-sign-in-error hidden>Sign-in did not start. Try again.</p>
+        <button class="button" type="button" data-sign-in>Sign in with Google</button>
+        <p class="notice">
+          By signing in, you agree to the <a href="/terms">Terms</a> and the
+          <a href="/privacy">Privacy Policy</a>.
+        </p>
+        <figure class="app-screenshot-figure">
+          <img
+            class="app-screenshot"
+            src="/app-screenshot.webp"
+            width="1920"
+            height="1848"
+            alt="The Stillstats channel screen at /app, signed in, showing a sample channel's last 28 days: engaged views and views, watch hours, estimated revenue with its RPM, and daily charts of engaged views and views, watch hours, estimated revenue and RPM."
+          />
+          <figcaption>Sample data</figcaption>
+        </figure>
+      </section>
+
+      <section class="home-section" id="differentiators" aria-labelledby="differentiators-heading">
+        <h2 id="differentiators-heading">Honest numbers, and nothing else.</h2>
+        <ul class="home-points">
+          <li>
+            <h3>Engaged views, kept apart</h3>
+            <p>
+              In August 2026 YouTube changed how it counts a view. Stillstats also shows engaged
+              views, counted the stricter way YouTube used before, so your numbers before and after
+              the change count views the same way.
+            </p>
+          </li>
+          <li>
+            <h3>No tags, no SEO scores</h3>
+            <p>
+              Tags, SEO scores, keyword competition scores and best-time-to-post advice each measure
+              something other than how your own viewers respond to your videos. Stillstats leaves
+              them out, and the principles say why.
+            </p>
+          </li>
+          <li>
+            <h3>No growth promises</h3>
+            <p>
+              No channel grades, no viral predictions, and no upgrade prompt that promises you
+              growth. Stillstats tells you what happened on your channel, plainly.
+            </p>
+          </li>
+        </ul>
+
+        <div class="extension-block" id="extension">
+          <h2 id="extension-heading">See your engaged views inside YouTube Studio.</h2>
+          <p>
+            The free Stillstats extension for Chrome and Firefox shows your engaged views in three
+            places in YouTube Studio: the latest video card, the Content list, and each video's
+            analytics page.
+          </p>
+          <p>
+            It reads every number from Stillstats, never from the Studio page. It runs on YouTube
+            Studio, and on public YouTube pages only when you turn on YouTube access.
+          </p>
+          <p class="extension-links">
+            <a href="https://chromewebstore.google.com/detail/dmfiepibjgpmholeacigjgejjgohdnhm">Add to Chrome<!-- include icons/arrow-up-right.svg --></a>
+            <a href="https://addons.mozilla.org/en-US/firefox/addon/stillstats/">Add to Firefox<!-- include icons/arrow-up-right.svg --></a>
+          </p>
+        </div>
+
+        <h2 class="proof-heading">Privacy is the proof.</h2>
+        <ul class="home-points">
+          <li>
+            <h3>No scripts but YouTube's player</h3>
+            <p>
+              The site and the app load no ad pixel and no script from another company. The one
+              exception is YouTube's own video player, on a video's page in the app. Product
+              analytics run on a server Stillstats operates itself, with first-party events only.
+            </p>
+          </li>
+          <li>
+            <h3>No AI processors</h3>
+            <p>
+              Your channel data never goes to an AI service. Not for summaries, not for
+              suggestions, and not for training.
+            </p>
+          </li>
+          <li>
+            <h3>Published retention windows</h3>
+            <p>Each kind of data has a time limit, and the limits are public.</p>
+          </li>
+        </ul>
+        <dl class="retention-windows" aria-label="Retention windows">
+          <div>
+            <dt>24 hours</dt>
+            <dd>The longest the free tier caches your analytics.</dd>
+          </div>
+          <div>
+            <dt>24 hours</dt>
+            <dd>To delete a channel's data after you disconnect it or delete yourself.</dd>
+          </div>
+          <div>
+            <dt>5 days</dt>
+            <dd>Until the backups that hold that data expire.</dd>
+          </div>
+          <div>
+            <dt>30 days</dt>
+            <dd>After a Pro subscription ends, until its stored history is purged.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="home-section" id="comparison" aria-labelledby="comparison-heading">
+        <h2 id="comparison-heading">What other tools publish about your data.</h2>
+        <p class="comparison-lede">
+          Each claim below comes from the company's own published page. Each one links that page
+          and shows the date it was checked, so you can read the source yourself.
+        </p>
+        <div class="claims">
+          <article class="claim" aria-labelledby="claim-social-blade">
+            <h3 id="claim-social-blade">Social Blade</h3>
+            <p>
+              Social Blade's terms say it does not delete the statistics it shows. A creator stops
+              collection only by making the profile private.
+            </p>
+            <p class="claim-source">
+              <a href="https://socialblade.com/info/terms">Terms of Service, section 9</a>.
+              Checked October 16, 2026.
+            </p>
+          </article>
+          <article class="claim" aria-labelledby="claim-vidiq">
+            <h3 id="claim-vidiq">vidIQ</h3>
+            <p>
+              vidIQ's privacy policy says it discloses identifiers and network activity to
+              advertising networks and analytics providers. It says these disclosures may be
+              considered a "sale" or "sharing" under applicable laws.
+            </p>
+            <p class="claim-source">
+              <a href="https://vidiq.com/privacy/">Privacy Policy, section 2.3</a>. Checked October
+              16, 2026.
+            </p>
+          </article>
+          <article class="claim" aria-labelledby="claim-viewstats">
+            <h3 id="claim-viewstats">ViewStats</h3>
+            <p>
+              ViewStats's privacy policy says it has sold or shared identifiers, internet activity
+              and IP location with its analytics and advertising partners in the past 12 months,
+              as applicable law defines those terms.
+            </p>
+            <p class="claim-source">
+              <a href="https://www.viewstats.com/privacy">Privacy Policy, U.S. Supplemental Privacy
+              Policy</a>. Checked October 16, 2026.
+            </p>
+          </article>
+          <article class="claim" aria-labelledby="claim-morningfame">
+            <h3 id="claim-morningfame">Morningfame</h3>
+            <p>
+              Morningfame's privacy policy says it shares the channel and video data it reads from
+              YouTube with the providers it lists under hosting and backend infrastructure. That
+              list includes OpenAI API and Google Cloud Vision AI.
+            </p>
+            <p class="claim-source">
+              <a href="https://www.iubenda.com/privacy-policy/51864814/legal">Privacy Policy, YouTube
+              API Services and Hosting and backend infrastructure</a>. Checked October 16, 2026.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="home-section" id="pricing" aria-labelledby="pricing-heading">
+        <h2 id="pricing-heading">Pricing</h2>
+        <div class="plans">
+          <article class="plan" aria-labelledby="plan-free">
+            <h3 id="plan-free">Free</h3>
+            <p class="plan-status">Open now, in the beta.</p>
+            <ul>
+              <li>Current analytics for each channel you connect</li>
+              <li>Engaged views and views for lifetime or the last 7, 28, 90 or 365 days</li>
+              <li>Cached for 24 hours or less, and never stored as history</li>
+            </ul>
+          </article>
+          <article class="plan" aria-labelledby="plan-paid">
+            <h3 id="plan-paid">Pro</h3>
+            <p class="plan-status">$7 a month or $70 a year, for each channel*.</p>
+            <ul>
+              <li>Everything in the free tier</li>
+              <li>
+                Each new upload beside the average of your newest uploads at the same age, over
+                their first 7 and first 28 days, by traffic source
+              </li>
+              <li>
+                Impressions and click-through rate beside engaged views, in your summary, charts,
+                video list and traffic sources, and in a video's sponsor report
+              </li>
+              <li>
+                Your video list sorted by click-through rate or impressions, for all traffic sources
+                or just one, without videos under a minimum number of impressions
+              </li>
+              <li>The audience retention curves of up to 5 of your videos on one chart</li>
+              <li>History kept while your subscription is active, and for 30 days after it ends</li>
+            </ul>
+            <p class="plan-note">* This is changing soon: $7 a month or $70 a year will cover up to 4 channels for one person.</p>
+            <p class="plan-action"><a class="button" href="/app/upgrade" data-upgrade-link>Subscribe</a></p>
+          </article>
+        </div>
+      </section>
+
+      <section class="home-section" id="principles" aria-labelledby="principles-heading">
+        <h2 id="principles-heading">What Stillstats refuses to do.</h2>
+        <ul class="refusals">
+          <li>Sell or share your data.</li>
+          <li>Use your channel in a case study or in marketing.</li>
+          <li>Compare you with channels you will never resemble.</li>
+          <li>Show a metric that measures something other than how your own viewers respond.</li>
+        </ul>
+        <p><a href="/principles">Read the principles</a></p>
+      </section>
+    </main>
+    <!-- include partials/footer.html -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

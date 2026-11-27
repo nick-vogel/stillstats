@@ -1,0 +1,13 @@
+{
+  "name": "@creator-analytics/api-types",
+  "private": true,
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./test/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

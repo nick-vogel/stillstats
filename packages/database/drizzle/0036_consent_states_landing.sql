@@ -1,0 +1,2 @@
+ALTER TABLE "consent_states" ADD COLUMN "landing" text;--> statement-breakpoint
+ALTER TABLE "consent_states" ADD CONSTRAINT "consent_states_landing" CHECK ("consent_states"."landing" is null or ("consent_states"."landing" = 'upgrade' and "consent_states"."purpose" = 'connect'));

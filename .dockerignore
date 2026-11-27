@@ -1,0 +1,15 @@
+# The build context is the repository root, for both images.
+**/node_modules
+**/dist
+**/test
+**/*.test.ts
+**/*.tsbuildinfo
+.git
+.github
+docs
+lint
+*.md
+.env
+.env.*
+.DS_Store
+.stillstats-fonts

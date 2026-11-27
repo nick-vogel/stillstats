@@ -1,0 +1,2 @@
+ALTER TABLE "preferences" DROP CONSTRAINT "preferences_chart_card";--> statement-breakpoint
+ALTER TABLE "preferences" ADD CONSTRAINT "preferences_chart_card" CHECK ("preferences"."chart_card" in ('engagedViews', 'watchTime', 'revenue', 'rpm'));

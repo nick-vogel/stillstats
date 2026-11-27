@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler"
+  },
+  "include": ["src", "wxt.config.ts", ".wxt/wxt.d.ts"]
+}

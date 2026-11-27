@@ -1,0 +1,23 @@
+{
+  "name": "@creator-analytics/youtube-gateway",
+  "private": true,
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@creator-analytics/api-types": "workspace:*",
+    "@creator-analytics/database": "workspace:*",
+    "@creator-analytics/reporter": "workspace:*",
+    "@creator-analytics/token-vault": "workspace:*",
+    "@googleapis/youtube": "^40.0.0",
+    "@googleapis/youtubeanalytics": "^11.0.1",
+    "@googleapis/youtubereporting": "^11.0.1",
+    "drizzle-orm": "^0.45.3",
+    "google-auth-library": "^11.1.0"
+  }
+}

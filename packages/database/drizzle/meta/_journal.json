@@ -1,0 +1,286 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791060362536,
+      "tag": "0000_roles_channels_memberships",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791060363031,
+      "tag": "0001_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791063038815,
+      "tag": "0002_better_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791076309616,
+      "tag": "0003_connections",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791076321900,
+      "tag": "0004_claim_channel",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791109117232,
+      "tag": "0005_read_cache_quota_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791110850524,
+      "tag": "0006_deletion_requests_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791137034814,
+      "tag": "0007_deletion_requests_ended_memberships",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791141042765,
+      "tag": "0008_consent_states_revenue",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791151229424,
+      "tag": "0009_retention_timers",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791152651322,
+      "tag": "0010_security_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791154712947,
+      "tag": "0011_connection_roster",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791156782675,
+      "tag": "0012_deletion_requests_retention",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791509358066,
+      "tag": "0013_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791678726253,
+      "tag": "0014_preferences_revenue_sources",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1791678754651,
+      "tag": "0015_claim_channel_disconnecting",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793851439195,
+      "tag": "0016_preferences_support_prompt_dismissed",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793852810206,
+      "tag": "0017_tips",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793935404001,
+      "tag": "0018_preferences_sidebar_open",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793979477718,
+      "tag": "0019_preferences_chart_card_rpm",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793979478279,
+      "tag": "0020_preferences_rpm_ads_and_premium_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794320603112,
+      "tag": "0021_tips_user_id_optional",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794337330822,
+      "tag": "0022_preferences_whats_new_marker",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794444763394,
+      "tag": "0023_activity_days",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794521680047,
+      "tag": "0024_preferences_theme",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794781820081,
+      "tag": "0025_feedback_messages",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794791489205,
+      "tag": "0026_feedback_retention",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794793691826,
+      "tag": "0027_feedback_admin",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1794869474131,
+      "tag": "0028_feedback_screen_extension",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794937897169,
+      "tag": "0029_reporting_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794940852346,
+      "tag": "0030_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794944317504,
+      "tag": "0031_reach_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794949288482,
+      "tag": "0032_subscription_cancellations",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794965890957,
+      "tag": "0033_subscription_end",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1795024014892,
+      "tag": "0034_subscription_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1795050194412,
+      "tag": "0035_preferences_upgrade_prompt_dismissed",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1795050602239,
+      "tag": "0036_consent_states_landing",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1795213635152,
+      "tag": "0037_sponsor_report_figures",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1795403466999,
+      "tag": "0038_retention_curves",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1795439515662,
+      "tag": "0039_subscription_turned_paid",
+      "breakpoints": true
+    }
+  ]
+}

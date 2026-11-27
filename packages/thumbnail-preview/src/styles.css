@@ -1,0 +1,864 @@
+/*
+ * The thumbnail preview tool's own stylesheet, ported from nick-vogel/nlvogel-site's
+ * `src/app/(frontend)/globals.css` at `6d5d921` and restyled to the visual system: every colour
+ * outside the YouTube block is a visual system token through var(), and the type is its
+ * --font-body and --font-mono. The visual system has no spacing or radius tokens beyond --gutter
+ * and --measure, so spacing and radii are the rem and 999px values the site's own sheet uses. The
+ * classes are the package's own `t-` names, scoped under the tool; the visual system's .button is
+ * the page's sign-in pill and too large for these controls.
+ *
+ * A TILE NEVER SCALES TO FIT. That is the tool's premise: a tile labelled 220 is 220 pixels of the
+ * reader's screen, so no rule here gives a true-pixel tile, its image or its title column a
+ * percentage width, a max-width, a min-width or a flex-shrink. A rail's track scrolls sideways
+ * instead, so the page itself never does. The scaled reference rail is the one exception, and it
+ * says so on screen.
+ */
+@import "./youtube.css";
+
+/* The size table's below and beside titles resolve `--text-primary` (`thumbnail-sizes.ts`), so the
+   title takes the page's ink in both modes. */
+.t-toolroot {
+  --text-primary: var(--ink);
+}
+
+.t-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.t-tag {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  font: 500 0.75rem / 1 var(--font-mono);
+}
+
+.t-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--ink);
+  font: 500 0.875rem / 1.2 var(--font-body);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.t-button:hover {
+  border-color: var(--accent);
+}
+
+.t-button--ghost {
+  border-color: transparent;
+}
+
+/* A control that does something on the page, so a button, drawn as a link. A bare button keeps
+   the user agent's chrome, which in dark mode fell below contrast on nlvogel.com. */
+.t-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: 500 0.875rem / 1.4 var(--font-body);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.t-link:hover {
+  color: var(--accent-hover);
+  text-decoration-color: var(--accent);
+}
+
+.t-titles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+}
+
+/* The grid item, not the input, refuses to shrink: its automatic minimum is the input's intrinsic
+   width, which grows with the root font, so without this the page scrolls sideways at a large
+   root font on a phone. */
+.t-titlefield {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+/* Not uppercase: Chrome names the field from the label's rendered text, so "TITLE A" would be
+   what a screen reader reads. */
+.t-titlefield label {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.t-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--bg-end);
+  color: var(--ink);
+  font: 400 1rem / 1.4 var(--font-body);
+}
+
+.t-input::placeholder {
+  color: var(--ink-soft);
+}
+
+.t-titles__hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+/* A carries the weight; B and C are quiet, because three identical boxes make the first action
+   look like three decisions. */
+.t-slots {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+}
+
+.t-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 230px;
+  min-width: 0;
+  padding: 2rem 1.5rem;
+  border: 1px dashed var(--line);
+  border-radius: 1rem;
+  text-align: center;
+}
+
+/* A border change, never a size change: a box that grows under the cursor moves the drop target
+   while it is aimed at. */
+.t-slot--over {
+  border-color: var(--accent);
+  border-style: solid;
+}
+
+.t-slot--quiet {
+  padding: 1.5rem 1rem;
+}
+
+.t-slot__big {
+  font-weight: 600;
+}
+
+.t-slot__quiettext {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.t-slot__hint {
+  max-width: 30ch;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+.t-slot__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 0.75rem;
+}
+
+/* The candidate bar, which replaces the slots once any slot fills. */
+.t-candbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1.5rem;
+}
+
+/* A chip may not be wider than its bar, and it wraps rather than squeezing: only the filename may
+   shrink, since it is the one element that can truncate honestly (Nick, 2026-08-12, on
+   nlvogel.com). */
+.t-chip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+}
+
+.t-chip img {
+  flex: none;
+  width: 48px;
+  height: 27px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.t-chip__name {
+  min-width: 0;
+  max-width: 18ch;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.t-chip__remove {
+  color: var(--ink-soft);
+}
+
+.t-chip--over {
+  border-color: var(--accent);
+}
+
+.t-chip--add {
+  border-style: dashed;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.t-candbar__hint {
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+/* One shape for every named outcome. The region is in the page before it has anything to say, so
+   a screen reader has a node to watch; empty, it has no box, and nothing moves when the first
+   message arrives. */
+.t-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: 0.5rem;
+}
+
+.t-notice:empty {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.t-notice svg {
+  flex: none;
+}
+
+.t-notice--info {
+  border-left-color: var(--ink-soft);
+}
+
+/* A refusal needs an action from the creator and a remainder does not, so the two read apart. */
+.t-notice--warn {
+  border-left-color: var(--accent);
+}
+
+.t-notice__body {
+  font-size: 0.875rem;
+}
+
+.t-notice__body p {
+  margin: 0;
+}
+
+.t-notice__body p + p {
+  margin-top: 0.5rem;
+}
+
+/* The marker on a mismatched tile's head and on its chip: a word beside a warning icon. The icon
+   takes the warn notice's accent, since the visual system has no warning colour, and the word stays
+   in the page's ink so it reads at its small size. `flex: none`, because the marker does not wrap
+   and its icon is a fixed-size item in a row that can run short. */
+.t-warnmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.t-warnmark svg {
+  flex: none;
+  color: var(--accent);
+}
+
+/* The strip between the notices and the rails. It sticks to the top of the window, since its
+   controls change every rail below it and a creator scrolls those rails while pressing them, and
+   it wraps, so a control never pushes the page sideways at 375px. Opaque and with no top margin,
+   so no rail shows through or above a stuck bar. `ThumbnailTool` unpins it through
+   `data-bar-pinned` when the window cannot hold a control under it. */
+.t-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+
+/* The strip in focus mode, the same element with this class instead. No shadow, since the visual
+   system has none: its edge keeps it apart from the rails on both stages. */
+.t-focusbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--yt-border);
+  border-radius: 0.75rem;
+  background: var(--yt-raised);
+}
+
+.t-toolroot[data-bar-pinned="false"] :is(.t-toolbar, .t-focusbar) {
+  position: static;
+}
+
+/* Holds the focus mode button apart, on the strip's far side. */
+.t-toolbar__spacer {
+  flex: 1;
+}
+
+/* A Tab scrolls each control clear of the stuck bar by its measured height, which `ThumbnailTool`
+   writes; the bar's own controls travel with it, so they take none while it is pinned. The pinned
+   half mirrors `CLEARED_FOCUSABLES` there: change one and change the other. */
+.t-toolroot :is(a[href], button, input, select, textarea, [tabindex]) {
+  scroll-margin-top: var(--t-bar-clearance, 0px);
+}
+
+.t-toolroot:not([data-bar-pinned="false"])
+  :is(.t-toolbar, .t-focusbar)
+  :is(a[href], button, input, select, textarea, [tabindex]) {
+  scroll-margin-top: 0;
+}
+
+/* A visible label, then one pressed toggle per option, in a well. It wraps inside itself, so a
+   control wider than the strip breaks its own line instead of the page's. */
+.t-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--bg);
+}
+
+/* Not uppercase, as `.t-titlefield label` is not: the label names the group through
+   `aria-labelledby`, and Chrome names it from the rendered text, so "CONVERSION" would be what a
+   screen reader reads. */
+.t-seg__label {
+  padding: 0 0.5rem 0 0.75rem;
+  color: var(--ink-soft);
+  font: 600 0.8125rem / 1.2 var(--font-body);
+}
+
+.t-seg button {
+  padding: 4px 12px;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--ink-soft);
+  font: 600 0.875rem / 1.4 var(--font-body);
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.t-seg button:hover {
+  color: var(--ink);
+}
+
+/* The pressed state is the only thing that says which option is active, so it takes the strongest
+   pair the visual system has: the accent fill with its own ink. */
+.t-seg button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.t-seg button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The zoom note, and the conversion and Shorts hints under the toolbar. */
+.t-hint {
+  margin: 0.5rem 0;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+.t-rails {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin: 1.5rem 0 0;
+}
+
+.t-rail__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0 0 0.75rem;
+}
+
+.t-rail__ctx {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.t-rail__px {
+  color: var(--ink-soft);
+  font: 400 0.75rem / 1.4 var(--font-mono);
+}
+
+.t-rail__scroll {
+  margin-left: auto;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+
+.t-rail__track {
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.t-tile {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+/* The head may not widen its tile: `width: 0` takes it out of the tile's intrinsic width and
+   `min-width: 100%` gives it the tile's width back. */
+.t-tile__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  width: 0;
+  min-width: 100%;
+}
+
+/* The scaled reference, the one tile that scales. The cap goes on the tile, whose containing
+   block is the track, and `flex: none` stays, so three references side by side still overflow the
+   rail and it scrolls. */
+.t-rail--scaled .t-tile {
+  max-width: 100%;
+}
+
+/* A grid of two shared rows on the true-pixel rails: every tile is a head and then a card, and
+   `subgrid` puts every head in one row, so a head that wraps cannot push its own cover out of line.
+   The scaled rail stays on flex: its `max-width: 100%` cap resolves against the flex container,
+   and as a grid item it would resolve against its own 640px column and do nothing. */
+.t-rail:not(.t-rail--scaled) .t-rail__track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  grid-template-rows: auto auto;
+  align-items: start;
+}
+
+.t-rail:not(.t-rail--scaled) .t-tile {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 2;
+}
+
+/* The stress plate sits apart and does not scroll: at 72px three candidates fit any viewport. */
+.t-plate {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+/* The plate wraps instead, so its no-scroll guarantee survives a large root font while the tiles
+   keep their true width. The column length is the size record's, from the component as
+   `--t-plate-col`, never a second copy here. This selector ties the one above on specificity and
+   wins on source order, so it stays below it. */
+.t-rail.t-plate .t-rail__track {
+  overflow-x: visible;
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fit, var(--t-plate-col));
+  justify-content: start;
+}
+
+.t-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 0;
+}
+
+.t-card img,
+.t-vtitle {
+  flex: none;
+}
+
+/* Every value that varies per surface is inline, from the size table. */
+.t-vtitle {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--yt-font);
+  text-align: left;
+}
+
+/* `cover`, so a candidate of any aspect fills the box the way YouTube fills it. */
+.t-card img {
+  display: block;
+  border-radius: 2px;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* A grid, so the title and the description placeholder share one column beside the image: the
+   title is the `figcaption`, which HTML keeps a direct child of the `figure`. `min-content` pins
+   row 1 to the title, so the image spanning both rows cannot push the placeholder down. */
+.t-card--beside {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: min-content 1fr;
+  align-items: start;
+  justify-items: start;
+}
+
+.t-card--beside img {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.t-card--beside .t-vtitle {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.t-vdesc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
+  width: 100%;
+}
+
+.t-vdesc__line {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.t-vdesc__line--last {
+  width: 62%;
+}
+
+/* YouTube's duration and "New" badges, over the image. Every value that is the badge's own is
+   inline, from the size table. Roboto is load-bearing: it sets `1:02:25` at YouTube's measured
+   40.44px, and the site's face would miss it by too little for any tolerance to catch. Above the
+   overlay scrim, beside the overlay title. */
+.t-badge,
+.t-newbadge {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--yt-font);
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* On the mobile Shorts surfaces YouTube draws the title on the cover, in white, over a scrim. */
+.t-card--overlay .t-vtitle {
+  position: absolute;
+  z-index: 2;
+}
+
+.t-card--overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 2px;
+  background: linear-gradient(to top, var(--yt-scrim) 0, transparent 100%);
+  pointer-events: none;
+}
+
+.t-card--scaled {
+  max-width: 100%;
+}
+
+.t-card--scaled img {
+  width: 640px;
+  max-width: 100%;
+  height: auto;
+}
+
+/* The Shorts reference's image and its two crop bands share a wrap, which takes the width while
+   the image fills it: a band placed against a box the image does not fill would shade the wrong
+   pixels. A 9:16 reference at 640px would stand taller than most windows; 260px gives the 462px
+   frame nlvogel.com's design drew. */
+.t-cropwrap {
+  position: relative;
+  display: block;
+  flex: none;
+}
+
+.t-card--scaled-shorts .t-cropwrap {
+  width: 260px;
+  max-width: 100%;
+}
+
+/* Two classes, so this outweighs `.t-card--scaled img` above, which would otherwise draw the image
+   640px wide inside the 260px wrap. */
+.t-card--scaled-shorts .t-cropwrap img {
+  width: 100%;
+}
+
+/* What the 2:3 grid takes off each end of the 9:16 frame. The height is inline, from
+   `SHORTS_CROP_BAND_FRACTION`, never here. Not a warning state: the crop is normal. The page's ink
+   at partial opacity darkens what is behind without hiding it in both modes, since the visual
+   system has no scrim token. The corners match `.t-card img`'s 2px, since the band sits on the
+   cover's corners. */
+.t-cropband {
+  position: absolute;
+  right: 0;
+  left: 0;
+  background: var(--ink);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.t-cropband--top {
+  top: 0;
+  border-bottom: 1px dashed var(--bg);
+  border-radius: 2px 2px 0 0;
+}
+
+.t-cropband--btm {
+  bottom: 0;
+  border-top: 1px dashed var(--bg);
+  border-radius: 0 0 2px 2px;
+}
+
+/* The caption under the Shorts reference, which explains the bands, so it sits with them. */
+.t-rail__cap {
+  max-width: 56ch;
+  margin: 0.5rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+/* Focus mode's stage: the tool alone on YouTube's own surface, across the whole window and at least
+   as tall as it, so no page paper shows around a correctly coloured box. The visual system's tokens
+   point at the stage inside it, so the chrome and the below and beside titles follow the stage, not
+   the page; the overlay titles keep `--yt-overlay-fg`. The top padding keeps the focus bar off the
+   window's top edge. */
+.t-focus {
+  --ink: var(--yt-fg);
+  --ink-soft: var(--yt-fg2);
+  --line: var(--yt-border);
+  --bg: var(--yt-surface);
+  --bg-end: var(--yt-raised);
+  --accent: var(--yt-link);
+  --text-primary: var(--yt-fg);
+  min-height: 100vh;
+  padding: 2.5rem 2rem 1.5rem;
+  background: var(--yt-surface);
+  color: var(--yt-fg);
+}
+
+/* What `enterFocusStage` marks: the page around the tool out of sight, as `inert` takes it out of
+   the accessibility tree, and each ancestor's width cap, gutter and margin gone, so the stage
+   reaches the window's edges. */
+.t-focus-locked .t-focus-hidden {
+  display: none;
+}
+
+.t-focus-locked .t-focus-host {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* YouTube's own chrome on the stage, through the palette alone. */
+.t-focus .t-rail__ctx,
+.t-focus .t-rail__px,
+.t-focus .t-rail__scroll {
+  color: var(--yt-fg2);
+}
+
+.t-focus .t-tag {
+  border: none;
+  background: var(--yt-chip);
+  color: var(--yt-fg);
+}
+
+.t-focus .t-seg {
+  border-color: transparent;
+  background: var(--yt-chip);
+}
+
+.t-focus .t-seg button {
+  color: var(--yt-fg2);
+}
+
+.t-focus .t-seg button:hover {
+  color: var(--yt-fg);
+}
+
+/* One rule for both stages: YouTube's pressed option is its foreground on its surface in each. */
+.t-focus .t-seg button[aria-pressed="true"] {
+  background: var(--yt-fg);
+  color: var(--yt-surface);
+}
+
+.t-focus .t-seg__label {
+  color: var(--yt-fg2);
+}
+
+.t-focus .t-button {
+  border: none;
+  border-radius: 18px;
+  background: var(--yt-chip);
+  color: var(--yt-fg);
+}
+
+.t-focus .t-button:hover {
+  background: var(--yt-border);
+}
+
+/* Red on both stages, its label white on both: `--yt-surface` would be black on the dark one. */
+.t-focus .t-focusbar .t-focusbar__exit {
+  background: var(--yt-danger);
+  color: var(--yt-overlay-fg);
+}
+
+.t-focus .t-focusbar .t-focusbar__exit:hover {
+  background: var(--yt-danger-hover);
+}
+
+.t-focus .t-link {
+  color: var(--yt-link);
+}
+
+.t-focus .t-link:hover {
+  color: inherit;
+}
+
+.t-focus .t-tile img {
+  border: none;
+  border-radius: 12px;
+}
+
+.t-focus .t-chip {
+  border-color: var(--yt-border);
+  background: var(--yt-raised);
+}
+
+.t-focus .t-chip__name {
+  color: var(--yt-fg);
+}
+
+.t-focus .t-vdesc__line {
+  background: var(--yt-chip);
+}
+
+/* Grayscale applies to the images and to nothing else: every tile image, the scaled reference
+   among them, and every chip image, since a chip still in colour beside gray tiles reads as a bug.
+   Never on a wrapper, which would gray the labels and rail heads too, and the control exists to
+   take colour out of the design alone. */
+.t-toolroot--grey .t-card img,
+.t-toolroot--grey .t-chip img {
+  filter: grayscale(1);
+}
+
+/* A conversion class does nothing alone: each rule needs `.t-toolroot--grey`, so the grey
+   modifier stays the single gate. Luminance takes no rule, so the default is the declaration
+   above. */
+.t-toolroot--grey.t-toolroot--conv-red .t-card img,
+.t-toolroot--grey.t-toolroot--conv-red .t-chip img {
+  filter: url(#conv-red);
+}
+
+.t-toolroot--grey.t-toolroot--conv-blue .t-card img,
+.t-toolroot--grey.t-toolroot--conv-blue .t-chip img {
+  filter: url(#conv-blue);
+}
+
+/* Out of flow: a zero-size inline `<svg>` still makes a line box, which would add a line's height
+   to the tool. */
+.t-filters {
+  position: absolute;
+}
+
+@media (max-width: 780px) {
+  .t-focus {
+    padding: 2rem 1rem 1rem;
+  }
+
+  .t-titles,
+  .t-slots {
+    grid-template-columns: 1fr;
+  }
+
+  .t-titles__hint {
+    grid-column: auto;
+  }
+}

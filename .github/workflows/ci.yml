@@ -1,0 +1,301 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# One run per ref at a time. A running push to main is never cancelled: two migrate jobs must
+# never run against staging at once. A newer push replaces one that is still pending, so the
+# newest commit deploys to staging. Pull request runs touch nothing, so a newer push cancels them.
+# Production deploys only from a published release, in release.yml.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  API_IMAGE: ghcr.io/${{ github.repository }}-api
+  WORKER_IMAGE: ghcr.io/${{ github.repository }}-worker
+
+jobs:
+  # The suite runs on the pull request only. The push that merges it would run it again on the same
+  # code: main requires this check, and requires a pull request to be up to date with main before it
+  # merges, so the merge commit's code is the code the pull request tested. Without that branch
+  # protection, skipping it here would deploy untested code.
+  check:
+    name: Lint, type check and test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      FONTS_TOKEN_SET: ${{ secrets.STILLSTATS_FONTS_TOKEN != '' }}
+      # A superuser for the test setup. Tests on the database harness connect as a non-owner role;
+      # the login role refusal tests connect as unsafe roles on purpose.
+      TEST_DATABASE_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      # The Fontshare fonts come from a private repository (packages/visual-system/src/fontshare.ts).
+      # GitHub gives a pull request from a fork no secret, so it builds with the fallback fonts.
+      - name: Check out the Fontshare fonts
+        if: env.FONTS_TOKEN_SET == 'true'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: nick-vogel/stillstats-fonts
+          token: ${{ secrets.STILLSTATS_FONTS_TOKEN }}
+          path: .stillstats-fonts
+          persist-credentials: false
+      - name: Copy the Fontshare fonts into the visual system
+        if: env.FONTS_TOKEN_SET == 'true'
+        run: |
+          node packages/visual-system/src/fetch-fonts-cli.ts --from "$GITHUB_WORKSPACE/.stillstats-fonts"
+          rm -rf .stillstats-fonts
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm test
+
+  # The smoke run covers what the test suite cannot: the migrations run from the API image as the
+  # migration role, the API serves the site and the web app, and pg-boss in the running worker
+  # fetches a committed job as a non-owner login role. On a push to main it pushes only the sha
+  # tag; deploy-staging moves staging once the staging migration succeeds, and only a published
+  # release moves latest.
+  #
+  # A skipped job skips every job after it in the chain, and an if: with no status check function
+  # means success(), so each job after check carries !cancelled() && !failure(): a check skipped on
+  # a push lets the chain run, and a check that failed on a pull request still stops it.
+  images:
+    name: Build, smoke-run and push the images
+    needs: [check]
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      FONTS_TOKEN_SET: ${{ secrets.STILLSTATS_FONTS_TOKEN != '' }}
+      SUPERUSER_URL: postgres://postgres:postgres@localhost:5432/postgres
+      SUPERUSER_APP_DB_URL: postgres://postgres:postgres@localhost:5432/creator_analytics
+      MIGRATOR_URL: postgres://app_migrator:app_migrator@localhost:5432/creator_analytics
+      WEB_URL: postgres://smoke_web:smoke_web@localhost:5432/creator_analytics
+      WORKER_URL: postgres://smoke_worker:smoke_worker@localhost:5432/creator_analytics
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      # The images a push to main builds are the ones staging and production run, and
+      # stillstats.com draws in these fonts, so a push never builds them with the fallback.
+      - name: Refuse to build the deploy images without the Fontshare fonts
+        if: github.event_name == 'push' && env.FONTS_TOKEN_SET != 'true'
+        run: |
+          echo "::error::The STILLSTATS_FONTS_TOKEN secret is not set, so the images would draw stillstats.com without Cabinet Grotesk and Switzer. Add a read-only token for nick-vogel/stillstats-fonts as that repository secret (docs/deploy.md, Environments)."
+          exit 1
+      # The Fontshare fonts come from a private repository (packages/visual-system/src/fontshare.ts).
+      # GitHub gives a pull request from a fork no secret, so it builds with the fallback fonts.
+      - name: Check out the Fontshare fonts
+        if: env.FONTS_TOKEN_SET == 'true'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: nick-vogel/stillstats-fonts
+          token: ${{ secrets.STILLSTATS_FONTS_TOKEN }}
+          path: .stillstats-fonts
+          persist-credentials: false
+      - name: Copy the Fontshare fonts into the visual system
+        if: env.FONTS_TOKEN_SET == 'true'
+        run: |
+          node packages/visual-system/src/fetch-fonts-cli.ts --from "$GITHUB_WORKSPACE/.stillstats-fonts"
+          rm -rf .stillstats-fonts
+      - run: pnpm install --frozen-lockfile
+
+      # Public values baked into the site and the web app, so repository variables rather than
+      # secrets. The API image refuses to build with VITE_OPENPANEL_API_URL or COMMIT_SHA unset.
+      # The OpenPanel client ID is not among them: the API answers it at load, so one image serves
+      # staging and production.
+      - name: Build the API image
+        env:
+          VITE_GLITCHTIP_DSN: ${{ vars.VITE_GLITCHTIP_DSN }}
+          VITE_OPENPANEL_API_URL: ${{ vars.VITE_OPENPANEL_API_URL }}
+        run: >-
+          docker build -f apps/api/Dockerfile
+          --build-arg VITE_GLITCHTIP_DSN
+          --build-arg VITE_OPENPANEL_API_URL
+          --build-arg COMMIT_SHA="$GITHUB_SHA"
+          -t "$API_IMAGE:sha-$GITHUB_SHA" .
+      - name: Build the worker image
+        run: >-
+          docker build -f apps/worker/Dockerfile
+          -t "$WORKER_IMAGE:sha-$GITHUB_SHA" .
+
+      # The same sequence as production: app_migrator is provisioned by hand, the migrations create
+      # app_web and app_worker, and each process logs in as its own member of one of them.
+      - name: Provision the migration role
+        run: |
+          psql "$SUPERUSER_URL" -v ON_ERROR_STOP=1 \
+            -c "create role app_migrator login createrole password 'app_migrator'" \
+            -c "create database creator_analytics owner app_migrator"
+      - name: Run the migrations from the API image
+        run: >-
+          docker run --rm --network host -e MIGRATION_DATABASE_URL="$MIGRATOR_URL"
+          "$API_IMAGE:sha-$GITHUB_SHA" pnpm --filter @creator-analytics/database migrate
+      - name: Provision the login roles
+        run: |
+          psql "$SUPERUSER_APP_DB_URL" -v ON_ERROR_STOP=1 \
+            -c "create role smoke_web login password 'smoke_web' in role app_web" \
+            -c "create role smoke_worker login password 'smoke_worker' in role app_worker"
+
+      - name: Start the worker and the API
+        run: |
+          # The worker probes the connections the API stores, so both hold the same token keys.
+          token_keys="1:$(openssl rand -base64 32)"
+          docker run -d --name worker --network host -e STILLSTATS_ENVIRONMENT=production \
+            -e DATABASE_URL="$WORKER_URL" -e DELETION_LOG_KEY="$(openssl rand -base64 32)" \
+            -e GOOGLE_CLIENT_ID=smoke -e GOOGLE_CLIENT_SECRET=smoke \
+            -e TOKEN_ENCRYPTION_KEYS="$token_keys" \
+            "$WORKER_IMAGE:sha-$GITHUB_SHA"
+          docker run -d --name api --network host -e PORT=3000 -e STILLSTATS_ENVIRONMENT=production \
+            -e DATABASE_URL="$WEB_URL" -e BETTER_AUTH_URL=http://localhost:3000 \
+            -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
+            -e GOOGLE_CLIENT_ID=smoke -e GOOGLE_CLIENT_SECRET=smoke \
+            -e TOKEN_ENCRYPTION_KEYS="$token_keys" \
+            -e GOOGLE_IDENTIFIER_KEY="$(openssl rand -base64 32)" \
+            "$API_IMAGE:sha-$GITHUB_SHA"
+      - name: The worker fetches a committed job
+        env:
+          DATABASE_URL: ${{ env.WORKER_URL }}
+        run: node apps/worker/test/smoke-run.ts
+      - name: The API reads the database and serves the site and the web app
+        run: |
+          curl --fail --silent --show-error --retry 15 --retry-delay 2 --retry-all-errors \
+            http://localhost:3000/health
+          curl --fail --silent --show-error http://localhost:3000/ | grep -q 'Sign in with Google'
+          curl --fail --silent --show-error http://localhost:3000/app | grep -q '<div id="root">'
+          # The answer reads the release content, so this shows the image's --prod install holds it.
+          curl --fail --silent --show-error http://localhost:3000/api/client-settings \
+            | grep -q '"environment":"production"'
+      - name: The site's stylesheet carries the Fontshare fonts
+        if: env.FONTS_TOKEN_SET == 'true'
+        run: |
+          for sheet in $(curl --fail --silent --show-error http://localhost:3000/ \
+            | grep -oE 'href="/assets/[^"]+\.css"' | sed -E 's/^href="(.*)"$/\1/'); do
+            curl --fail --silent --show-error "http://localhost:3000$sheet"
+          done > "$RUNNER_TEMP/site.css"
+          grep -q 'Switzer-Variable' "$RUNNER_TEMP/site.css"
+          grep -q 'CabinetGrotesk-Variable' "$RUNNER_TEMP/site.css"
+      - name: Container logs
+        if: ${{ !cancelled() }}
+        run: |
+          docker logs worker || true
+          docker logs api || true
+
+      - name: Push the images
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$API_IMAGE:sha-$GITHUB_SHA"
+          docker push "$WORKER_IMAGE:sha-$GITHUB_SHA"
+
+  # Every job from here references the staging Environment, whose secrets override the
+  # repository's of the same name, and no job in this file references production. The release
+  # step runs the pushed API image's migrations against staging as the migration role, over an
+  # ephemeral Tailscale node, before any new image starts. A failed migration fails this job, and
+  # deploy-staging never runs.
+  migrate-staging:
+    name: Migrate the staging database
+    needs: [images]
+    if: ${{ !cancelled() && !failure() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    environment: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Connect to the tailnet
+        uses: tailscale/github-action@6cae46e2d796f265265cfcf628b72a32b4d7cade # v3.3.0
+        with:
+          # An OAuth client, not an auth key: a key expires, and an expired key blocks every deploy.
+          # Both values are staging Environment secrets, like the other deploy secrets
+          # (docs/deploy.md, Environments).
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      # Host networking gives the container the runner's tailnet route and MagicDNS.
+      - name: Run the migrations
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+        run: >-
+          docker run --rm --network host -e MIGRATION_DATABASE_URL
+          "$API_IMAGE:sha-$GITHUB_SHA" pnpm --filter @creator-analytics/database migrate
+
+  deploy-staging:
+    name: Deploy staging through Dokploy
+    needs: [migrate-staging]
+    if: ${{ !cancelled() && !failure() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    environment: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      # staging moves only after the staging migration succeeds, so a failed migration leaves it on
+      # the last staged image. The retag happens on the registry, with no pull; --prefer-index=false
+      # copies the manifest as is, so staging keeps the sha tag's digest.
+      - name: Move staging to this commit
+        run: |
+          docker buildx imagetools create --prefer-index=false \
+            --tag "$API_IMAGE:staging" "$API_IMAGE:sha-$GITHUB_SHA"
+          docker buildx imagetools create --prefer-index=false \
+            --tag "$WORKER_IMAGE:staging" "$WORKER_IMAGE:sha-$GITHUB_SHA"
+      - name: Redeploy the API
+        env:
+          DOKPLOY_WEBHOOK_API: ${{ secrets.DOKPLOY_WEBHOOK_API }}
+        run: curl --fail --silent --show-error -X POST "$DOKPLOY_WEBHOOK_API"
+      - name: Redeploy the worker
+        env:
+          DOKPLOY_WEBHOOK_WORKER: ${{ secrets.DOKPLOY_WEBHOOK_WORKER }}
+        run: curl --fail --silent --show-error -X POST "$DOKPLOY_WEBHOOK_WORKER"

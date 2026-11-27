@@ -1,0 +1,6 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+patchedDependencies:
+  "@tanstack/charts@1.2.1": patches/@tanstack__charts@1.2.1.patch

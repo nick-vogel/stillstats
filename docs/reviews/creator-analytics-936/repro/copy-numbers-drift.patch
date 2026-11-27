@@ -1,0 +1,45 @@
+diff --git a/apps/site/partials/footer.html b/apps/site/partials/footer.html
+index 71848feb..9ca5970f 100644
+--- a/apps/site/partials/footer.html
++++ b/apps/site/partials/footer.html
+@@ -38,7 +38,7 @@
+           Your impressions and click-through rate show beside your engaged views in your summary,
+           charts, video list and each video's traffic sources. The audience retention curves of up
+           to 5 of your videos show on one chart. Stillstats reads each curve daily for the video's
+-          first 28 days, then monthly. The history starts with up to 60 days before you subscribe,
++          first 14 days, then monthly. The history starts with up to 60 days before you subscribe,
+           and grows each day. Stillstats keeps it while your subscription is active, and for 30 days
+           after it ends.
+         </p>
+diff --git a/apps/web/src/retention-comparison.ts b/apps/web/src/retention-comparison.ts
+index b6a9e5ea..8a2ed0ae 100644
+--- a/apps/web/src/retention-comparison.ts
++++ b/apps/web/src/retention-comparison.ts
+@@ -23,12 +23,12 @@ import type { Route } from './route.ts'
+ // Pending Nick's word-for-word approval on the epic's PR, creator-analytics#951.
+ export const comparisonText = {
+   heading: 'Compare retention',
+-  intro: 'Pick up to 5 videos to draw their audience retention on one chart.',
++  intro: 'Pick up to 6 videos to draw their audience retention on one chart.',
+   chart: 'Retention comparison',
+   legend: 'Compared videos',
+   explanation:
+     'The share of viewers still watching at each point of each video, across its whole length.',
+-  limit: 'You can compare up to 5 videos. Clear a pick to choose another.',
++  limit: 'You can compare up to 6 videos. Clear a pick to choose another.',
+   empty: 'Pick a video below to draw its retention here.',
+   noCurve: 'YouTube has no retention curve for this video yet.',
+   notRead: 'Stillstats has not read this video yet.',
+diff --git a/apps/web/src/upgrade.ts b/apps/web/src/upgrade.ts
+index ac045370..afe90bee 100644
+--- a/apps/web/src/upgrade.ts
++++ b/apps/web/src/upgrade.ts
+@@ -65,7 +65,7 @@ export const upgradeFeatures: readonly UpgradeFeature[] = [
+     key: 'retention',
+     title: 'Retention comparison', // drafted in creator-analytics#952, pending Nick's word-for-word approval on the epic's PR
+     lines: [
+-      'The audience retention curves of up to 5 of your videos on one chart, each read daily for its first 28 days and monthly after.', // drafted in creator-analytics#952, pending Nick's word-for-word approval on the epic's PR
++      'The audience retention curves of up to 5 of your videos on one chart, each read daily for its first 14 days and monthly after.', // drafted in creator-analytics#952, pending Nick's word-for-word approval on the epic's PR
+     ],
+   },
+   {

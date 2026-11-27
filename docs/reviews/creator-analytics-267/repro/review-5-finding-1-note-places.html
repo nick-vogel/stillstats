@@ -1,0 +1,13 @@
+<!-- Pre-PR review 5 of creator-analytics#267, finding 1. The launch chart's notes beside their placeholder shapes, with the real stylesheets, inside the signed-in shell with main's sidebar (creator-analytics#274). Run from the repo root: sh docs/reviews/creator-analytics-267/repro/review-5-finding-1.sh. The title holds, per note, "loaded lines/placeholder lines", with "!" where they differ. -->
+<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width">
+<link rel="stylesheet" href="../../../../packages/visual-system/src/styles.css">
+<link rel="stylesheet" href="../../../../apps/web/src/app.css"></head><body>
+<main class="app app-signed-in"><div class="signed-in-shell"><nav class="sidebar"><ul><li><a href="/app">Overview</a></li><li><a href="/app/audience">Audience</a></li></ul></nav><div class="signed-in-screen">
+<section class="video-detail-section metric-charts launch-chart">
+<p class="note" id="first">The chart shows the first 10 videos on this page that have data.</p>
+<p class="note" id="ltotal">The running total adds the daily numbers, so its last point can differ from the totals in the list.</p>
+<p class="note" id="total">The running total adds the daily numbers, so its last point can differ from the totals above.</p>
+<p class="note" id="delay">YouTube has processed data up to September 30, 2026. New numbers usually take two to three days to appear.</p>
+<div class="placeholder placeholder-first-rows-note" id="pfirst"></div><div class="placeholder placeholder-launch-total-note" id="pltotal"></div><div class="placeholder placeholder-total-note" id="ptotal"></div><div class="placeholder placeholder-note" id="pdelay"></div>
+</section></div></div></main>
+<script>document.fonts.ready.then(()=>{const o={vw:innerWidth};for(const k of ['first','ltotal','total','delay']){const n=document.getElementById(k),p=document.getElementById(`p${k}`);o[k]=`${Math.round((n.offsetHeight-16)/24)}/${Math.round((p.offsetHeight-16)/24)}${n.offsetHeight===p.offsetHeight?'':'!'}`}document.title=JSON.stringify(o)})</script></body></html>

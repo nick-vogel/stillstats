@@ -1,0 +1,22 @@
+{
+  "name": "@creator-analytics/releases",
+  "private": true,
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./version": "./src/version.ts",
+    "./testing": "./test/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "merged-since-release": "node src/merged-since-release-cli.ts",
+    "release-tag-check": "node src/release-tag-check-cli.ts",
+    "rollback-check": "node src/rollback-check-cli.ts"
+  },
+  "dependencies": {
+    "@creator-analytics/api-types": "workspace:*",
+    "markdown-it": "^15.0.3",
+    "yaml": "^2.9.1"
+  }
+}

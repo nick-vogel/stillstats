@@ -1,0 +1,2 @@
+ALTER TABLE "preferences" ADD COLUMN "whats_new_marker" text;--> statement-breakpoint
+ALTER TABLE "preferences" ADD CONSTRAINT "preferences_whats_new_marker" CHECK ("preferences"."whats_new_marker" ~ '^[1-9][0-9]{3}\.[1-9][0-9]?\.[1-9][0-9]?(\.[1-9][0-9]*)?$');

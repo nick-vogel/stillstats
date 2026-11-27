@@ -1,0 +1,13 @@
+diff --git a/dist/svg-renderer.js b/dist/svg-renderer.js
+index a90345f8d901324085ce3dfd3b0720f3a10de09a..d8aae6bec27a9debc8ecaefd53b4dbdde1a2e91c 100644
+--- a/dist/svg-renderer.js
++++ b/dist/svg-renderer.js
+@@ -22,7 +22,7 @@ function renderChartSvgWithHooks(scene, options, hooks) {
+     hooks,
+     idPrefix
+   );
+-  return `<svg class="${escapeAttribute(className)}" width="100%" height="100%" viewBox="0 0 ${number(scene.width)} ${number(scene.height)}" role="img" aria-roledescription="chart" aria-label="${escapeAttribute(options.ariaLabel)}" tabindex="${number(options.tabIndex ?? 0)}"${direction} style="display:block;overflow:visible">${description}${definitions}${background}${renderSceneNodes(scene.nodes, idPrefix, hooks, svgRenderChildren(options))}</svg>`;
++  return `<svg class="${escapeAttribute(className)}" width="100%" height="100%" viewBox="0 0 ${number(scene.width)} ${number(scene.height)}" role="img" aria-roledescription="chart" aria-label="${escapeAttribute(options.ariaLabel)}" tabindex="${number(options.tabIndex ?? 0)}"${direction}>${description}${definitions}${background}${renderSceneNodes(scene.nodes, idPrefix, hooks, svgRenderChildren(options))}</svg>`;
+ }
+ function renderSceneNodes(nodes, idPrefix = "", hooks, children) {
+   let markup = "";

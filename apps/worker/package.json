@@ -1,0 +1,29 @@
+{
+  "name": "@creator-analytics/worker",
+  "private": true,
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "node src/worker.ts"
+  },
+  "dependencies": {
+    "@creator-analytics/api-types": "workspace:*",
+    "@creator-analytics/database": "workspace:*",
+    "@creator-analytics/entitlements": "workspace:*",
+    "@creator-analytics/event-relay": "workspace:*",
+    "@creator-analytics/releases": "workspace:*",
+    "@creator-analytics/reporter": "workspace:*",
+    "@creator-analytics/retention-engine": "workspace:*",
+    "@creator-analytics/token-vault": "workspace:*",
+    "@creator-analytics/youtube-gateway": "workspace:*",
+    "drizzle-orm": "^0.45.3",
+    "pg": "^8.23.1",
+    "pg-boss": "^12.36.0"
+  },
+  "devDependencies": {
+    "@creator-analytics/fake-google": "workspace:*",
+    "@creator-analytics/fake-stripe": "workspace:*",
+    "@types/pg": "^8.23.1"
+  }
+}

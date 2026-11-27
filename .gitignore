@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+.DS_Store
+.wxt/
+.output/
+# YouTube Studio's own stylesheet, which extract-studio-styles.ts writes locally for the store
+# screenshots. It is YouTube's file, so the repository does not hold it (creator-analytics#942).
+apps/extension/test/fixtures/studio/studio.css
+# The Fontshare fonts and their licence, which the ITF Free Font License keeps out of a public
+# repository. `pnpm fonts` copies them in from the private fonts repository, and CI checks that
+# repository out into .stillstats-fonts/ first (packages/visual-system/src/fontshare.ts).
+packages/visual-system/fonts/CabinetGrotesk-Variable.woff2
+packages/visual-system/fonts/Switzer-Variable.woff2
+packages/visual-system/fonts/LICENSE-ITF-FFL.txt
+.stillstats-fonts/

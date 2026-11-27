@@ -1,0 +1,32 @@
+diff --git a/apps/worker/src/retention-curves.ts b/apps/worker/src/retention-curves.ts
+index 6cc2815b..d85844e3 100644
+--- a/apps/worker/src/retention-curves.ts
++++ b/apps/worker/src/retention-curves.ts
+@@ -145,12 +145,7 @@ export function refreshRetentionCurves({ gateway, reporter }: RetentionCurveOpti
+                 },
+               ],
+         )
+-        return { due: dueVideos(candidates, tx.now).slice(0, readsPerRun(candidates, tx.now)) }
+-      },
+-    )
+-    if ('refusal' in plan) return refused(plan.refusal)
+-
+-    for (const { videoId, publishedAt } of plan.due) {
++    for (const { videoId, publishedAt } of dueVideos(candidates, tx.now).slice(0, readsPerRun(candidates, tx.now))) {
+       const refusal = await worker.forChannel(channelId, async (tx) => {
+         const read = await gateway.read(tx, channelId, 'audienceRetention', {
+           videoId,
+@@ -184,7 +179,12 @@ export function refreshRetentionCurves({ gateway, reporter }: RetentionCurveOpti
+           })
+         return null
+       })
+-      if (refusal) return refused(refusal)
++      if (refusal) { refused(refusal); return { due: [] } }
+     }
++        return { due: [] as Candidate[] }
++      },
++    )
++    if ('refusal' in plan) return refused(plan.refusal)
++
+   }
+ }

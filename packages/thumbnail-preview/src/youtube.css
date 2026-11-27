@@ -1,0 +1,127 @@
+/* The package's one declared YouTube block: the palette and the type a preview surface uses to
+   look like YouTube's own, and the one exception to the visual system's colour rules
+   (creator-analytics#732). A colour may be written only on a `--yt-*` declaration in this file;
+   every other rule in the package takes its colour from a visual system token, and
+   `test/styles.test.ts` holds both halves. The tracing tests compare the `--yt-` values to the
+   measurement docs as strings, so each keeps the spelling the docs publish.
+
+   The palette's comments below moved verbatim from nick-vogel/nlvogel-site's
+   `src/app/(frontend)/globals.css` at `6d5d921`. The checks and gates they name
+   (`check-copy-css.mjs`, `check:copy`, `gate:theme-cascade`) and "this site" are nlvogel-site's. */
+
+/* ROBOTO, YOUTUBE'S UI FONT, for the title previews and nothing else. Self-hosted, since the
+   policy allows fonts from 'self' only, and named by a path relative to this file, so the build
+   emits it under the site's /assets/ as it does the visual system's fonts. NO `unicode-range`:
+   each file carries the latin and latin-ext subsets combined, so one face per weight loads for an
+   all-ASCII title. Moved from nlvogel-site's `fonts.css`; its `public/fonts/README.md` records
+   how the files were cut. */
+@font-face {
+  font-family: "Roboto";
+  src: url("../fonts/roboto-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Roboto";
+  src: url("../fonts/roboto-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* THE `--yt-` PALETTE. Every name in it is a value YouTube's own surface uses,
+   reproduced so a preview can be judged against the real thing rather than
+   against this site's paper. It is the ONE exemption from the no-pure-white and
+   no-pure-black rules, and `check-copy-css.mjs` enforces the exemption's shape:
+   a banned literal may appear only on a `--yt-*` declaration, at any selector.
+
+   Phase 3 declares TWO names, and both are used OUTSIDE focus mode, on the
+   default page surface. These two land at `:root` rather than with the rest of
+   the palette because YouTube draws a mobile Shorts title in white on the cover,
+   over its own black scrim, whatever sits behind the page.
+
+   PHASE 4 ADDS NINE ROLE NAMES, NOT FOURTEEN, and the difference is worth one
+   sentence because an earlier draft of this comment said fourteen. The spec
+   enumerates fourteen VALUES. Under the two-surface remap the spec also mandates,
+   a role carries one value per surface, so fourteen values fit on nine names.
+
+   `--yt-scrim` ARRIVED IN REVIEW, and it is the same exemption rather than a new
+   one. The scrim shipped as a raw `rgba(0, 0, 0, 0.6)` inside a gradient, which
+   is pure black on the reading surface with nothing permitting it.
+   `check-copy-css.mjs` could not see it: rule 6 read whitespace-and-comma tokens,
+   where `0` is not a banned value, so the check passed on 562 declarations with
+   an unauthorised black among them. The check now reads `rgb()` and `rgba()`
+   channels too, and this declaration is what keeps the build green, through the
+   authorised route rather than by being invisible to the rule. */
+:root {
+  /* Arial is the metric-compatible stand-in, so a missing Roboto degrades to something close
+     rather than to the site's own face, which would misrepresent the surface. */
+  --yt-font: Roboto, Arial, sans-serif;
+  --yt-overlay-fg: #ffffff;
+  --yt-scrim: rgba(0, 0, 0, 0.6);
+  /* The duration badge's fill, measured 2026-08-13 (NLV-34). It happens to
+     equal `--yt-scrim`, and it is a SEPARATE NAME anyway: a scrim is a gradient
+     behind overlaid text and a badge fill is a solid chip, so one name serving
+     both is how a later change to one silently moves the other. */
+  --yt-badge-bg: rgba(0, 0, 0, 0.6);
+  /* The New badge's landscape skin, measured 2026-09-19 (#61): a white chip
+     with near-black text, on the watch page suggested tile. The values are
+     spelled the way `youtube-new-badge.md` publishes them, because
+     `new-badge-tracing.test.ts` compares these declarations to that file as
+     strings. The white is the same exemption as `--yt-overlay-fg`: it is
+     YouTube's, and the chip sits on the creator's cover, not on paper.
+
+     SEPARATE NAMES FROM `--yt-raised` AND `--yt-fg`, which carry the same two
+     values on the light stage and DIFFERENT ones on the dark stage. The badge
+     was measured white on YouTube's default surface and the tool has no
+     measurement of it under YouTube's dark theme, so it does not follow the
+     stage. It is one measured skin, not a role. */
+  --yt-new-badge-bg: rgb(255, 255, 255);
+  --yt-new-badge-fg: rgb(15, 15, 15);
+}
+
+/* THE TWO STAGE SURFACES. They are PLAIN CLASS SELECTORS, and that is a
+   constraint rather than a preference: `gate:theme-cascade` fails any app CSS
+   rule whose selector contains `data-theme`, and it runs in CI. So the client
+   component reads `document.documentElement.dataset.theme` once on entry,
+   resolves `auto` through `matchMedia`, and puts the resolved class on the tool
+   root. Nothing here reacts to the site theme on its own.
+
+   `--yt-surface` EXISTS BECAUSE THE STAGE BACKGROUND IS NOT A ROLE THE DESIGN
+   ALREADY NAMES. The design file writes `.t-focus--light { background: #FFFFFF }`
+   as a literal, which this project's rule forbids: a banned literal may appear
+   only on a `--yt-*` declaration. Light's surface happens to equal `--yt-raised`,
+   so reusing that name would look right; dark's `#0F0F0F` equals nothing raised,
+   so the same reuse would put `#212121` behind the dark stage.
+
+   OF THE FOURTEEN VALUES ONLY `#FFFFFF` IS A BANNED LITERAL. `#0F0F0F` is not:
+   `BANNED_VALUES` holds the pure spellings, and the functional-notation check
+   flags a channel only at exactly 0 or 255, which 15 is not. The other thirteen
+   values would pass rule 6 under any property name at all. They carry the
+   `--yt-` prefix for palette fidelity, so that every YouTube value this tool
+   reproduces is named in one place and none of them drifts into a component. */
+.t-focus--light {
+  --yt-surface: #ffffff;
+  --yt-fg: #0f0f0f;
+  --yt-fg2: #606060;
+  --yt-chip: #f2f2f2;
+  --yt-border: #e5e5e5;
+  --yt-raised: #ffffff;
+  --yt-link: #065fd4;
+  --yt-danger: #d9002b;
+  --yt-danger-hover: #b00022;
+}
+
+.t-focus--dark {
+  --yt-surface: #0f0f0f;
+  --yt-fg: #f1f1f1;
+  --yt-fg2: #aaaaaa;
+  --yt-chip: #272727;
+  --yt-border: #3f3f3f;
+  --yt-raised: #212121;
+  --yt-link: #3ea6ff;
+  --yt-danger: #d9002b;
+  --yt-danger-hover: #b00022;
+}

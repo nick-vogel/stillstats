@@ -1,0 +1,16 @@
+{
+  "name": "@creator-analytics/fake-google",
+  "private": true,
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@creator-analytics/api-types": "workspace:*",
+    "jose": "^6.2.12"
+  }
+}

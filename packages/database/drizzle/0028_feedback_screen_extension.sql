@@ -1,0 +1,2 @@
+ALTER TABLE "feedback_messages" DROP CONSTRAINT "feedback_messages_screen";--> statement-breakpoint
+ALTER TABLE "feedback_messages" ADD CONSTRAINT "feedback_messages_screen" CHECK ("feedback_messages"."screen" in ('video_list', 'video_detail', 'audience', 'settings', 'whats_new', 'extension'));

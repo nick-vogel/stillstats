@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- include partials/head.html -->
+    <title>{{name}} | Stillstats</title>
+    <meta name="description" content="{{summary}}" />
+  </head>
+  <body>
+    <!-- include partials/header.html -->
+    <main class="legal release">
+      <p class="release-back"><a href="/releases/">Releases</a></p>
+      <h1>{{name}}</h1>
+      <p class="legal-updated"><time datetime="{{date}}">{{day}}</time></p>
+      <div class="release-note">{{{note}}}</div>
+    </main>
+    <!-- include partials/footer.html -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

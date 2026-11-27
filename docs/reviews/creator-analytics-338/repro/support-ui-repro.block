@@ -1,0 +1,36 @@
+
+describe('pre-PR review 1 repro (creator-analytics#338)', () => {
+  const reproLink = 'https://buy.stripe.com/test_00g3cd?client_reference_id=user-1'
+
+  test('finding 1: focus stays inside the sidebar after "Hide"', async () => {
+    const api = installFakeApi()
+    api.support = { link: reproLink, prompt: true }
+    const { container } = await render()
+    const hide = [...(sidebarIn(container)?.querySelectorAll('button') ?? [])].find(
+      (each) => each.getAttribute('aria-label') === hideSupportLabel,
+    )
+    if (!hide) throw new Error('No Hide button on view')
+    hide.focus()
+    expect(document.activeElement).toBe(hide)
+
+    await click(hide)
+
+    const focused = document.activeElement
+    expect({
+      connected: focused?.isConnected ?? false,
+      inSidebar: sidebarIn(container)?.contains(focused) ?? false,
+    }).toEqual({ connected: true, inSidebar: true })
+  })
+
+  test('finding 2: Stripe\'s return shows no sidebar prompt beside the thanks line, before the webhook lands', async () => {
+    const api = installFakeApi()
+    api.support = { link: reproLink, prompt: true }
+    const { container } = await render('profile?support=thanks')
+
+    const thanks = [...container.querySelectorAll('p')].some((p) => p.textContent === supportThanksText)
+    const sidebarPrompt = [...(sidebarIn(container)?.querySelectorAll('a') ?? [])].some(
+      (a) => a.textContent === supportHeading,
+    )
+    expect({ thanks, sidebarPrompt }).toEqual({ thanks: true, sidebarPrompt: false })
+  })
+})

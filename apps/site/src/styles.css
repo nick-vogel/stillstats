@@ -1,0 +1,692 @@
+@import "@creator-analytics/visual-system/styles.css";
+
+.icon {
+  width: 0.85em;
+  height: 0.85em;
+  margin-inline-start: 0.15em;
+  vertical-align: -0.05em;
+}
+
+.site-header,
+main,
+.site-footer-inner {
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.site-header {
+  position: relative;
+  padding-block: 1.75rem;
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+/*
+ * The header's navigation (creator-analytics issue 888): its items share the wordmark's and the
+ * avatar's vertical centre. The header still stretches its wordmark from its top, where the web
+ * app's header lines its own up (creator-analytics issue 119, W3), so the navigation centres itself,
+ * and its line height keeps it shorter than the wordmark, so the header keeps the wordmark's
+ * height. Wide, the links and the Extensions button sit in one row before the avatar; below 48rem
+ * they fold into the Menu button. Each menu shows and hides through `hidden`, so a rule that sets
+ * a menu's display skips a hidden one.
+ */
+.site-nav {
+  display: flex;
+  align-self: center;
+  align-items: center;
+  margin-inline-start: auto;
+  line-height: 1.5;
+}
+
+.site-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-nav-list {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.site-nav li {
+  display: flex;
+  align-items: center;
+}
+
+.site-nav a {
+  display: inline-flex;
+  align-items: center;
+  text-decoration-color: transparent;
+}
+
+.site-nav a:hover,
+.site-nav a[aria-current="page"] {
+  text-decoration-color: var(--accent);
+}
+
+.site-nav-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.site-nav-extensions {
+  position: relative;
+}
+
+.site-nav-menu,
+.site-nav-panel {
+  position: absolute;
+  z-index: 10;
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+
+/* Under its button, its right edge on the button's. */
+.site-nav-menu {
+  top: calc(100% + 0.75rem);
+  right: 0;
+  padding: 0.5rem 0;
+  white-space: nowrap;
+  border-radius: 0.75rem;
+}
+
+.site-nav-menu:not([hidden]) {
+  display: grid;
+}
+
+.site-nav-menu a {
+  padding: 0.5rem 1rem;
+}
+
+/* Under the header, at the header's width. */
+.site-nav-panel {
+  top: 100%;
+  left: 0;
+  right: 0;
+  padding: 1rem var(--gutter) 1.25rem;
+  border-radius: 0 0 1rem 1rem;
+}
+
+.site-nav-panel ul {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.site-nav-panel hr {
+  margin: 1rem 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.site-nav-label {
+  margin: 0 0 0.75rem;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.site-nav-menu-button,
+.site-nav-panel {
+  display: none;
+}
+
+@media (width < 48rem) {
+  .site-nav-list {
+    display: none;
+  }
+
+  .site-nav-menu-button {
+    display: inline-flex;
+  }
+
+  .site-nav-panel:not([hidden]) {
+    display: block;
+  }
+}
+
+/*
+ * Held empty until main.ts learns the visitor is signed in and puts the avatar in it. Its negative
+ * block margins center it on the shorter wordmark and add no height, so neither the header nor
+ * the page below it moves when the avatar shows.
+ */
+.avatar-place {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-block: calc((1.625rem - 2.5rem) / 2);
+}
+
+main {
+  flex: 1;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding-block: clamp(4rem, 12vw, 9rem);
+  text-align: center;
+}
+
+.hero h1 {
+  max-width: 14ch;
+}
+
+.site-footer {
+  margin-top: clamp(4rem, 10vw, 7rem);
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.site-footer-inner {
+  padding-block: 3rem 3.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.site-footer-inner p {
+  margin: 0;
+  max-width: 60ch;
+}
+
+.site-footer-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  margin-bottom: 1rem;
+  color: var(--ink);
+}
+
+.site-footer-top nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+
+.site-footer-top .wordmark {
+  font-size: 1.25rem;
+}
+
+/* The homepage (#31). */
+
+.lede {
+  margin: 0;
+  max-width: 44ch;
+  color: var(--ink-soft);
+  font-size: 1.1875rem;
+}
+
+/*
+ * "Open your dashboard", which main.ts pins to the width of the "Sign in with Google" button it
+ * replaces. Its label is about 21px wider than the button's, so it would wrap to a second line and
+ * push the hero down. On one line it spills, centered, into the padding and stays inside the pill.
+ */
+a.button {
+  white-space: nowrap;
+}
+
+/* A signed-in visitor already agreed, but the notice keeps its line so nothing below moves up. */
+.notice-agreed {
+  visibility: hidden;
+}
+
+.app-screenshot,
+.retention-windows div,
+.plan,
+.claim {
+  border: 1px solid var(--line);
+}
+
+/* The screenshot shows a made-up channel (ADR 0009: no creator data in marketing), and its caption
+   says so (#39). */
+.app-screenshot-figure {
+  width: 100%;
+  margin: clamp(1.5rem, 5vw, 3rem) 0 0;
+}
+
+.app-screenshot {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 1rem;
+}
+
+.app-screenshot-figure figcaption {
+  margin-top: 0.75rem;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.home-section {
+  padding-block: clamp(3rem, 8vw, 5.5rem);
+  border-top: 1px solid var(--line);
+}
+
+.home-section h2 {
+  max-width: 20ch;
+  font-size: clamp(2rem, 4.5vw, 3rem);
+}
+
+.home-section .proof-heading {
+  margin-top: clamp(3rem, 8vw, 5rem);
+}
+
+/* The Studio extension and its two store listings, the ones the homepage graph names. */
+.extension-block {
+  margin-top: clamp(3rem, 8vw, 5rem);
+}
+
+.extension-block p {
+  max-width: 52ch;
+  margin-top: 1.5rem;
+  color: var(--ink-soft);
+}
+
+.extension-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+}
+
+.home-section p {
+  margin-bottom: 0;
+}
+
+.home-points {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 2rem clamp(1.5rem, 4vw, 3rem);
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Card headings. The footer FAQ heading shares this size. */
+.home-points h3,
+.plan h3,
+.claim h3,
+.faq h2 {
+  font-size: 1.375rem;
+  letter-spacing: -0.02em;
+}
+
+.home-points p {
+  color: var(--ink-soft);
+}
+
+.home-points p,
+.claim p {
+  margin: 0.75rem 0 0;
+}
+
+.retention-windows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 1rem;
+  margin: 2.5rem 0 0;
+}
+
+.retention-windows div {
+  padding: 1.25rem 1.5rem;
+  border-radius: 1rem;
+}
+
+.retention-windows dt {
+  font: 500 1.5rem / 1.2 var(--font-mono);
+}
+
+.retention-windows dd {
+  margin: 0.5rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9375rem;
+}
+
+.plans,
+.claims {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 1.5rem;
+  margin-top: 2.5rem;
+}
+
+.plan,
+.claim {
+  padding: clamp(1.5rem, 4vw, 2.25rem);
+  border-radius: 1.25rem;
+}
+
+.plan-status {
+  margin: 0.5rem 0 0;
+  color: var(--ink-soft);
+}
+
+.plan ul,
+.refusals {
+  display: grid;
+  gap: 0.6rem;
+  padding-inline-start: 1.15rem;
+}
+
+.plan ul {
+  margin: 1.5rem 0 0;
+}
+
+/* The Pro card's "Subscribe" (creator-analytics issue 907), under its list. */
+.plan-action {
+  margin: 1.5rem 0 0;
+}
+
+/* The Pro card's note on the coming price for 4 channels, under its list. */
+.plan-note {
+  margin: 1.25rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9375rem;
+}
+
+.refusals {
+  margin: 2rem 0;
+  font-size: 1.1875rem;
+}
+
+/*
+ * The privacy policy, the terms and the release pages: long-form text at a reading measure. These
+ * rules stay before the FAQ's: .faq details p is more specific than .legal p, and Biome's
+ * noDescendingSpecificity rule fails when the more specific selector comes first.
+ */
+
+.legal {
+  max-width: calc(44rem + 2 * var(--gutter));
+  padding-block: clamp(2.5rem, 7vw, 5rem) 0;
+}
+
+.legal h1 {
+  font-size: clamp(2.25rem, 6vw, 3.5rem);
+}
+
+.legal h2 {
+  margin-top: 2.75rem;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.legal p,
+.legal ul {
+  margin: 1rem 0 0;
+}
+
+/* List rules. The principles page shares them. */
+.legal ul,
+.principles ul {
+  padding-inline-start: 1.25rem;
+}
+
+.legal li + li,
+.principles li + li {
+  margin-top: 0.5rem;
+}
+
+.legal li::marker,
+.principles li::marker {
+  color: var(--accent);
+}
+
+.legal strong {
+  font-weight: 600;
+}
+
+.legal code {
+  font: 400 0.875em / 1 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.legal a {
+  overflow-wrap: anywhere;
+}
+
+.legal .legal-updated {
+  margin-top: 0.75rem;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+/*
+ * A tool page (ADR 0021): the page gives the tool the window's full width, and sets the heading,
+ * the privacy line and the prose at the reading measure the legal and principles pages use. On the
+ * tool page the header and the main column drop the 68rem measure and keep 2rem at each side from
+ * 48rem up and 1rem below (creator-analytics issue 889); every other page, and the footer here,
+ * keep the measure and the gutter. The header's rule keys on the page's own main, so the shared
+ * header partial needs no class. Each selector stays below the package's
+ * `.t-focus-locked .t-focus-host`, which zeroes the main column's padding in focus mode: the build
+ * joins the two into one `:is()`, which takes its most specific selector's weight, so the header's
+ * `:has()` sits in a `:where()` and the list weighs no more than `main.tool-page`. A back
+ * link sits 1.5rem under the header, above the title, as the release pages set theirs. These rules
+ * stay before the FAQ's for the same reason the legal rules do. The sign-in band that ends the page
+ * sits at the prose's measure and stacks as the homepage hero does, so its agreement notice sits as
+ * it does there.
+ */
+
+:where(body:has(> main.tool-page)) > .site-header,
+main.tool-page {
+  max-width: none;
+  padding-inline: 1rem;
+}
+
+@media (width >= 48rem) {
+  :where(body:has(> main.tool-page)) > .site-header,
+  main.tool-page {
+    padding-inline: 2rem;
+  }
+}
+
+.tool-page {
+  padding-block: 1.5rem 0;
+}
+
+.tool-back {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+}
+
+.tool-back a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+
+/* The arrow leads the text, so it drops the margin `.icon` keeps for a trailing icon. */
+.tool-back .icon {
+  margin-inline-start: 0;
+}
+
+.tool-page h1,
+.tool-privacy,
+.tool-prose,
+.sign-in-band {
+  max-width: 44rem;
+}
+
+.tool-page h1 {
+  font-size: clamp(2.25rem, 6vw, 3.5rem);
+}
+
+/* The gap above the tool is the privacy line's, not the mount's: focus mode hides the line, so the
+   gap goes with it, and a margin on `#thumbnail-tool` would outrank the package's `.t-focus-host`
+   and open the stage below a band of the page. */
+.tool-privacy {
+  margin-block: 1rem clamp(2rem, 5vw, 3rem);
+  color: var(--ink-soft);
+}
+
+.tool-prose {
+  margin-top: clamp(2.5rem, 6vw, 4rem);
+}
+
+.tool-prose h2 {
+  margin-top: 2.75rem;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.tool-prose p {
+  margin: 1rem 0 0;
+}
+
+.sign-in-band {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.5rem;
+  margin-top: clamp(2.5rem, 6vw, 4rem);
+  padding-top: clamp(2.5rem, 6vw, 4rem);
+  border-top: 1px solid var(--line);
+}
+
+.sign-in-band h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.sign-in-band p:not([class], [role]) {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+/* The footer FAQ (#31), which every page carries. */
+
+.faq {
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.faq h2 {
+  margin-bottom: 0.75rem;
+}
+
+.faq details {
+  border-bottom: 1px solid var(--line);
+}
+
+.faq summary {
+  padding-block: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.faq details p {
+  margin: 0 0 1rem;
+  color: var(--ink-soft);
+}
+
+/* The principles page (#30). */
+
+.principles {
+  padding-block: clamp(3rem, 9vw, 6rem) 0;
+}
+
+.principles > * {
+  max-width: 44rem;
+}
+
+.principles h2 {
+  margin-top: clamp(2.5rem, 6vw, 4rem);
+  font-size: clamp(1.5rem, 3.5vw, 2.125rem);
+}
+
+.principles-lede {
+  margin-block: 1.5rem 0;
+  color: var(--ink-soft);
+  font-size: 1.25rem;
+}
+
+.principles dl {
+  margin: 0;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.principles dt {
+  font-weight: 600;
+}
+
+.principles dd {
+  margin: 0.25rem 0 0;
+  color: var(--ink-soft);
+}
+
+/* The competitor comparison (#32). */
+
+.comparison-lede {
+  max-width: 52ch;
+  margin-top: 1.5rem;
+  color: var(--ink-soft);
+}
+
+.claim {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-section .claim .claim-source {
+  margin-top: auto;
+  padding-top: 1.25rem;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+/* The release index and the release pages, which take the long-form rules above. */
+
+.releases-list {
+  margin: 2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legal .releases-list li {
+  position: relative;
+  margin-top: 0;
+  padding-block: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.releases-list h2 {
+  margin-top: 0;
+}
+
+/* The heading's link covers its whole card, so a click anywhere on it opens the release, and a
+   screen reader still hears one link per release (creator-analytics issue 635). */
+.releases-list h2 a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.releases-list li:hover h2 a {
+  text-decoration: underline;
+}
+
+/* Beats `.legal p`, so the link gets its own line above the heading. */
+.legal .release-back {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+}
+
+.release-note > :first-child {
+  margin-top: 2rem;
+}

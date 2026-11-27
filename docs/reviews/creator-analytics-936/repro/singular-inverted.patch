@@ -1,0 +1,13 @@
+diff --git a/apps/web/src/retention-comparison.ts b/apps/web/src/retention-comparison.ts
+index b6a9e5ea..8173cf3d 100644
+--- a/apps/web/src/retention-comparison.ts
++++ b/apps/web/src/retention-comparison.ts
+@@ -45,7 +45,7 @@ export const comparisonText = {
+  */
+ export function backfillNoteOf(unread: number, locale?: string): string {
+   const count = unread.toLocaleString(locale)
+-  const videos = unread === 1 ? `${count} video` : `${count} videos`
++  const videos = unread === 1 ? `${count} videos` : `${count} video`
+   return `Stillstats is still reading your videos' retention, a batch each day. ${videos} to go.`
+ }
+ 

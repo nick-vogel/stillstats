@@ -1,0 +1,2924 @@
+{
+  "id": "46f43e5a-308f-49d7-89be-5b3240965e2a",
+  "prevId": "966d4c4d-8faf-4bfd-b2da-008d35bdca9d",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.accounts": {
+      "name": "accounts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "access_token": {
+          "name": "access_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token": {
+          "name": "refresh_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "id_token": {
+          "name": "id_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "access_token_expires_at": {
+          "name": "access_token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token_expires_at": {
+          "name": "refresh_token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "accounts_user_id_idx": {
+          "name": "accounts_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "accounts_user_id_users_id_fk": {
+          "name": "accounts_user_id_users_id_fk",
+          "tableFrom": "accounts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "accounts_anonymous": {
+          "name": "accounts_anonymous",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'anonymous')",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'anonymous')"
+        },
+        "accounts_web_select": {
+          "name": "accounts_web_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"accounts\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "accounts_web_delete": {
+          "name": "accounts_web_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"accounts\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.activity_days": {
+      "name": "activity_days",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "activity_days_user_id_users_id_fk": {
+          "name": "activity_days_user_id_users_id_fk",
+          "tableFrom": "activity_days",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "activity_days_user_id_day_pk": {
+          "name": "activity_days_user_id_day_pk",
+          "columns": [
+            "user_id",
+            "day"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "activity_days_web_insert": {
+          "name": "activity_days_web_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_web"
+          ],
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"activity_days\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "activity_days_worker_system_select": {
+          "name": "activity_days_worker_system_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'system')"
+        },
+        "activity_days_worker_system_delete": {
+          "name": "activity_days_worker_system_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'system')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.channels": {
+      "name": "channels",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "youtube_channel_id": {
+          "name": "youtube_channel_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "channels_youtube_channel_id_unique": {
+          "name": "channels_youtube_channel_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "youtube_channel_id"
+          ]
+        }
+      },
+      "policies": {
+        "channels_web": {
+          "name": "channels_web",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"channels\".\"id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "channels_worker": {
+          "name": "channels_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"channels\".\"id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"channels\".\"id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        },
+        "channels_claim": {
+          "name": "channels_claim",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_claim"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user')",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.connection_identifiers": {
+      "name": "connection_identifiers",
+      "schema": "",
+      "columns": {
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hmac": {
+          "name": "hmac",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "connection_identifiers_channel_id_idx": {
+          "name": "connection_identifiers_channel_id_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "connection_identifiers_kind_hmac_idx": {
+          "name": "connection_identifiers_kind_hmac_idx",
+          "columns": [
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "hmac",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "connection_identifiers_channel_id_channels_id_fk": {
+          "name": "connection_identifiers_channel_id_channels_id_fk",
+          "tableFrom": "connection_identifiers",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "connection_identifiers_channel_id_kind_key": {
+          "name": "connection_identifiers_channel_id_kind_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "channel_id",
+            "kind"
+          ]
+        }
+      },
+      "policies": {
+        "connection_identifiers_web": {
+          "name": "connection_identifiers_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"connection_identifiers\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"connection_identifiers\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "connection_identifiers_worker": {
+          "name": "connection_identifiers_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"connection_identifiers\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"connection_identifiers\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        },
+        "connection_identifiers_worker_system_select": {
+          "name": "connection_identifiers_worker_system_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'system')"
+        },
+        "connection_identifiers_roster": {
+          "name": "connection_identifiers_roster",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_roster"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'system')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.connections": {
+      "name": "connections",
+      "schema": "",
+      "columns": {
+        "refresh_token": {
+          "name": "refresh_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "access_token": {
+          "name": "access_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "access_token_expires_at": {
+          "name": "access_token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key_version": {
+          "name": "key_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scopes": {
+          "name": "scopes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "connected_at": {
+          "name": "connected_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "connections_channel_id_channels_id_fk": {
+          "name": "connections_channel_id_channels_id_fk",
+          "tableFrom": "connections",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "connections_pkey": {
+          "name": "connections_pkey",
+          "columns": [
+            "channel_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "connections_web": {
+          "name": "connections_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"connections\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"connections\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "connections_worker": {
+          "name": "connections_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"connections\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"connections\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        },
+        "connections_roster": {
+          "name": "connections_roster",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_roster"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'system')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.consent_states": {
+      "name": "consent_states",
+      "schema": "",
+      "columns": {
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "landing": {
+          "name": "landing",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "consent_states_user_id_idx": {
+          "name": "consent_states_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "consent_states_user_id_users_id_fk": {
+          "name": "consent_states_user_id_users_id_fk",
+          "tableFrom": "consent_states",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "consent_states_web": {
+          "name": "consent_states_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"consent_states\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"consent_states\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        }
+      },
+      "checkConstraints": {
+        "consent_states_revenue_names_channel": {
+          "name": "consent_states_revenue_names_channel",
+          "value": "(\"consent_states\".\"purpose\" = 'revenue') = (\"consent_states\".\"channel_id\" is not null)"
+        },
+        "consent_states_landing": {
+          "name": "consent_states_landing",
+          "value": "\"consent_states\".\"landing\" is null or (\"consent_states\".\"landing\" = 'upgrade' and \"consent_states\".\"purpose\" = 'connect')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.deletion_log": {
+      "name": "deletion_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "youtube_channel_hmac": {
+          "name": "youtube_channel_hmac",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_at": {
+          "name": "requested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "row_counts": {
+          "name": "row_counts",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "deletion_log_youtube_channel_hmac_idx": {
+          "name": "deletion_log_youtube_channel_hmac_idx",
+          "columns": [
+            {
+              "expression": "youtube_channel_hmac",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "deletion_log_worker_channel_insert": {
+          "name": "deletion_log_worker_channel_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_worker"
+          ],
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel')"
+        },
+        "deletion_log_worker_system_select": {
+          "name": "deletion_log_worker_system_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'system')"
+        },
+        "deletion_log_worker_system_delete": {
+          "name": "deletion_log_worker_system_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'system' and \"deletion_log\".\"completed_at\" < ((nullif(current_setting('app.now', true), '')::timestamptz at time zone 'UTC') - interval '24 months') at time zone 'UTC')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.deletion_requests": {
+      "name": "deletion_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ended_memberships": {
+          "name": "ended_memberships",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_at": {
+          "name": "requested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "deletion_requests_one_open_idx": {
+          "name": "deletion_requests_one_open_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"deletion_requests\".\"completed_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "deletion_requests_web": {
+          "name": "deletion_requests_web",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"deletion_requests\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "deletion_requests_web_insert": {
+          "name": "deletion_requests_web_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_web"
+          ],
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"deletion_requests\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "deletion_requests_worker": {
+          "name": "deletion_requests_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"deletion_requests\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"deletion_requests\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        },
+        "deletion_requests_worker_complete": {
+          "name": "deletion_requests_worker_complete",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"deletion_requests\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"deletion_requests\".\"channel_id\" is null)"
+        },
+        "deletion_requests_worker_system_delete": {
+          "name": "deletion_requests_worker_system_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'system' and \"deletion_requests\".\"completed_at\" < ((nullif(current_setting('app.now', true), '')::timestamptz at time zone 'UTC') - interval '24 months') at time zone 'UTC')"
+        }
+      },
+      "checkConstraints": {
+        "deletion_requests_open_until_cleared": {
+          "name": "deletion_requests_open_until_cleared",
+          "value": "(\"deletion_requests\".\"completed_at\" is null) = (\"deletion_requests\".\"channel_id\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.feedback_messages": {
+      "name": "feedback_messages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "screen": {
+          "name": "screen",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "app_version": {
+          "name": "app_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reply_to": {
+          "name": "reply_to",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "done_at": {
+          "name": "done_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "feedback_messages_user_id_created_at_idx": {
+          "name": "feedback_messages_user_id_created_at_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "feedback_messages_user_id_users_id_fk": {
+          "name": "feedback_messages_user_id_users_id_fk",
+          "tableFrom": "feedback_messages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "feedback_messages_web_insert": {
+          "name": "feedback_messages_web_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_web"
+          ],
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"feedback_messages\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "feedback_messages_count": {
+          "name": "feedback_messages_count",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_feedback_count"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"feedback_messages\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "feedback_messages_admin_select": {
+          "name": "feedback_messages_admin_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'admin')"
+        },
+        "feedback_messages_admin_update": {
+          "name": "feedback_messages_admin_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'admin')",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'admin')"
+        },
+        "feedback_messages_worker_system_delete": {
+          "name": "feedback_messages_worker_system_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'system' and \"feedback_messages\".\"done_at\" < ((nullif(current_setting('app.now', true), '')::timestamptz at time zone 'UTC') - interval '1 year') at time zone 'UTC')"
+        }
+      },
+      "checkConstraints": {
+        "feedback_messages_type": {
+          "name": "feedback_messages_type",
+          "value": "\"feedback_messages\".\"type\" in ('something_wrong', 'idea', 'other')"
+        },
+        "feedback_messages_screen": {
+          "name": "feedback_messages_screen",
+          "value": "\"feedback_messages\".\"screen\" in ('video_list', 'video_detail', 'audience', 'settings', 'whats_new', 'extension')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.memberships": {
+      "name": "memberships",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "memberships_channel_id_idx": {
+          "name": "memberships_channel_id_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "memberships_one_owner_idx": {
+          "name": "memberships_one_owner_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"memberships\".\"role\" = 'owner'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "memberships_user_id_users_id_fk": {
+          "name": "memberships_user_id_users_id_fk",
+          "tableFrom": "memberships",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "memberships_channel_id_channels_id_fk": {
+          "name": "memberships_channel_id_channels_id_fk",
+          "tableFrom": "memberships",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "memberships_user_id_channel_id_pk": {
+          "name": "memberships_user_id_channel_id_pk",
+          "columns": [
+            "user_id",
+            "channel_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "memberships_web": {
+          "name": "memberships_web",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"memberships\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "memberships_web_delete": {
+          "name": "memberships_web_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"memberships\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "memberships_worker": {
+          "name": "memberships_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"memberships\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"memberships\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        },
+        "memberships_claim": {
+          "name": "memberships_claim",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_claim"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user')",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.preferences": {
+      "name": "preferences",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "page_size": {
+          "name": "page_size",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "views_column": {
+          "name": "views_column",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "watch_time_column": {
+          "name": "watch_time_column",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revenue_column": {
+          "name": "revenue_column",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revenue_sources": {
+          "name": "revenue_sources",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rpm_ads_and_premium_only": {
+          "name": "rpm_ads_and_premium_only",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chart_mode": {
+          "name": "chart_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chart_card": {
+          "name": "chart_card",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "visibility": {
+          "name": "visibility",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sidebar_open": {
+          "name": "sidebar_open",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "theme": {
+          "name": "theme",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "support_prompt_dismissed_at": {
+          "name": "support_prompt_dismissed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "upgrade_prompt_dismissed_at": {
+          "name": "upgrade_prompt_dismissed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "whats_new_marker": {
+          "name": "whats_new_marker",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "preferences_user_id_users_id_fk": {
+          "name": "preferences_user_id_users_id_fk",
+          "tableFrom": "preferences",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "preferences_web": {
+          "name": "preferences_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"preferences\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"preferences\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        }
+      },
+      "checkConstraints": {
+        "preferences_page_size": {
+          "name": "preferences_page_size",
+          "value": "\"preferences\".\"page_size\" in (10, 25, 50)"
+        },
+        "preferences_chart_mode": {
+          "name": "preferences_chart_mode",
+          "value": "\"preferences\".\"chart_mode\" in ('daily', 'aggregate')"
+        },
+        "preferences_chart_card": {
+          "name": "preferences_chart_card",
+          "value": "\"preferences\".\"chart_card\" in ('engagedViews', 'watchTime', 'revenue', 'rpm', 'impressions', 'ctr')"
+        },
+        "preferences_visibility": {
+          "name": "preferences_visibility",
+          "value": "\"preferences\".\"visibility\" in ('public', 'all')"
+        },
+        "preferences_theme": {
+          "name": "preferences_theme",
+          "value": "\"preferences\".\"theme\" in ('light', 'dark', 'system')"
+        },
+        "preferences_currency": {
+          "name": "preferences_currency",
+          "value": "\"preferences\".\"currency\" ~ '^[A-Z]{3}$'"
+        },
+        "preferences_whats_new_marker": {
+          "name": "preferences_whats_new_marker",
+          "value": "\"preferences\".\"whats_new_marker\" ~ '^[1-9][0-9]{3}\\.[1-9][0-9]?\\.[1-9][0-9]?(\\.[1-9][0-9]*)?$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.quota_usage": {
+      "name": "quota_usage",
+      "schema": "",
+      "columns": {
+        "api": {
+          "name": "api",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quota_day": {
+          "name": "quota_day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "units": {
+          "name": "units",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "quota_usage_api_quota_day_pk": {
+          "name": "quota_usage_api_quota_day_pk",
+          "columns": [
+            "api",
+            "quota_day"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "quota_usage_web": {
+          "name": "quota_usage_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user')",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user')"
+        },
+        "quota_usage_worker": {
+          "name": "quota_usage_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel')",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.reach_history": {
+      "name": "reach_history",
+      "schema": "",
+      "columns": {
+        "video_id": {
+          "name": "video_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "traffic_source_type": {
+          "name": "traffic_source_type",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "impressions": {
+          "name": "impressions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ctr": {
+          "name": "ctr",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "reach_history_channel_id_idx": {
+          "name": "reach_history_channel_id_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "reach_history_row_idx": {
+          "name": "reach_history_row_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "video_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "day",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "traffic_source_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "reach_history_channel_id_day_idx": {
+          "name": "reach_history_channel_id_day_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "day",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "reach_history_channel_id_channels_id_fk": {
+          "name": "reach_history_channel_id_channels_id_fk",
+          "tableFrom": "reach_history",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "reach_history_web": {
+          "name": "reach_history_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"reach_history\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"reach_history\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "reach_history_worker": {
+          "name": "reach_history_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"reach_history\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"reach_history\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        }
+      },
+      "checkConstraints": {
+        "reach_history_impressions": {
+          "name": "reach_history_impressions",
+          "value": "\"reach_history\".\"impressions\" >= 0"
+        },
+        "reach_history_ctr": {
+          "name": "reach_history_ctr",
+          "value": "\"reach_history\".\"ctr\" between 0 and 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.reach_history_days": {
+      "name": "reach_history_days",
+      "schema": "",
+      "columns": {
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "report_created_at": {
+          "name": "report_created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "reach_history_days_channel_id_idx": {
+          "name": "reach_history_days_channel_id_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "reach_history_days_channel_id_channels_id_fk": {
+          "name": "reach_history_days_channel_id_channels_id_fk",
+          "tableFrom": "reach_history_days",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "reach_history_days_pkey": {
+          "name": "reach_history_days_pkey",
+          "columns": [
+            "channel_id",
+            "day"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "reach_history_days_web": {
+          "name": "reach_history_days_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"reach_history_days\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"reach_history_days\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "reach_history_days_worker": {
+          "name": "reach_history_days_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"reach_history_days\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"reach_history_days\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.read_cache": {
+      "name": "read_cache",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fetched_at": {
+          "name": "fetched_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "read_cache_channel_id_idx": {
+          "name": "read_cache_channel_id_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "read_cache_channel_id_key_idx": {
+          "name": "read_cache_channel_id_key_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "read_cache_channel_id_channels_id_fk": {
+          "name": "read_cache_channel_id_channels_id_fk",
+          "tableFrom": "read_cache",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "read_cache_web": {
+          "name": "read_cache_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"read_cache\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"read_cache\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "read_cache_worker": {
+          "name": "read_cache_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"read_cache\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"read_cache\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        },
+        "read_cache_worker_system_delete": {
+          "name": "read_cache_worker_system_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'system' and \"read_cache\".\"expires_at\" <= nullif(current_setting('app.now', true), '')::timestamptz)"
+        }
+      },
+      "checkConstraints": {
+        "read_cache_expiry_within_24_hours": {
+          "name": "read_cache_expiry_within_24_hours",
+          "value": "\"read_cache\".\"expires_at\" <= \"read_cache\".\"fetched_at\" + interval '24 hours'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.reporting_jobs": {
+      "name": "reporting_jobs",
+      "schema": "",
+      "columns": {
+        "job_id": {
+          "name": "job_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "downloads_failing_since": {
+          "name": "downloads_failing_since",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "reporting_jobs_channel_id_channels_id_fk": {
+          "name": "reporting_jobs_channel_id_channels_id_fk",
+          "tableFrom": "reporting_jobs",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "reporting_jobs_pkey": {
+          "name": "reporting_jobs_pkey",
+          "columns": [
+            "channel_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "reporting_jobs_web": {
+          "name": "reporting_jobs_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"reporting_jobs\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"reporting_jobs\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "reporting_jobs_worker": {
+          "name": "reporting_jobs_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"reporting_jobs\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"reporting_jobs\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.retention_curve_reads": {
+      "name": "retention_curve_reads",
+      "schema": "",
+      "columns": {
+        "video_id": {
+          "name": "video_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "retention_curve_reads_channel_id_idx": {
+          "name": "retention_curve_reads_channel_id_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "retention_curve_reads_channel_id_channels_id_fk": {
+          "name": "retention_curve_reads_channel_id_channels_id_fk",
+          "tableFrom": "retention_curve_reads",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "retention_curve_reads_pkey": {
+          "name": "retention_curve_reads_pkey",
+          "columns": [
+            "channel_id",
+            "video_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "retention_curve_reads_web": {
+          "name": "retention_curve_reads_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"retention_curve_reads\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"retention_curve_reads\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "retention_curve_reads_worker": {
+          "name": "retention_curve_reads_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"retention_curve_reads\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"retention_curve_reads\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.retention_curves": {
+      "name": "retention_curves",
+      "schema": "",
+      "columns": {
+        "video_id": {
+          "name": "video_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "elapsed_video_time_ratio": {
+          "name": "elapsed_video_time_ratio",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "audience_watch_ratio": {
+          "name": "audience_watch_ratio",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "retention_curves_channel_id_idx": {
+          "name": "retention_curves_channel_id_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "retention_curves_point_idx": {
+          "name": "retention_curves_point_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "video_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "elapsed_video_time_ratio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "retention_curves_channel_id_channels_id_fk": {
+          "name": "retention_curves_channel_id_channels_id_fk",
+          "tableFrom": "retention_curves",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "retention_curves_web": {
+          "name": "retention_curves_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"retention_curves\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"retention_curves\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "retention_curves_worker": {
+          "name": "retention_curves_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"retention_curves\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"retention_curves\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        }
+      },
+      "checkConstraints": {
+        "retention_curves_elapsed_video_time_ratio": {
+          "name": "retention_curves_elapsed_video_time_ratio",
+          "value": "\"retention_curves\".\"elapsed_video_time_ratio\" between 0 and 1"
+        },
+        "retention_curves_audience_watch_ratio": {
+          "name": "retention_curves_audience_watch_ratio",
+          "value": "\"retention_curves\".\"audience_watch_ratio\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.security_events": {
+      "name": "security_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hmac": {
+          "name": "hmac",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "security_events_anonymous_insert": {
+          "name": "security_events_anonymous_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_web"
+          ],
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'anonymous')"
+        },
+        "security_events_worker_system_select": {
+          "name": "security_events_worker_system_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'system')"
+        },
+        "security_events_worker_system_delete": {
+          "name": "security_events_worker_system_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'system')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sessions": {
+      "name": "sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "sessions_user_id_idx": {
+          "name": "sessions_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sessions_user_id_users_id_fk": {
+          "name": "sessions_user_id_users_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "sessions_token_unique": {
+          "name": "sessions_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {
+        "sessions_anonymous": {
+          "name": "sessions_anonymous",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'anonymous')",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'anonymous')"
+        },
+        "sessions_web_select": {
+          "name": "sessions_web_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"sessions\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "sessions_web_delete": {
+          "name": "sessions_web_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"sessions\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sponsor_report_figures": {
+      "name": "sponsor_report_figures",
+      "schema": "",
+      "columns": {
+        "figures": {
+          "name": "figures",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "sponsor_report_figures_channel_id_channels_id_fk": {
+          "name": "sponsor_report_figures_channel_id_channels_id_fk",
+          "tableFrom": "sponsor_report_figures",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "sponsor_report_figures_pkey": {
+          "name": "sponsor_report_figures_pkey",
+          "columns": [
+            "channel_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "sponsor_report_figures_web": {
+          "name": "sponsor_report_figures_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"sponsor_report_figures\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"sponsor_report_figures\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "sponsor_report_figures_worker": {
+          "name": "sponsor_report_figures_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"sponsor_report_figures\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"sponsor_report_figures\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        }
+      },
+      "checkConstraints": {
+        "sponsor_report_figures_figures": {
+          "name": "sponsor_report_figures_figures",
+          "value": "cardinality(\"sponsor_report_figures\".\"figures\") > 0 and \"sponsor_report_figures\".\"figures\" <@ array['views', 'engagedViews', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage', 'likes', 'comments', 'shares', 'subscribersGained', 'impressions', 'ctr']::text[]"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.subscription_cancellations": {
+      "name": "subscription_cancellations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deletion_request_id": {
+          "name": "deletion_request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stripe_subscription_id": {
+          "name": "stripe_subscription_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "subscription_cancellations_deletion_request_id_unique": {
+          "name": "subscription_cancellations_deletion_request_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "deletion_request_id"
+          ]
+        }
+      },
+      "policies": {
+        "subscription_cancellations_worker": {
+          "name": "subscription_cancellations_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"subscription_cancellations\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"subscription_cancellations\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.subscription_payments": {
+      "name": "subscription_payments",
+      "schema": "",
+      "columns": {
+        "stripe_invoice_id": {
+          "name": "stripe_invoice_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "subscription_payments_channel_id_idx": {
+          "name": "subscription_payments_channel_id_idx",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "subscription_payments_channel_id_channels_id_fk": {
+          "name": "subscription_payments_channel_id_channels_id_fk",
+          "tableFrom": "subscription_payments",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "subscription_payments_web": {
+          "name": "subscription_payments_web",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"subscription_payments\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "subscription_payments_worker_channel_select": {
+          "name": "subscription_payments_worker_channel_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"subscription_payments\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        },
+        "subscription_payments_billing": {
+          "name": "subscription_payments_billing",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_billing"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'anonymous')",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'anonymous')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.subscriptions": {
+      "name": "subscriptions",
+      "schema": "",
+      "columns": {
+        "stripe_customer_id": {
+          "name": "stripe_customer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stripe_subscription_id": {
+          "name": "stripe_subscription_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "plan": {
+          "name": "plan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current_period_end": {
+          "name": "current_period_end",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "purge_after": {
+          "name": "purge_after",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "subscriptions_channel_id_channels_id_fk": {
+          "name": "subscriptions_channel_id_channels_id_fk",
+          "tableFrom": "subscriptions",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "subscriptions_pkey": {
+          "name": "subscriptions_pkey",
+          "columns": [
+            "channel_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "subscriptions_stripe_subscription_id_unique": {
+          "name": "subscriptions_stripe_subscription_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "stripe_subscription_id"
+          ]
+        }
+      },
+      "policies": {
+        "subscriptions_web": {
+          "name": "subscriptions_web",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"subscriptions\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'user' and \"subscriptions\".\"channel_id\" in (select m.channel_id from memberships m where m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "subscriptions_worker": {
+          "name": "subscriptions_worker",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_worker"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"subscriptions\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'channel' and \"subscriptions\".\"channel_id\" = nullif(current_setting('app.channel_id', true), '')::uuid)"
+        },
+        "subscriptions_billing": {
+          "name": "subscriptions_billing",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_billing"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'anonymous')",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'anonymous')"
+        }
+      },
+      "checkConstraints": {
+        "subscriptions_plan": {
+          "name": "subscriptions_plan",
+          "value": "\"subscriptions\".\"plan\" in ('monthly', 'annual')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.tips": {
+      "name": "tips",
+      "schema": "",
+      "columns": {
+        "checkout_session_id": {
+          "name": "checkout_session_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "tips_user_id_idx": {
+          "name": "tips_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tips_user_id_users_id_fk": {
+          "name": "tips_user_id_users_id_fk",
+          "tableFrom": "tips",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "tips_anonymous_insert": {
+          "name": "tips_anonymous_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_web"
+          ],
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'anonymous')"
+        },
+        "tips_web_select": {
+          "name": "tips_web_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"tips\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "tips_web_delete": {
+          "name": "tips_web_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"tips\".\"user_id\" = nullif(current_setting('app.user_id', true), ''))"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email_verified": {
+          "name": "email_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {
+        "users_anonymous": {
+          "name": "users_anonymous",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'anonymous')",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'anonymous')"
+        },
+        "users_web_select": {
+          "name": "users_web_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"users\".\"id\" = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "users_web_delete": {
+          "name": "users_web_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'user' and \"users\".\"id\" = nullif(current_setting('app.user_id', true), ''))"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.verifications": {
+      "name": "verifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "identifier": {
+          "name": "identifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "verifications_identifier_idx": {
+          "name": "verifications_identifier_idx",
+          "columns": [
+            {
+              "expression": "identifier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "verifications_anonymous": {
+          "name": "verifications_anonymous",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_web"
+          ],
+          "using": "(nullif(current_setting('app.scope', true), '') = 'anonymous')",
+          "withCheck": "(nullif(current_setting('app.scope', true), '') = 'anonymous')"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {
+    "app_billing": {
+      "name": "app_billing",
+      "createDb": false,
+      "createRole": false,
+      "inherit": true
+    },
+    "app_claim": {
+      "name": "app_claim",
+      "createDb": false,
+      "createRole": false,
+      "inherit": true
+    },
+    "app_feedback_count": {
+      "name": "app_feedback_count",
+      "createDb": false,
+      "createRole": false,
+      "inherit": true
+    },
+    "app_roster": {
+      "name": "app_roster",
+      "createDb": false,
+      "createRole": false,
+      "inherit": true
+    },
+    "app_web": {
+      "name": "app_web",
+      "createDb": false,
+      "createRole": false,
+      "inherit": true
+    },
+    "app_worker": {
+      "name": "app_worker",
+      "createDb": false,
+      "createRole": false,
+      "inherit": true
+    }
+  },
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

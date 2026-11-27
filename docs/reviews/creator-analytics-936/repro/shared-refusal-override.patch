@@ -1,0 +1,12 @@
+diff --git a/apps/web/src/retention-comparison.ts b/apps/web/src/retention-comparison.ts
+index b6a9e5ea..e2200bb7 100644
+--- a/apps/web/src/retention-comparison.ts
++++ b/apps/web/src/retention-comparison.ts
+@@ -125,6 +125,7 @@ export function comparisonViewOf(
+       kind: 'refused',
+       message: refusalMessageOf(body, 'the retention curves', {
+         sort_without_history: comparisonText.refused,
++        google_failed: '',
+       }),
+     }
+   }

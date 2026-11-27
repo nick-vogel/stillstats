@@ -1,0 +1,38 @@
+{
+  "name": "@creator-analytics/web",
+  "private": true,
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json && tsc -p test/tsconfig.json"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.9.0",
+    "@creator-analytics/api-types": "workspace:*",
+    "@creator-analytics/releases": "workspace:*",
+    "@creator-analytics/reporter": "workspace:*",
+    "@creator-analytics/visual-system": "workspace:*",
+    "@openpanel/web": "^1.4.1",
+    "@sentry/react": "^11.4.0",
+    "@tanstack/charts": "1.2.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.66.0",
+    "react": "^19.3.0",
+    "react-day-picker": "^10.0.2",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@creator-analytics/database": "workspace:*",
+    "@tailwindcss/vite": "^4.3.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "shadcn": "4.23.0",
+    "tailwindcss": "^4.3.4",
+    "vite": "^8.3.2"
+  }
+}

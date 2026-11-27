@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>Focus stage accent contrast repro</title>
+    <link rel="stylesheet" href="../../../../packages/visual-system/src/styles.css" />
+    <link rel="stylesheet" href="../../../../packages/thumbnail-preview/src/styles.css" />
+  </head>
+  <body>
+    <div id="root" class="t-toolroot">
+      <button type="button" class="t-button">Focus mode</button>
+      <span class="t-warnmark"><svg aria-hidden="true"></svg></span>
+    </div>
+    <pre id="out"></pre>
+    <script>
+      const paint = document.createElement('canvas').getContext('2d')
+      function channels(colour) {
+        paint.fillStyle = '#000'
+        paint.fillStyle = colour
+        paint.fillRect(0, 0, 1, 1)
+        const [r, g, b] = paint.getImageData(0, 0, 1, 1).data
+        return [r, g, b]
+      }
+      function luminance(colour) {
+        const linear = (value) => {
+          const v = value / 255
+          return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+        }
+        const [r, g, b] = channels(colour)
+        return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+      }
+      function contrast(a, b) {
+        const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+        return Number(((high + 0.05) / (low + 0.05)).toFixed(2))
+      }
+      const root = document.getElementById('root')
+      const button = root.querySelector('.t-button')
+      const warnIcon = root.querySelector('.t-warnmark svg')
+      const rows = []
+      for (const page of ['light', 'dark']) {
+        for (const stage of ['light', 'dark']) {
+          document.documentElement.dataset.theme = page
+          root.className = `t-toolroot t-focus t-focus--${stage}`
+          const surface = getComputedStyle(root).backgroundColor
+          const ring = getComputedStyle(button).getPropertyValue('--accent').trim()
+          const icon = getComputedStyle(warnIcon).color
+          rows.push({
+            page,
+            stage,
+            surface,
+            accent: ring,
+            focusRingContrast: contrast(ring, surface),
+            warnIconContrast: contrast(icon, surface),
+          })
+        }
+      }
+      document.getElementById('out').textContent = JSON.stringify(rows, null, 1)
+    </script>
+  </body>
+</html>

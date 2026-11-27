@@ -1,0 +1,41 @@
+@import "@creator-analytics/visual-system/styles.css";
+
+body {
+  min-width: 20rem;
+}
+
+.popup {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem;
+}
+
+.popup p,
+.popup ul {
+  margin: 0;
+}
+
+.popup h2 {
+  font-size: 1.1rem;
+}
+
+.popup ul {
+  padding-left: 1.1rem;
+}
+
+.popup .button {
+  justify-self: start;
+}
+
+.popup .toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Chrome sizes a popup to its content's unwrapped width, up to 800px, so the explanation wraps
+   at the popup's own width rather than widening it. */
+.popup .explanation {
+  max-width: 20rem;
+  font-size: 0.9rem;
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@creator-analytics/extension",
+  "private": true,
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "version": "0.3.0",
+  "scripts": {
+    "build": "wxt build -b chrome --mv3 && wxt build -b firefox --mv3",
+    "screenshots": "node test/screenshot/take-screenshots.ts",
+    "build:dev": "wxt build -b chrome --mv3 --mode development && wxt build -b firefox --mv3 --mode development",
+    "build:staging": "wxt build -b chrome --mv3 --mode staging && wxt build -b firefox --mv3 --mode staging",
+    "typecheck": "wxt prepare && tsc -p tsconfig.json && tsc -p test/tsconfig.json"
+  },
+  "dependencies": {
+    "@creator-analytics/api-types": "workspace:*",
+    "@creator-analytics/visual-system": "workspace:*"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.2",
+    "wxt": "0.21.4"
+  }
+}

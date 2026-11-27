@@ -1,0 +1,1 @@
+ALTER TABLE "preferences" ADD COLUMN "support_prompt_dismissed_at" timestamp with time zone;

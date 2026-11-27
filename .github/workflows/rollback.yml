@@ -1,0 +1,147 @@
+name: Rollback
+
+# A rollback puts an earlier release's images back on production. Run it from the newest release
+# tag, with the version to go back to:
+#   gh workflow run rollback.yml --ref <newest release tag> -f version=<version>
+# It runs no migration, so the schema stays at the newest release's. docs/deploy.md describes the
+# steps and what to do when one fails.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The app version to roll back to, such as 2026.11.9
+        required: true
+        type: string
+
+# The release workflow's group: a rollback never runs beside a release or another rollback, and a
+# running one is never cancelled.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  API_IMAGE: ghcr.io/${{ github.repository }}-api
+  WORKER_IMAGE: ghcr.io/${{ github.repository }}-worker
+
+jobs:
+  # No environment: the checks need no production secret, so production's secrets reach only the
+  # rollback job, after every check passes. A refused rollback fails this job, and nothing moves.
+  check:
+    name: Check the rollback and the images
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      version: ${{ steps.rule.outputs.version }}
+      commit: ${{ steps.commit.outputs.commit }}
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      # The release content is read at the newest release tag, so it holds every release note
+      # production may have run, and no remove release newer than the target is missed.
+      - name: Check that the run is from the newest release tag
+        run: |
+          newest="$(git ls-remote --tags --refs origin \
+            | sed 's#.*refs/tags/##' \
+            | grep -E '^[0-9]{4}\.[0-9]+\.[0-9]+(\.[0-9]+)?$' \
+            | sort -V | tail -n 1)"
+          if [ "$GITHUB_REF_TYPE" != tag ] || [ "$GITHUB_REF_NAME" != "$newest" ]; then
+            echo "::error::Run the rollback from the newest release tag, ${newest:-(none found)}, not from $GITHUB_REF_TYPE $GITHUB_REF_NAME: gh workflow run rollback.yml --ref ${newest:-<newest release tag>} -f version=$VERSION"
+            exit 1
+          fi
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The target must have an app release note, and no newer app release may remove something.
+      # The command prints a version= line.
+      - name: Check the rollback against the release notes
+        id: rule
+        run: >-
+          pnpm --silent --filter @creator-analytics/releases rollback-check
+          --version "$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      # A release adds the version tag only after its migration succeeds, so a version with no
+      # image tag never ran on production.
+      - name: Check that the version's images exist
+        run: |
+          for image in "$API_IMAGE" "$WORKER_IMAGE"; do
+            if ! docker buildx imagetools inspect "$image:$VERSION" > /dev/null; then
+              echo "::error::$image:$VERSION is not on the registry. The release of $VERSION never reached production, so there is nothing to go back to."
+              exit 1
+            fi
+          done
+      # The running-image check compares the API's commit with the commit the version tag names.
+      - name: Read the version tag's commit
+        id: commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$VERSION" --jq .sha)"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+  # No migration runs: the schema stays at the newest release's, which every migration keeps
+  # working for older images, and the rollback check refuses to go back past a remove release.
+  rollback:
+    name: Roll production back through Dokploy
+    needs: [check]
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      COMMIT: ${{ needs.check.outputs.commit }}
+    steps:
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      # The retag happens on the registry, with no pull; --prefer-index=false copies the manifest
+      # as is, so latest and the version tag share one digest.
+      - name: Move latest to the version's images
+        run: |
+          docker buildx imagetools create --prefer-index=false \
+            --tag "$API_IMAGE:latest" "$API_IMAGE:$VERSION"
+          docker buildx imagetools create --prefer-index=false \
+            --tag "$WORKER_IMAGE:latest" "$WORKER_IMAGE:$VERSION"
+      - name: Redeploy the API
+        env:
+          DOKPLOY_WEBHOOK_API: ${{ secrets.DOKPLOY_WEBHOOK_API }}
+        run: curl --fail --silent --show-error -X POST "$DOKPLOY_WEBHOOK_API"
+      - name: Redeploy the worker
+        env:
+          DOKPLOY_WEBHOOK_WORKER: ${{ secrets.DOKPLOY_WEBHOOK_WORKER }}
+        run: curl --fail --silent --show-error -X POST "$DOKPLOY_WEBHOOK_WORKER"
+      # Dokploy #5496: a redeploy on latest can pull the image and leave the old container running.
+      # The API answers its version and commit, so this waits for the rolled-back ones. It checks
+      # the API only; the worker answers nothing over HTTP.
+      - name: Check that the API runs the version's image
+        run: |
+          commit="${COMMIT:0:7}"
+          for attempt in $(seq 1 30); do
+            answer="$(curl --fail --silent --show-error https://stillstats.com/api/client-settings || true)"
+            if [ -n "$answer" ] && echo "$answer" \
+              | jq -e --arg version "$VERSION" --arg commit "$commit" \
+                '.version == $version and .commit == $commit' > /dev/null; then
+              echo "The API runs $VERSION at $commit."
+              exit 0
+            fi
+            echo "Attempt $attempt: the API answers ${answer:-nothing}"
+            sleep 10
+          done
+          echo "::error::After 5 minutes the API at https://stillstats.com still does not run $VERSION at $commit. Dokploy #5496 can leave the old container running: redeploy the API application in Dokploy, then check https://stillstats.com/api/client-settings by hand."
+          exit 1

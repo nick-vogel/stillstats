@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- include partials/head.html -->
+    <title>Privacy Policy | Stillstats</title>
+    <meta name="description" content="What Stillstats reads from YouTube, how long it keeps each kind of data, who it shares data with, and how you delete it." />
+  </head>
+  <body>
+    <!-- include partials/header.html -->
+    <main class="legal">
+      <h1>Privacy Policy</h1>
+      <p class="legal-updated">Last updated November 24, 2026</p>
+
+      <p>
+        Stillstats is a read-only analytics product for YouTube creators. MIDLO WEB DESIGN, LLC, a
+        Virginia limited liability company, operates Stillstats. In this policy, "we" and "us" mean
+        MIDLO WEB DESIGN, LLC. This policy explains what information Stillstats accesses, how it
+        uses, stores and shares that information, and how you delete it. You agree to this policy
+        when you sign in to Stillstats.
+      </p>
+
+      <h2>YouTube API Services and Google</h2>
+      <p>
+        Stillstats uses YouTube API Services to read your channel's data, with your permission.
+        Google's own use of your information is described in the
+        <a href="https://www.google.com/policies/privacy">Google Privacy Policy<!-- include icons/arrow-up-right.svg --></a>.
+      </p>
+      <p>
+        Stillstats's use of information received from Google APIs will adhere to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy<!-- include icons/arrow-up-right.svg --></a>,
+        including the Limited Use requirements.
+      </p>
+      <p>
+        Stillstats's use of information received from the Stillstats extension will adhere to the
+        <a href="https://developer.chrome.com/docs/webstore/program-policies/limited-use">Chrome Web Store User Data Policy<!-- include icons/arrow-up-right.svg --></a>,
+        including the Limited Use requirements.
+      </p>
+
+      <h2>What Stillstats accesses</h2>
+      <p>Stillstats asks Google for your permission in up to three separate steps.</p>
+      <ul>
+        <li>
+          <strong>Sign in with Google.</strong> Stillstats receives your Google account ID, your
+          name, your email address and your profile picture. It uses them to create your account and
+          to show you who is signed in.
+        </li>
+        <li>
+          <strong>Connect a channel.</strong> Stillstats asks to view your YouTube account and to
+          view your YouTube Analytics reports. It reads your channel's ID each time you connect the
+          channel or give revenue consent, to know which channel the permission is for.
+          <!-- Approved word for word in creator-analytics#61, with #158's countries clause and #268's audience clause, reworded in #329. -->
+          It reads your channel's name, handle and creation date, your uploads list with each
+          video's title, thumbnail, publish date, privacy status and length, and the analytics of
+          your channel and your videos: views, engaged views, watch time, average percentage viewed,
+          audience retention, traffic sources, the split between subscribers and non-subscribers,
+          and subscribers gained, for each day and in total over the window you pick, and on each
+          video's page, for each day since it was published. For your channel as a whole, never for
+          a single video, it also reads the countries, US states and cities your viewers watch from,
+          the age group and gender of signed-in viewers, and the device types and operating systems
+          they watch on, in total over the window you pick.
+          It reads each video's format (video, Short or live stream) from the video's views since it
+          was published, whatever window you pick. It also reads your channel's numbers for each day
+          of the last 90 days, to know which days Google has finished counting.
+          It also asks for your email address and basic account identity, so that Google can send it
+          security alerts about your account.
+        </li>
+        <li>
+          <strong>Revenue consent, only if you choose to give it.</strong> Stillstats asks to view
+          the monetary reports of YouTube Analytics.
+          <!-- Approved word for word in creator-analytics#61. -->
+          It reads the estimated revenue of your channel and of each video, with its sources, its
+          revenue by day and your channel's revenue by format, over the window you pick and, on each
+          video's page, since the video was published, and shows it in your channel summary, your
+          video list and each video's page.
+          If you never give revenue consent, Stillstats never reads revenue data.
+        </li>
+        <li>
+          <strong>A daily reach report.</strong> With the permission to view your YouTube Analytics
+          reports, Stillstats asks YouTube to prepare a daily reach report for each channel you
+          connect: the impressions and click-through rate of your videos. It asks when you connect
+          the channel, and asks again each day until YouTube has it.
+        </li>
+        <li>
+          <strong>A Stillstats Pro channel's history.</strong> For a channel on Stillstats Pro,
+          Stillstats downloads the channel's new reach reports each day, and on its first day every
+          report YouTube still holds, up to 60 days. With the permission to view your YouTube
+          account, it also asks YouTube once a day which of the videos in the history still exist.
+        </li>
+      </ul>
+      <p>
+        Stillstats is read-only. It never changes anything on your YouTube channel, and it never
+        asks for your YouTube password.
+      </p>
+
+      <!-- Approved word for word in creator-analytics#98, #202 and #120, with #488's usage events and #539's youtube.com wording, and #751's feedback link, which the links sentence covers, and the timing fields of release 2026.11.24.1. -->
+      <h2>The Studio extension</h2>
+      <p>
+        The Stillstats extension for Chrome and Firefox works on studio.youtube.com and
+        stillstats.com, and on www.youtube.com only if you turn that on.
+      </p>
+      <p>
+        On studio.youtube.com it reads the channel id and video ids on the page you have open, and
+        the analytics period you select. It does not read the numbers, text or anything else on the
+        page.
+      </p>
+      <p>
+        It sends stillstats.com the video ids, the period and Stillstats' own id for the channel you
+        connected, with your Stillstats sign-in. It matches that channel to the page on your device,
+        so the YouTube channel id stays in your browser. For the comparison on the latest video
+        card, it also sends the video's format and how many recent uploads to compare.
+        stillstats.com answers with your numbers from YouTube's official API. The rest of this
+        policy covers how Stillstats handles them.
+      </p>
+      <p>
+        It sends a few usage events to stillstats.com: that it was installed, which kind of page
+        showed a number or could not (a Studio page, or a channel page, watch page, feed or Shorts
+        on www.youtube.com), how long it took your data to show and whether it came from a recent
+        copy, when you turn on access to www.youtube.com and when you or your
+        browser remove it, and when you click one of its links to stillstats.com. They carry no
+        ids, names or email, and they go to Stillstats' own analytics, run on its own server. In
+        Firefox, it sends them only if you allow it, when you install the extension or later in
+        about:addons.
+      </p>
+      <p>
+        It never uses your YouTube sign-in, never reads YouTube's private endpoints, and never sells
+        or shares anything it reads.
+      </p>
+      <p>
+        If you turn on "Show engaged views on youtube.com" in the extension's popup, the extension
+        also works on www.youtube.com. There it reads the links to videos and channels on the page,
+        and the page address. It asks Stillstats for the videos of the channels you connected, with
+        your Stillstats sign-in, and matches them on your device, so no video id from
+        www.youtube.com leaves your browser. It reads no number from the page, and does not use your
+        YouTube sign-in. You can turn it off in the popup or in your browser's extension settings.
+      </p>
+
+      <h2>What Stillstats stores</h2>
+      <ul>
+        <li>
+          Your account: your Google account ID, name, email address and the address of your profile
+          picture.
+        </li>
+        <li>
+          Your sign-in: the tokens Google issued when you signed in and the permissions you granted.
+          These are an access token, an ID token and, when Google issues one, a refresh token. The
+          access token and the refresh token are encrypted with XChaCha20-Poly1305 before they are
+          stored. Stillstats keeps them until you delete your account.
+        </li>
+        <li>
+          Your sessions: the browser user agent of each signed-in session. Stillstats does not
+          store your IP address with a session.
+        </li>
+        <li>
+          <!-- Approved word for word in creator-analytics#64 pre-PR review 3, with #329's sidebar clause, #589's Settings and #691's theme. -->
+          Your display preferences: page size, which columns and charts show, whether the charts
+          show daily numbers or a running total, your currency, whether the video list shows
+          unlisted and private videos, whether the sidebar is open, and your theme (Light, Dark or
+          System).
+          They stay until you reset them in Settings or delete yourself from the product.
+        </li>
+        <li>
+          Each connected channel: the channel's ID, the permissions you granted and when you granted
+          them, and the access and refresh tokens Google issued for the channel. These tokens are
+          encrypted with AES-256-GCM before they are stored.
+        </li>
+        <li>
+          Keyed one-way hashes of your Google account ID and of two identifiers of your refresh
+          token. When Google sends a security alert, Stillstats finds your connection by these
+          hashes.
+        </li>
+        <li>
+          <!-- Pending Nick's word-for-word approval, creator-analytics#582. -->
+          Each feedback message you send from Stillstats: its type, its text, the name of the screen
+          you sent it from, the app version, and a reply address only when you choose to give one.
+          It holds no channel ID and no video ID.
+        </li>
+        <li>
+          For each connected channel, the ID of the request for its daily reach report and when
+          YouTube created it. The free tier stores nothing from the report itself.
+        </li>
+        <li>
+          For a channel on Stillstats Pro, its reach history: the impressions and click-through rate
+          of each video, for each day as YouTube counts it and for each traffic source type, such as
+          browse features, YouTube search or suggested videos, and which days the history holds. It
+          stores nothing finer, such as the search terms or the videos that suggested yours.
+        </li>
+        <li>
+          <!-- Approved word for word in creator-analytics#936 (#950). -->
+          For a channel on Stillstats Pro, the audience retention curve of each of its videos: how
+          many of the video's viewers are still watching at each point in the video, and when
+          Stillstats read the curve. Stillstats keeps the curves for as long as it keeps the
+          channel's reach history.
+        </li>
+        <li>
+          <!-- Approved word for word in release 2026.11.24. -->
+          For each connected channel, the figures you chose to include in its sponsor report. It
+          holds no numbers.
+        </li>
+        <li>
+          For a channel that has subscribed to Stillstats Pro, its subscription: the Stripe customer
+          ID and subscription ID, the plan, the subscription's status, the end of the paid period
+          and, once the subscription ends, the purge date of its history.
+          It also holds the Stripe invoice ID of each payment, so that each payment counts once in
+          the product analytics described below. It holds no email, name, card or amount.
+        </li>
+        <li>
+          The analytics results Stillstats shows you, and your channel's name and handle, for a
+          short time only. See "How long Stillstats keeps your data" below.
+        </li>
+      </ul>
+
+      <h2>How Stillstats uses your data</h2>
+      <p>
+        <!-- Approved word for word in creator-analytics#61, with #589's Settings, and the sponsor report, the sort and filter and the retention curves in release 2026.11.24. -->
+        Stillstats uses your Google user data only to provide the features you see in Stillstats:
+        showing which channel is connected and its name, in the channel picker and in Settings,
+        and its handle in the channel picker; using your channel's creation date as the earliest
+        day you can pick; showing your channel's numbers, and your videos' titles and numbers, in
+        your channel summary; showing each video's title, thumbnail, length and numbers in your
+        video list and on each video's page, and its publish date, privacy status and format in
+        your video list, where you can also filter by format; using each video's publish date to
+        count its numbers from the day it was published; showing a video's numbers over its first
+        7, 14 and 30 days in its sponsor report; and showing your channel's and each
+        video's estimated revenue if you gave revenue consent, in your channel summary, your video
+        list and each video's page;
+        and, for a channel on Stillstats Pro, storing its impressions and click-through rate as
+        history, showing them in your channel summary and its charts, in your video list, where you
+        can also sort and filter by them, in each video's traffic sources and in its sponsor
+        report, showing each new upload beside the average of your newest
+        uploads of its format over the same days since publish, storing the audience retention
+        curve of each of its videos, to show up to 5 of them on one chart, and checking which
+        videos in the history still exist, to delete the history and the retention curve of a
+        deleted one.
+        Stillstats does not use your data for advertising, to determine creditworthiness or for
+        lending, or to train any AI model. We never use your channel or its data in case studies or
+        marketing.
+      </p>
+      <p>
+        No person reads your data unless you ask us to, for example in a support request, or unless
+        it is necessary for security, such as investigating a bug or abuse, or to comply with the
+        law.
+      </p>
+
+      <h2>How Stillstats shares your data</h2>
+      <p>
+        We do not sell your data. We share it with no one beyond the infrastructure that delivers
+        Stillstats, described below, and Stripe, only when you open the tip link or one of
+        Stillstats Pro's Stripe pages.
+        Stillstats sends no data to an AI processor, an advertising platform or a data broker.
+        Stillstats loads no ad pixels, and no third-party script except YouTube's video player,
+        which loads only when you ask for it, as described below.
+      </p>
+      <p>We transfer your data only in these cases:</p>
+      <ul>
+        <li>to comply with the law;</li>
+        <li>
+          if Stillstats is sold or merged, and only after we ask for and receive your explicit
+          consent first.
+        </li>
+      </ul>
+      <p>
+        Stillstats sends requests to Google's APIs on your behalf, and Google receives those
+        requests. Requests to stillstats.com, and the responses to them, pass through Cloudflare,
+        which delivers the site and protects it from attacks.
+      </p>
+      <p>
+        Video thumbnails in the app load from YouTube's image servers on ytimg.com, such as
+        i.ytimg.com. Your browser fetches them straight from YouTube, the same way YouTube Studio
+        does. A video's page in the app also loads YouTube's video player when the video has
+        audience retention to show, from youtube.com and youtube-nocookie.com, YouTube's
+        privacy-enhanced mode. While that page is open, YouTube's player runs in it, and Google
+        receives what any embedded YouTube player sends it, such as your IP address and the video on
+        the page. The player can set cookies and can show YouTube's ads.
+        <a href="https://policies.google.com/privacy">Google's Privacy Policy<!-- include icons/arrow-up-right.svg --></a> applies to it, and
+        <a href="https://support.google.com/youtube/answer/171780">YouTube's help page on privacy-enhanced mode<!-- include icons/arrow-up-right.svg --></a>
+        says what that mode changes. No other page in the app runs a script from YouTube or anyone
+        else.
+      </p>
+      <p>
+        Tips go through Stripe. The tip link opens Stripe's own page. When you open the tip link,
+        Stripe receives a Stillstats account ID, an opaque code that holds no name or email
+        address, so that Stillstats knows which account tipped. Stripe receives that account ID even
+        if you do not pay. If you tip, Stripe also receives what you type on Stripe's page.
+        Stillstats loads no Stripe script, and it stores only the fact of the tip. When you delete
+        your account, Stripe keeps its own record of the payment under its own obligations.
+      </p>
+      <p>
+        Stillstats Pro goes through Stripe too. Subscribing opens Stripe Checkout, and managing or
+        cancelling a subscription opens the Stripe Customer Portal, each Stripe's own page. When you
+        open Checkout, Stripe receives the channel's Stillstats ID, an opaque code that holds no
+        name, email address or YouTube channel ID, so that Stillstats knows which channel the
+        subscription is for, the plan you chose, and, for a channel that subscribed before, its
+        earlier Stripe customer.
+        Stripe sells Stillstats Pro as the merchant of record, through Stripe Managed Payments, so
+        Stripe also receives what you type on its pages, and it keeps its own records of your
+        payments under its own obligations. Stillstats loads no Stripe script, and it stores only
+        what "What Stillstats stores" lists.
+      </p>
+
+      <h2>Product analytics and error reports</h2>
+      <p>
+        <!-- The timing sentences here and in the next paragraph approved word for word in release 2026.11.24.1. -->
+        Stillstats counts how people use the site and the product with OpenPanel, which we host on
+        our own servers. No OpenPanel data goes to a third party. The site records page views,
+        clicks on the sign-in button, on Stillstats Pro's "Subscribe" button and on the links in the
+        site's navigation, and a few actions in the thumbnail preview tool, such as loading an image
+        or turning on grayscale. No tool
+        event carries an image, a file name or a title you type. The product records a small set of actions, such as clicking to connect a
+        channel, to disconnect a channel or to delete your account. It also records how long each
+        main screen takes to show and to answer what you ask, and whether the answer came from a
+        recent copy. No event carries a channel ID,
+        an account ID or an email address. If you click "Support Stillstats" and leave
+        a tip, that tip event carries the amount and currency, and no account ID. Stillstats sends
+        it when Stripe confirms the tip, so it carries no IP address or user agent.
+        If your channel is on Stillstats Pro, each payment of its subscription sends a payment
+        event, which carries the amount before tax and the currency, and no account ID or channel
+        ID.
+        Stillstats sends it when Stripe confirms the payment, so it carries no IP address or user
+        agent either. Every other event carries your browser's IP address and user agent, like any
+        web request, which OpenPanel uses to tell visits apart and to estimate your country.
+      </p>
+      <p>
+        When something breaks, Stillstats sends an error report to GlitchTip, which we also host on
+        our own servers. Before a report leaves the process, Stillstats removes tokens, channel IDs,
+        analytics values, request headers, cookies and request bodies from it. Stillstats also
+        sends GlitchTip a timing record of some requests to its server: the kind of request, its
+        status and how long it took. A timing record carries no channel ID, video ID, account ID,
+        email, token or analytics value.
+      </p>
+      <p>
+        Stillstats also counts how many people use the product each day, each week and each month.
+        When you read your channel's numbers, in the app or through the extension, Stillstats records
+        the date on which you did, and nothing else. Only the counts go to OpenPanel, with no account
+        ID, IP address or user agent. This record does not depend on the extension's usage events setting.
+      </p>
+
+      <h2>Cookies and device storage</h2>
+      <p>Stillstats places two cookies in your browser. Both are strictly necessary.</p>
+      <ul>
+        <li>
+          <code>__Secure-better-auth.session_token</code> keeps you signed in. It expires after 7 days
+          without use, or when you sign out. Scripts on the page cannot read it.
+        </li>
+        <li>
+          <code>__Secure-better-auth.state</code> protects the sign-in from forgery. It exists only
+          while you sign in, and it expires after 5 minutes.
+        </li>
+      </ul>
+      <p>
+        Stillstats also keeps a copy of your theme in your browser's local storage for
+        stillstats.com, under the name <code>theme</code>, so that the app's pages show your theme
+        as they load. The copy holds only light or dark, and only while your theme is Light or
+        Dark. When your theme is System, for example after you choose System or reset your
+        preferences in Settings, Stillstats removes the copy. It stays when you sign out or delete
+        your account. To remove it then, clear your browser's data for stillstats.com. It is not a
+        cookie, so your browser does not send it with any request.
+      </p>
+      <p>
+        OpenPanel sets no cookie and keeps no identifier on your device. Stillstats sets no
+        advertising cookies and no third-party cookies. The one exception is YouTube's video player
+        on a video's page: there, YouTube can store and read information on your device under
+        <a href="https://policies.google.com/privacy">Google's Privacy Policy<!-- include icons/arrow-up-right.svg --></a>.
+        On every other page, no third party stores or reads information on your device.
+      </p>
+
+      <h2>How long Stillstats keeps your data</h2>
+      <ul>
+        <li>
+          Analytics results are cached for 24 hours or less. On the free tier, Stillstats never
+          keeps them as history. On Stillstats Pro, it also keeps a channel's impressions and
+          click-through rate as history, for as long as the next item says.
+        </li>
+        <li>
+          <!-- Approved word for word in creator-analytics#936. -->
+          A Stillstats Pro channel's reach history and its audience retention curves are kept while
+          its subscription is active. The subscription ends at the end of its paid period, not when
+          you press Cancel. Both then stay readable for 30 days, until the purge date, and
+          Stillstats downloads no new days and reads no new curves. On the purge date, Stillstats
+          deletes them. If you subscribe again before then, Stillstats keeps both and fills in the
+          history's missing days from the reports YouTube still holds.
+          The record of the subscription and of its payments stays while the channel is connected.
+        </li>
+        <li>
+          <!-- Approved word for word in creator-analytics#936. -->
+          When a video is deleted on YouTube, Stillstats deletes its reach history and its audience
+          retention curve at the next daily check. A private or unlisted video keeps both.
+        </li>
+        <li>
+          Your account, your sessions and your sign-in tokens stay until you delete your account.
+          When you delete it, Stillstats deletes them at once.
+        </li>
+        <li>
+          The record of the days on which you used Stillstats is kept for 30 days, then deleted. When
+          you delete your account, Stillstats deletes it at once.
+        </li>
+        <li>
+          <!-- Pending Nick's word-for-word approval, creator-analytics#582. -->
+          A feedback message stays until you delete your account, or until one year after it is
+          handled, whichever comes first. When you delete your account, Stillstats deletes your
+          messages at once.
+        </li>
+        <li>
+          A connected channel stays until you disconnect it, delete your account or revoke
+          Stillstats's access at Google.
+        </li>
+        <li>
+          When you disconnect a channel, delete your account or revoke access at Google, Stillstats
+          deletes the channel's live data within 24 hours. The backups that hold it expire within 5
+          days.
+        </li>
+        <li>
+          <!-- Approved word for word in creator-analytics#936. -->
+          When you disconnect a paid channel, revoke access at Google or delete your account, its
+          reach history, its audience retention curves and the record of its subscription and of its
+          payments go with the channel's other data, on the windows above. Stillstats also cancels the channel's subscription with Stripe at once,
+          with a refund of the unused share of its latest payment, as the Terms of Service set out,
+          and keeps the Stripe subscription ID only until Stripe has accepted the cancellation and
+          the refund.
+        </li>
+        <li>
+          Revoking access at Google deletes the channel's data, not your account. To delete your
+          account, delete it inside Stillstats.
+        </li>
+        <li>
+          To prove that a deletion happened, Stillstats keeps a record of it for 24 months. The
+          record holds a keyed one-way hash of the channel ID, the number of rows deleted, the
+          reason and the times. It holds no channel ID and no analytics data.
+        </li>
+      </ul>
+
+      <h2>Deleting your data and revoking access</h2>
+      <p>You can delete your data inside Stillstats at any time.</p>
+      <ul>
+        <li>
+          <strong>Disconnect a channel.</strong> Stillstats revokes its access at Google and deletes
+          the channel's data.
+          For a paid channel, it also cancels the subscription at once and refunds the unused share
+          of its latest payment, as the Terms of Service set out.
+        </li>
+        <li>
+          <strong>Delete your account.</strong> Stillstats disconnects every channel and deletes your
+          account, your sessions and your sign-in tokens.
+          For each paid channel it deletes, it also cancels the subscription at once and refunds the
+          unused share of its latest payment, as the Terms of Service set out.
+        </li>
+      </ul>
+      <p>
+        Deleting data stored by Stillstats does not affect data stored by YouTube. To delete data on
+        YouTube, use YouTube or another authorized app that can delete that data.
+      </p>
+      <p>
+        In addition to deleting data inside Stillstats, you can revoke Stillstats's access to your
+        data on the Google security settings page at
+        <a href="https://security.google.com/settings/security/permissions">https://security.google.com/settings/security/permissions<!-- include icons/arrow-up-right.svg --></a>.
+        Stillstats checks every connection each day, and Google also alerts Stillstats to some
+        revocations. When Stillstats finds a revocation, it deletes the channel's data on the
+        windows above. Your account stays until you delete it.
+      </p>
+      <p>
+        You can also email
+        <a href="mailto:privacy@stillstats.com">privacy@stillstats.com</a>
+        to ask us to delete your data. We delete it within 7 days of your request.
+      </p>
+
+      <h2>Security</h2>
+      <p>
+        Stillstats serves every page over HTTPS. It encrypts the access and refresh tokens Google
+        issues before it stores them, and its database keeps each account's data apart from every
+        other account's data.
+      </p>
+
+      <h2>Children</h2>
+      <p>Stillstats is not for children under 13, and we do not knowingly collect their data.</p>
+
+      <h2>Changes to this policy</h2>
+      <p>
+        When we change this policy, we publish the new version on this page and change the date at
+        the top.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        For questions or complaints about Stillstats's privacy practices, email
+        <a href="mailto:privacy@stillstats.com">privacy@stillstats.com</a>.
+      </p>
+    </main>
+    <!-- include partials/footer.html -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

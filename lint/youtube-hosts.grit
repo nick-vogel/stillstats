@@ -1,0 +1,14 @@
+language js
+
+// The YouTube API hosts, and the older www.googleapis.com/youtube path. Not the OAuth scope URLs
+// under www.googleapis.com/auth, which the token vault sends.
+or {
+  JsStringLiteralExpression(),
+  JsTemplateChunkElement()
+} as $literal where {
+  $literal <: or {
+    r".*youtube[a-z]*\.googleapis\.com.*",
+    r".*www\.googleapis\.com/youtube[a-z]*/.*"
+  },
+  register_diagnostic(span=$literal, message="Only the YouTube gateway calls a YouTube host (ADR 0003).")
+}

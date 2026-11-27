@@ -1,0 +1,1 @@
+CREATE POLICY "feedback_messages_worker_system_delete" ON "feedback_messages" AS PERMISSIVE FOR DELETE TO "app_worker" USING ((nullif(current_setting('app.scope', true), '') = 'system' and "feedback_messages"."done_at" < ((nullif(current_setting('app.now', true), '')::timestamptz at time zone 'UTC') - interval '1 year') at time zone 'UTC'));

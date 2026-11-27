@@ -1,0 +1,1 @@
+ALTER TABLE "preferences" ADD COLUMN "rpm_ads_and_premium_only" boolean;

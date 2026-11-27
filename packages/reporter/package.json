@@ -1,0 +1,17 @@
+{
+  "name": "@creator-analytics/reporter",
+  "private": true,
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./scrub": "./src/scrub.ts",
+    "./testing": "./test/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sentry/node": "^11.4.0"
+  }
+}

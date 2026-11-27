@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- include partials/head.html -->
+    <title>Thumbnail preview | Stillstats</title>
+    <meta name="description" content="Check a YouTube thumbnail at the sizes YouTube really renders it, in color and in grayscale. Nothing is uploaded." />
+  </head>
+  <body>
+    <!-- include partials/header.html -->
+    <main class="tool-page">
+      <p class="tool-back"><a href="/" data-back-link><!-- include icons/arrow-left.svg --><span data-back-link-text>Home</span></a></p>
+      <h1>Check your thumbnail at YouTube’s real sizes</h1>
+      <p class="tool-privacy">
+        Your images and titles stay in this browser tab. Nothing is uploaded, nothing is stored,
+        and nothing leaves your device.
+      </p>
+      <div id="thumbnail-tool"></div>
+      <div class="tool-prose">
+        <p>
+          A thumbnail that looks good at 1920 pixels can look bad at 160. This tool renders your
+          thumbnails at the sizes YouTube actually uses, from 500 pixels down to 148, plus a 72
+          pixel stress test, so you can judge your thumbnail at even the smallest size before you
+          publish it.
+        </p>
+        <h2>Why do small sizes matter more than the big one?</h2>
+        <p>
+          You design at 1920 x 1080 or higher. YouTube almost never shows it that way except on TVs.
+          A search result returns a thumbnail at 500 pixels of width, the home feed 347, the
+          suggested rail beside a video 220, and the home feed on a phone 160. Text that looked
+          clear at full size turns into an ambiguous smear, and the face you cropped so carefully
+          becomes a smudge.
+        </p>
+        <p>
+          The 72 pixel tile is not a YouTube size at all. It is a stress test. Detail that shows up
+          at 72 pixels can be seen anywhere, and detail that vanishes there was probably never going
+          to be seen anyway. This helps you see if details you care about disappear or stay
+          prominent.
+        </p>
+        <h2>Why check your thumbnail in grayscale?</h2>
+        <p>
+          Color is important to a good design, but it can hide a weak composition. Grayscale takes
+          color away and leaves you with what's underneath: value, contrast, and shape. If the
+          subject still separates from the background with the color gone, the design is
+          well-composed and clear. If everything flattens into one middling gray, there wasn't as
+          much contrast as you might've thought, and no amount of saturation will fix it.
+        </p>
+        <h2>What is the difference between the three conversions?</h2>
+        <!--
+          The toolbar's conversion hint in packages/thumbnail-preview/src/toolbar.tsx makes this
+          section's claim in one line. Re-read it when you edit this section.
+        -->
+        <p>
+          "Luminance" is the plain reading. It weights red, green, and blue the way the eye weights
+          them, so what is left is brightness alone. It's closest to how your thumbnail looks once
+          color is removed from the equation.
+        </p>
+        <p>
+          "Red filter" and "Blue filter" weight the same image in opposite directions. "Red filter"
+          brightens warm areas and darkens cool ones, so warm skin lifts away from a cool sky. "Blue
+          filter" does the reverse, brightening cool areas and darkening warm ones, so a cool
+          subject lifts away from a warm background. Skin and a blue sky can flatten into a single
+          gray under "Luminance," so if you need a more accurate read of how your thumbnail's
+          contrast is perceived, use one of these filters. Both are included so warm and cool
+          compositions can be both fairly judged.
+        </p>
+        <p>
+          "Red filter" is based on the "High Contrast Red Filter" preset in Photoshop, and "Blue
+          filter" on "High Contrast Blue Filter." Both do the best they can to match the Photoshop
+          preset. The conversion runs in your browser with a color matrix, though, so the result is
+          a close stand-in for the preset, not a replacement for it.
+        </p>
+        <h2>Why are these sizes accurate at 100% browser zoom?</h2>
+        <p>
+          Every tile is drawn at its true width and never scales to fit. That guarantee depends on
+          your browser set to 100% zoom. At any other zoom your browser scales the whole page, so a
+          tile labeled 220 stops being 220 pixels of your screen, and the comparison loses its
+          meaning. Reset the zoom before you judge a size.
+        </p>
+        <p>
+          The sizes themselves were measured on YouTube rather than estimated. The measurements were
+          taken while logged out in a browser, at multiple window widths. They are a snapshot of one
+          day, but we all know YouTube changes its layouts every now and then, so these sizes may
+          change.
+        </p>
+      </div>
+      <section class="sign-in-band" aria-labelledby="sign-in-band-heading">
+        <h2 id="sign-in-band-heading">
+          Your thumbnail earns the click. Stillstats shows what happens next.
+        </h2>
+        <p>
+          Calm, privacy-first analytics for your own channel: engaged views, views and revenue, with
+          no ad pixels and no AI processors.
+        </p>
+        <p role="alert" data-sign-in-error hidden>Sign-in did not start. Try again.</p>
+        <button class="button" type="button" data-sign-in data-sign-in-source="thumbnail-preview">
+          Sign in with Google
+        </button>
+        <p class="notice">
+          By signing in, you agree to the <a href="/terms">Terms</a> and the
+          <a href="/privacy">Privacy Policy</a>.
+        </p>
+      </section>
+    </main>
+    <!-- include partials/footer.html -->
+    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/thumbnail-tool.tsx"></script>
+  </body>
+</html>

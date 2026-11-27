@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>Focus stage contrast repro</title>
+    <link rel="stylesheet" href="../../../../packages/visual-system/src/styles.css" />
+    <link rel="stylesheet" href="../../../../packages/thumbnail-preview/src/styles.css" />
+  </head>
+  <body>
+    <div id="root" class="t-toolroot">
+      <input class="t-input" placeholder="Title" />
+      <div class="t-cropband t-cropband--top"></div>
+    </div>
+    <pre id="out"></pre>
+    <script>
+      const root = document.getElementById('root')
+      const input = root.querySelector('.t-input')
+      const band = root.querySelector('.t-cropband')
+      const rows = []
+      for (const page of ['light', 'dark']) {
+        for (const stage of ['none', 'light', 'dark']) {
+          document.documentElement.dataset.theme = page
+          root.className = stage === 'none' ? 't-toolroot' : `t-toolroot t-focus t-focus--${stage}`
+          const field = getComputedStyle(input)
+          rows.push({
+            page,
+            stage,
+            inputText: field.color,
+            inputBackground: field.backgroundColor,
+            cropBand: getComputedStyle(band).backgroundColor,
+          })
+        }
+      }
+      document.getElementById('out').textContent = JSON.stringify(rows, null, 1)
+    </script>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+<!-- Pre-PR review 1 of creator-analytics#267, finding 1. A copy of the launch chart day card markup, with the real stylesheets, at 375px. Run from the repo root: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --dump-dom --window-size=375,800 "file://$PWD/docs/reviews/creator-analytics-267/repro/review-1-finding-1-card-375.html" | grep -o "<title>.*</title>". coversPlot true is the defect. -->
+<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width">
+<link rel="stylesheet" href="../../../../packages/visual-system/src/styles.css">
+<link rel="stylesheet" href="../../../../apps/web/src/app.css">
+<style>body{margin:0}main{padding:1rem;width:375px;box-sizing:border-box}</style></head><body><main>
+<section class="video-detail-section metric-charts launch-chart"><div class="metric-chart"><h2>Launch</h2>
+<div class="chart"><span class="chart-label" style="top:0%">1K</span>
+<div class="chart-plot" id="plot"><svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none"><path class="chart-line launch-chart-line" d="M0,50 L100,20"/></svg>
+<div class="chart-hover-card" id="card"><p class="chart-hover-title">Day 3</p><ol class="launch-card-rows" id="rows"></ol></div>
+</div></div></div></section></main>
+<script>
+const titles=["I built a SaaS in 30 days and here is what happened","Why every developer should learn Payload CMS in 2026","Next.js vs TanStack Start: an honest comparison","The data center problem nobody talks about","My entire home office setup tour","How I self-host everything on one VPS","Stop using useEffect for this","React 19 in 10 minutes","What I learned shipping my first app","Building a design system from scratch"];
+const rows=document.getElementById('rows');
+titles.forEach((t,i)=>{rows.insertAdjacentHTML('beforeend',`<li class="launch-card-row${i===1?' launch-card-row-selected':''}"><svg class="launch-swatch" data-launch-position="${i+1}" viewBox="0 0 1 1"><rect width="1" height="1"/></svg><span class="launch-card-title">${t}</span><span class="chart-hover-value">${(12345-i*1000).toLocaleString()}</span></li>`)});
+const p=document.getElementById('plot'),c=document.getElementById('card');
+const sw=c.querySelector('.launch-swatch').getBoundingClientRect();
+document.title=JSON.stringify({vw:innerWidth,plotW:p.clientWidth,plotH:p.clientHeight,cardW:c.offsetWidth,cardH:c.offsetHeight,swatch:[sw.width,sw.height],titleClipped:[...c.querySelectorAll('.launch-card-title')].filter(e=>e.scrollWidth>e.clientWidth).length,coversPlot:c.getBoundingClientRect().top<p.getBoundingClientRect().bottom&&c.offsetWidth>p.clientWidth*0.9});
+</script></body></html>

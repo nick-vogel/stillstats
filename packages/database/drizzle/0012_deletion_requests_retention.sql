@@ -1,0 +1,1 @@
+CREATE POLICY "deletion_requests_worker_system_delete" ON "deletion_requests" AS PERMISSIVE FOR DELETE TO "app_worker" USING ((nullif(current_setting('app.scope', true), '') = 'system' and "deletion_requests"."completed_at" < ((nullif(current_setting('app.now', true), '')::timestamptz at time zone 'UTC') - interval '24 months') at time zone 'UTC'));

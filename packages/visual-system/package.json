@@ -1,0 +1,19 @@
+{
+  "name": "@creator-analytics/visual-system",
+  "private": true,
+  "license": "FSL-1.1-ALv2",
+  "type": "module",
+  "exports": {
+    "./avatar": "./src/avatar.ts",
+    "./styles.css": "./src/styles.css",
+    "./testing": "./test/testing.ts",
+    "./vite": "./src/vite.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "fonts": "node src/fetch-fonts-cli.ts"
+  },
+  "devDependencies": {
+    "vite": "^8.3.2"
+  }
+}

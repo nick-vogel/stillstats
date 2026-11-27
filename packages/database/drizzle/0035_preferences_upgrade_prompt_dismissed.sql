@@ -1,0 +1,1 @@
+ALTER TABLE "preferences" ADD COLUMN "upgrade_prompt_dismissed_at" timestamp with time zone;

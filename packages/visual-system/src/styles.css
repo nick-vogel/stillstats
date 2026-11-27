@@ -1,0 +1,317 @@
+/*
+ * The tokens, fonts and base styles the site and the web app share, and the components both apps
+ * use: .wordmark, .avatar, .button, .notice and [role="alert"]. A .notice is the agreement line
+ * under a sign-in button, which is why its negative top margin pulls it up toward the button.
+ *
+ * Every background token is named --bg*, which is how the tests find the tokens they hold to
+ * "never cream, ivory, beige or sepia". The neutrals carry a visible cool tint, because an
+ * untinted near-white or near-black sits within a glance of anthropic.com's ivories and slates;
+ * the tests measure every colour here against that palette. Pure white is the one exception they
+ * allow, and it appears only as the light page's lower end.
+ *
+ * The dark tokens are written twice, with the same values: under data-theme="dark" on the root,
+ * and under the system's dark mode on a root without data-theme="light". CSS cannot join a
+ * selector and a media query in one rule, so the tests hold the two blocks to the same
+ * declarations. data-theme="light" needs no tokens of its own: the :root block holds them, and the
+ * media query's block skips that root. With no data-theme the system's preference decides.
+ *
+ * Each font is named by a path relative to this file, so each app's build emits it under that
+ * app's own base: /assets/ for the site and /app/assets/ for the web app. Switzer and Cabinet
+ * Grotesk are not in the repository (src/fontshare.ts): a build without them drops their
+ * @font-face rules, and the font stacks below fall back to the system's sans-serif.
+ */
+
+@font-face {
+  font-family: "Switzer";
+  src: url("../fonts/Switzer-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cabinet Grotesk";
+  src: url("../fonts/CabinetGrotesk-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../fonts/JetBrainsMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+
+  --bg: oklch(0.96 0.02 292);
+  --bg-end: oklch(1 0 0);
+  --bg-glow: oklch(0.84 0.06 292 / 0.5);
+  --ink: oklch(0.27 0.03 288);
+  --ink-soft: oklch(0.46 0.03 288);
+  --line: oklch(0.9 0.022 292);
+  --accent: oklch(0.49 0.06 308);
+  --accent-hover: oklch(0.43 0.06 308);
+  --on-accent: oklch(0.96 0.02 292);
+  --grain: 0.05;
+
+  /* The launch chart's line colors by row position, approved in creator-analytics#191. */
+  --launch-line-1: oklch(0.56 0.13 265);
+  --launch-line-2: oklch(0.56 0.13 60);
+  --launch-line-3: oklch(0.56 0.115 165);
+  --launch-line-4: oklch(0.56 0.13 340);
+  --launch-line-5: oklch(0.56 0.115 95);
+  --launch-line-6: oklch(0.56 0.115 235);
+  --launch-line-7: oklch(0.56 0.13 25);
+  --launch-line-8: oklch(0.56 0.13 135);
+  --launch-line-9: oklch(0.56 0.13 305);
+  --launch-line-10: oklch(0.56 0.095 200);
+
+  --font-body: "Switzer", system-ui, sans-serif;
+  --font-display: "Cabinet Grotesk", "Switzer", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --measure: 68rem;
+  --gutter: clamp(1.25rem, 4vw, 2.5rem);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: oklch(0.215 0.028 288);
+  --bg-end: oklch(0.19 0.032 288);
+  --bg-glow: oklch(0.45 0.08 292 / 0.6);
+  --ink: oklch(0.93 0.018 292);
+  --ink-soft: oklch(0.79 0.025 290);
+  --line: oklch(0.33 0.032 288);
+  --accent: oklch(0.77 0.055 308);
+  --accent-hover: oklch(0.83 0.05 308);
+  --on-accent: oklch(0.215 0.028 288);
+  --grain: 0.08;
+
+  --launch-line-1: oklch(0.76 0.12 265);
+  --launch-line-2: oklch(0.76 0.12 60);
+  --launch-line-3: oklch(0.76 0.12 165);
+  --launch-line-4: oklch(0.76 0.12 340);
+  --launch-line-5: oklch(0.76 0.12 95);
+  --launch-line-6: oklch(0.76 0.12 235);
+  --launch-line-7: oklch(0.76 0.12 25);
+  --launch-line-8: oklch(0.76 0.12 135);
+  --launch-line-9: oklch(0.76 0.12 305);
+  --launch-line-10: oklch(0.76 0.12 200);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: oklch(0.215 0.028 288);
+    --bg-end: oklch(0.19 0.032 288);
+    --bg-glow: oklch(0.45 0.08 292 / 0.6);
+    --ink: oklch(0.93 0.018 292);
+    --ink-soft: oklch(0.79 0.025 290);
+    --line: oklch(0.33 0.032 288);
+    --accent: oklch(0.77 0.055 308);
+    --accent-hover: oklch(0.83 0.05 308);
+    --on-accent: oklch(0.215 0.028 288);
+    --grain: 0.08;
+
+    --launch-line-1: oklch(0.76 0.12 265);
+    --launch-line-2: oklch(0.76 0.12 60);
+    --launch-line-3: oklch(0.76 0.12 165);
+    --launch-line-4: oklch(0.76 0.12 340);
+    --launch-line-5: oklch(0.76 0.12 95);
+    --launch-line-6: oklch(0.76 0.12 235);
+    --launch-line-7: oklch(0.76 0.12 25);
+    --launch-line-8: oklch(0.76 0.12 135);
+    --launch-line-9: oklch(0.76 0.12 305);
+    --launch-line-10: oklch(0.76 0.12 200);
+  }
+}
+
+/*
+ * A printed page is light whatever the theme: the light value of every token the dark blocks
+ * override, on three :root pseudo-classes, which outrank both dark blocks, each of two, wherever
+ * they sit. Keep it in step with the :root block; the tests pin each value to it.
+ */
+@media print {
+  :root:root:root {
+    color-scheme: light;
+
+    --bg: oklch(0.96 0.02 292);
+    --bg-end: oklch(1 0 0);
+    --bg-glow: oklch(0.84 0.06 292 / 0.5);
+    --ink: oklch(0.27 0.03 288);
+    --ink-soft: oklch(0.46 0.03 288);
+    --line: oklch(0.9 0.022 292);
+    --accent: oklch(0.49 0.06 308);
+    --accent-hover: oklch(0.43 0.06 308);
+    --on-accent: oklch(0.96 0.02 292);
+    --grain: 0.05;
+
+    --launch-line-1: oklch(0.56 0.13 265);
+    --launch-line-2: oklch(0.56 0.13 60);
+    --launch-line-3: oklch(0.56 0.115 165);
+    --launch-line-4: oklch(0.56 0.13 340);
+    --launch-line-5: oklch(0.56 0.115 95);
+    --launch-line-6: oklch(0.56 0.115 235);
+    --launch-line-7: oklch(0.56 0.13 25);
+    --launch-line-8: oklch(0.56 0.13 135);
+    --launch-line-9: oklch(0.56 0.13 305);
+    --launch-line-10: oklch(0.56 0.095 200);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(70% 38% at 50% 0%, var(--bg-glow), transparent 75%),
+    linear-gradient(var(--bg) 25%, var(--bg-end));
+  color: var(--ink);
+  font: 400 1.0625rem / 1.6 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: clamp(2.5rem, 7vw, 4.75rem);
+}
+
+a {
+  color: inherit;
+  text-decoration-color: var(--line);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color 0.2s;
+}
+
+a:hover {
+  text-decoration-color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 0.25rem;
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.625rem;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 600 1.0625rem / 1 var(--font-body);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.avatar:hover {
+  background: var(--accent-hover);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.05rem 1.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 600 1.0625rem / 1 var(--font-body);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    transform 0.2s;
+}
+
+.button:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.notice {
+  margin: -0.5rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+[role="alert"] {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/*
+ * The svg TanStack Charts draws. The library writes these two as an inline style attribute, which
+ * the content security policy's style-src blocks, so a pnpm patch drops that attribute and the
+ * rule lives here (creator-analytics#369).
+ */
+.ts-chart {
+  display: block;
+  overflow: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a,
+  .button,
+  .button:hover {
+    transition: none;
+    transform: none;
+  }
+}
