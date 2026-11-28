@@ -8,6 +8,8 @@ import type { DrizzleTransaction } from './scopes.ts'
 export const jobNames = [
   'deleteChannel',
   'cancelSubscription',
+  'cancelAccountSubscription',
+  'accountCancellationAlarm',
   'deletionCheck',
   'deletionAlarm',
   'cacheSweep',
@@ -53,11 +55,13 @@ export const jobSchedules: Partial<Record<JobName, string>> = {
  * The queues whose retries differ from pg-boss's defaults, two retries with no delay. The active
  * user count's six retries five minutes apart ride out a short OpenPanel outage, and all still run
  * on the day after the day they count. A subscription cancellation's eleven retries an hour apart
- * ride out a Stripe outage, the last one before the deletion's alarm at 12 hours reports it.
+ * ride out a Stripe outage, the last one before the deletion's alarm at 12 hours reports it; an
+ * account deletion's cancellation retries the same way before its own alarm.
  */
 export const queueOptions: Partial<Record<JobName, { retryLimit: number; retryDelay: number }>> = {
   activeUserCount: { retryLimit: 6, retryDelay: 300 },
   cancelSubscription: { retryLimit: 11, retryDelay: 3600 },
+  cancelAccountSubscription: { retryLimit: 11, retryDelay: 3600 },
 }
 
 /**

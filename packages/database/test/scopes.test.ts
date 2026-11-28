@@ -73,13 +73,18 @@ async function readNotes(scope: Scoped<ScopeKind>) {
   return scope.sql.select({ channelId: fixtureNotes.channelId }).from(fixtureNotes)
 }
 
-/** The channels table and every table with a foreign key to it, read from the catalog. */
+/**
+ * The channels table and every table with a foreign key to it, read from the catalog, but the
+ * channel subscription payments of the release before blocks, which nothing writes any more
+ * (stillstats#20), so no seeded channel holds one.
+ */
 async function channelOwnedTables(scope: Scoped<ScopeKind>): Promise<string[]> {
   const result = await scope.sql.execute<{ name: string }>(sql`
     select c.relname as name
     from pg_class c
     join pg_namespace n on n.oid = c.relnamespace
-    where n.nspname = 'public' and c.relkind in ('r', 'p') and (
+    where n.nspname = 'public' and c.relkind in ('r', 'p') and c.relname <> 'subscription_payments'
+    and (
       c.oid = 'channels'::regclass
       or exists (
         select 1 from pg_constraint k
@@ -507,7 +512,7 @@ describe('seam 3: the database roles', () => {
     ])
   })
 
-  test('the system scope deletes no row of a table other than the cache, the deletion log, the deletion requests, the security events, the activity days and the feedback messages', async ({
+  test('the system scope deletes no row of a table other than the cache, the deletion log, the deletion requests, the security events, the activity days, the feedback messages and the account cancellations', async ({
     web,
     worker,
     seedChannel,
@@ -523,6 +528,7 @@ describe('seam 3: the database roles', () => {
           'security_events',
           'activity_days',
           'feedback_messages',
+          'account_cancellations',
         ].includes(table),
     )
     expect(tables).toEqual(expect.arrayContaining(['channels', 'connections', 'users']))

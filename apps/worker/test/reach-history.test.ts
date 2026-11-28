@@ -11,17 +11,15 @@
 // does, inside the test's transaction, and a re-queued job at its start time, which pg-boss's
 // fetch honouring `startAfter` is outside.
 import {
-  proEnds,
   reachHistory,
   reachHistoryDays,
   reportingJobs,
-  subscriptions,
   type WorkerDatabase,
 } from '@creator-analytics/database'
-import type { FindJobs, TestClock } from '@creator-analytics/database/testing'
+import { type FindJobs, subscribeOwner, type TestClock } from '@creator-analytics/database/testing'
 import { purgeDateOf } from '@creator-analytics/entitlements'
 import type { FakeGoogle, FakeReachRow } from '@creator-analytics/fake-google'
-import { asc, eq, sql } from 'drizzle-orm'
+import { asc, sql } from 'drizzle-orm'
 import { describe, expect } from 'vitest'
 import type { jobHandlers } from '../src/jobs.ts'
 import { ensureReportingJob } from '../src/reporting-jobs.ts'
@@ -152,19 +150,9 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-ended', 'UC-reach-ended')
-    await worker.forChannel(channelId, async (tx) => {
-      await tx.sql.insert(subscriptions).values({
-        channelId,
-        stripeCustomerId: `cus_${channelId}`,
-        stripeSubscriptionId: `sub_${channelId}`,
-        status: 'canceled',
-        updatedAt: tx.now,
-      })
-      await tx.sql.insert(proEnds).values({
-        channelId,
-        endedAt: new Date('2026-11-17T12:00:00.000Z'),
-        purgeAfter: new Date('2026-12-17T12:00:00.000Z'),
-      })
+    await subscribeOwner(web, worker, channelId, {
+      status: 'canceled',
+      purgeAfter: new Date('2026-12-17T12:00:00.000Z'),
     })
     addDay(google, 'UC-reach-ended', '2026-11-15', '2026-11-16T10:00:00Z')
 
@@ -185,7 +173,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-new', 'UC-reach-new')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     // Created 61 days before today, so Google no longer holds it.
     addDay(google, 'UC-reach-new', '2026-09-16', '2026-09-17T10:00:00Z')
     const kept = [
@@ -210,7 +198,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-later', 'UC-reach-later')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     addDay(google, 'UC-reach-later', '2026-11-14', '2026-11-15T10:00:00Z')
     await handlers.ensureReportingJob(worker, { channelId })
     const newer = addDay(google, 'UC-reach-later', '2026-11-15', '2026-11-16T10:00:00Z')
@@ -233,7 +221,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-tie', 'UC-reach-tie')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     addDay(google, 'UC-reach-tie', '2026-11-14', '2026-11-16T10:00:00Z')
     await handlers.ensureReportingJob(worker, { channelId })
     const tied = addDay(google, 'UC-reach-tie', '2026-11-15', '2026-11-16T10:00:00Z')
@@ -260,23 +248,9 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     // The report of the UTC date `n` days after day 0, created at 10:00 UTC the day after it.
     const addReport = (n: number) =>
       addDay(google, 'UC-reach-return', dateOf(n), `${dateOf(n + 1)}T10:00:00Z`)
-    // The channel's purge date is on its pro_ends row, which a paid status deletes.
+    // The channel's purge date is on its pro_ends row, which a turn to paid deletes.
     const setSubscription = ({ status, purgeAfter }: { status: string; purgeAfter: Date | null }) =>
-      worker.forChannel(channelId, async (tx) => {
-        await tx.sql
-          .update(subscriptions)
-          .set({ status })
-          .where(eq(subscriptions.channelId, channelId))
-        if (!purgeAfter) {
-          await tx.sql.delete(proEnds).where(eq(proEnds.channelId, channelId))
-          return
-        }
-        const ended = { endedAt: day0, purgeAfter }
-        await tx.sql
-          .insert(proEnds)
-          .values({ channelId, ...ended })
-          .onConflictDoUpdate({ target: proEnds.channelId, set: ended })
-      })
+      subscribeOwner(web, worker, channelId, { status, purgeAfter })
     const runAt = async (n: number) => {
       clock.set(dayAt(n))
       google.setNow(dayAt(n))
@@ -286,7 +260,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(day0)
     google.setNow(day0)
     const channelId = await connectedChannel(web, google, keys, 'reach-return', 'UC-reach-return')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     for (const n of [-3, -2, -1]) addReport(n)
     await runAt(0)
     // The `deleted` webhook ends the subscription on day 0.
@@ -321,7 +295,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-fix', 'UC-reach-fix')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     addDay(google, 'UC-reach-fix', '2026-11-14', '2026-11-15T10:00:00Z')
     addDay(google, 'UC-reach-fix', '2026-11-15', '2026-11-16T10:00:00Z')
     await handlers.ensureReportingJob(worker, { channelId })
@@ -355,7 +329,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-cols', 'UC-reach-cols')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     google.addReachReport('UC-reach-cols', {
       day: '2026-11-15',
       createTime: '2026-11-16T10:00:00Z',
@@ -415,7 +389,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-retry', 'UC-reach-retry')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     const report = addDay(google, 'UC-reach-retry', '2026-11-15', '2026-11-16T10:00:00Z')
     google.failReportDownloads(503)
     await handlers.ensureReportingJob(worker, { channelId })
@@ -440,7 +414,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-clicks', 'UC-reach-clicks')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     addDay(google, 'UC-reach-clicks', '2026-11-15', '2026-11-16T10:00:00Z', [
       { videoId: 'v1', trafficSourceType: 5, impressions: 4, ctr: 1.25 },
     ])
@@ -463,7 +437,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-skip', 'UC-reach-skip')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     const reports = [
       addDay(google, 'UC-reach-skip', '2026-11-13', '2026-11-14T10:00:00Z'),
       addDay(google, 'UC-reach-skip', '2026-11-14', '2026-11-15T10:00:00Z', unreadableRows),
@@ -490,7 +464,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-last', 'UC-reach-last')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     const read = addDay(google, 'UC-reach-last', '2026-11-14', '2026-11-15T10:00:00Z')
     const refused = addDay(
       google,
@@ -522,7 +496,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-log', 'UC-reach-log')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     addDay(google, 'UC-reach-log', '2026-11-15', '2026-11-16T10:00:00Z', unreadableRows)
 
     await handlers.ensureReportingJob(worker, { channelId })
@@ -547,7 +521,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-stop', 'UC-reach-stop')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     const first = addDay(google, 'UC-reach-stop', '2026-11-14', '2026-11-15T10:00:00Z')
     addDay(google, 'UC-reach-stop', '2026-11-15', '2026-11-16T10:00:00Z')
     google.failReportDownloads(503)
@@ -570,7 +544,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-skips', 'UC-reach-skips')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     const dayMs = 24 * 60 * 60 * 1000
     const hoursBefore = (hours: number) =>
       new Date(clock.now().getTime() - hours * 60 * 60 * 1000).toISOString()
@@ -604,7 +578,7 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-alarm', 'UC-reach-alarm')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     addDay(google, 'UC-reach-alarm', '2026-11-15', '2026-11-16T10:00:00Z')
     google.failReportDownloads(503)
     const errorReportsAfterRun = async (ms: number) => {
@@ -644,7 +618,7 @@ describe("seam 2: a history download Google's 429 cuts short", () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-429', 'UC-reach-429')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     const days = ['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13']
     const [r1, r2, r3, r4, r5] = days.map((day, i) =>
       addDay(google, 'UC-reach-429', day, `2026-11-1${i}T10:00:00Z`),
@@ -680,7 +654,7 @@ describe("seam 2: a history download Google's 429 cuts short", () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-slow', 'UC-reach-slow')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     addDay(google, 'UC-reach-slow', '2026-11-13', '2026-11-14T10:00:00Z')
     addDay(google, 'UC-reach-slow', '2026-11-14', '2026-11-15T10:00:00Z')
     addDay(google, 'UC-reach-slow', '2026-11-15', '2026-11-16T10:00:00Z')
@@ -716,7 +690,7 @@ describe("seam 2: a history download Google's 429 cuts short", () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-wait', 'UC-reach-wait')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     addDay(google, 'UC-reach-wait', '2026-11-15', '2026-11-16T10:00:00Z')
     const ran: string[] = []
     /** Runs the job under a 429 with this Retry-After, and returns the job the run queued. */
@@ -758,7 +732,7 @@ describe("seam 2: a history download Google's 429 cuts short", () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-cap', 'UC-reach-cap')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     addDay(google, 'UC-reach-cap', '2026-11-15', '2026-11-16T10:00:00Z')
     google.limitReportDownloads(0)
 
@@ -789,7 +763,7 @@ describe("seam 2: a history download Google's 429 cuts short", () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'reach-limited', 'UC-reach-limited')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     addDay(google, 'UC-reach-limited', '2026-11-14', '2026-11-15T10:00:00Z')
     addDay(google, 'UC-reach-limited', '2026-11-15', '2026-11-16T10:00:00Z')
     google.failReportDownloads(503)
@@ -825,7 +799,7 @@ describe("seam 2: a history download Google's 429 cuts short", () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'list-429', 'UC-list-429')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     addDay(google, 'UC-list-429', '2026-11-14', '2026-11-15T10:00:00Z')
     addDay(google, 'UC-list-429', '2026-11-15', '2026-11-16T10:00:00Z')
     google.limitReportLists(0)
@@ -855,7 +829,7 @@ describe("seam 2: a history download Google's 429 cuts short", () => {
     clock.set(today)
     google.setNow(today)
     const channelId = await connectedChannel(web, google, keys, 'list-cap', 'UC-list-cap')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     addDay(google, 'UC-list-cap', '2026-11-15', '2026-11-16T10:00:00Z')
     google.limitReportLists(0)
 

@@ -59,18 +59,17 @@ export interface StripeApi {
 export interface Billing {
   readonly settings: BillingSettings
   /**
-   * Opens a Checkout Session for the channel's subscription to the plan, and answers its URL on
-   * Stripe. The customer is the channel's earlier one, or null for a channel that never subscribed.
+   * Opens a Checkout Session for the user's subscription to the plan, one block, and answers its
+   * URL on Stripe. The customer is the user's earlier one, or null for a user who never subscribed.
    */
   startCheckout(checkout: {
-    channelId: string
+    userId: string
     plan: Plan
     customerId: string | null
   }): Promise<string>
   /**
-   * Opens a Customer Portal session for the channel's Stripe customer, in which its owner changes
-   * the card, switches between the two plans or cancels at period end, and answers its URL on
-   * Stripe.
+   * Opens a Customer Portal session for the user's Stripe customer, in which they change the card
+   * or cancel at period end, and answers its URL on Stripe.
    */
   openPortal(portal: { customerId: string }): Promise<string>
   /**
@@ -85,7 +84,14 @@ export interface Billing {
 
 /**
  * The metadata a Stillstats session and its subscription carry, which marks them as Stillstats',
- * since only Stillstats Checkout writes it, and names the channel they pay for.
+ * since only Stillstats Checkout writes it, and names the user they belong to (stillstats#20).
+ */
+export const userMetadataKey = 'stillstats_user_id'
+
+/**
+ * The metadata a session and its subscription made before blocks carry, which names the channel
+ * they paid for. The webhook still reads it, and records such a subscription onto the channel's
+ * owner, while one is live.
  */
 export const channelMetadataKey = 'stillstats_channel_id'
 
@@ -144,8 +150,8 @@ export function createBilling({
 
   return {
     settings,
-    async startCheckout({ channelId, plan, customerId }) {
-      const metadata = { [channelMetadataKey]: channelId, plan }
+    async startCheckout({ userId, plan, customerId }) {
+      const metadata = { [userMetadataKey]: userId, plan }
       // Managed Payments' parameters, from docs.stripe.com/payments/managed-payments/set-up and
       // /update-checkout, checked 2026-11-17. It refuses a session that also sets automatic_tax,
       // tax_id_collection, payment_method_types, payment_method_options,
@@ -154,9 +160,10 @@ export function createBilling({
       // or name: Stripe's page asks for them.
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
+        // One block: a user buys their first block here, and changes the count in the app.
         line_items: [{ price: settings.prices[plan], quantity: 1 }],
         managed_payments: { enabled: true },
-        client_reference_id: channelId,
+        client_reference_id: userId,
         metadata,
         subscription_data: { metadata },
         ...(customerId !== null && { customer: customerId }),

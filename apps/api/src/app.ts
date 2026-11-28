@@ -13,6 +13,7 @@ import type {
   MeAnswer,
 } from '@creator-analytics/api-types'
 import type { WebDatabase } from '@creator-analytics/database'
+import { requestAccountCancellation } from '@creator-analytics/entitlements'
 import type { EventRelay } from '@creator-analytics/event-relay'
 import type { Logger, Reporter } from '@creator-analytics/reporter'
 import {
@@ -312,11 +313,13 @@ export function createApi({
     return c.json({ email, name, createdAt: createdAt.toISOString() } satisfies MeAnswer)
   })
   // One transaction, as with a disconnect, for every channel the user held. Deleting the user
-  // deletes its sessions, so the sign-out only clears the cookies.
+  // deletes its sessions, so the sign-out only clears the cookies. The user's live subscription is
+  // pended for its cancellation and refund first, since deleting the user deletes its row (ADR 0024).
   signedIn.delete('/me', async (c) => {
-    const { revokedAtGoogle } = await database.asUser(c.get('user').id, (tx) =>
-      accounts.deleteUser(tx),
-    )
+    const { revokedAtGoogle } = await database.asUser(c.get('user').id, async (tx) => {
+      await requestAccountCancellation(tx)
+      return accounts.deleteUser(tx)
+    })
     const { headers } = await auth.api.signOut({ headers: c.req.raw.headers, returnHeaders: true })
     for (const cookie of headers.getSetCookie()) c.header('set-cookie', cookie, { append: true })
     return c.json({ revokedAtGoogle } satisfies DeleteMeAnswer)

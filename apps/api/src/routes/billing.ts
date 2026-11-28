@@ -5,13 +5,15 @@ import {
   type ErrorAnswer,
   type PortalStartAnswer,
 } from '@creator-analytics/api-types'
+import type { Scoped } from '@creator-analytics/database'
 import {
   entitlementOf,
   heldChannelsOf,
   portalCustomerOf,
+  proAccountOf,
   stripeCustomerOf,
 } from '@creator-analytics/entitlements'
-import type { Hono } from 'hono'
+import type { Context, Hono } from 'hono'
 import type { ApiDependencies } from '../app.ts'
 import { channelIdOf, refuse, type SignedIn } from '../signed-in.ts'
 
@@ -22,16 +24,54 @@ async function requestedPlan(request: Request) {
   return billingPlans.find((each) => each === plan)
 }
 
+type Checked<T> =
+  | { refusal: 'not_connected' | 'not_owner' | 'already_subscribed' | 'not_subscribed' }
+  | T
+
 /**
- * GET /api/me/entitlements: whether Pro is offered, each channel the user holds, its
- * tier, and whether the user may start a Checkout for it or open its Customer Portal.
- * POST /api/channels/:channelId/checkout: opens Stripe's Checkout for the channel's Pro subscription and
- * answers its URL, which the web app goes to, as it goes to Google's consent. Only the channel's
- * owner may, and only for a free channel, an ended one included (ADR 0022).
- * POST /api/channels/:channelId/portal: opens Stripe's Customer Portal for the channel's customer
- * and answers its URL. Only the channel's owner may, and only for a paid channel: an ended one
- * subscribes again through Checkout. Without Pro's settings, both routes answer 404 as an
- * unknown route does, and no channel may subscribe or manage.
+ * Whether the user may open Checkout: they own a channel, which only an owner may buy Pro for,
+ * and hold no live subscription, which a second one would bill twice. Answers their customer, kept
+ * from an ended subscription, so a return buys as the same customer.
+ */
+async function checkoutCheck(tx: Scoped<'user'>): Promise<Checked<{ customerId: string | null }>> {
+  const account = await proAccountOf(tx)
+  if (account.ownedChannels.length === 0) return { refusal: 'not_owner' }
+  if (account.subscribed) return { refusal: 'already_subscribed' }
+  return { customerId: await stripeCustomerOf(tx) }
+}
+
+/** Whether the user may open the Customer Portal: they hold a live subscription. */
+async function portalCheck(tx: Scoped<'user'>): Promise<Checked<{ customerId: string }>> {
+  const customerId = await portalCustomerOf(tx)
+  if (customerId === null) return { refusal: 'not_subscribed' }
+  return { customerId }
+}
+
+/**
+ * Whether the user holds the channel a route of the release before blocks names, and owns it, as
+ * that route checked before it opened Checkout or the Portal for the channel.
+ */
+async function ownedChannelCheck(tx: Scoped<'user'>, channelId: string) {
+  const held = (await heldChannelsOf(tx)).find((each) => each.channelId === channelId)
+  if (!held) return { refusal: 'not_connected' } as const
+  if (!held.owner) return { refusal: 'not_owner' } as const
+  return null
+}
+
+/**
+ * GET /api/me/entitlements: whether Pro is offered, the user's blocks and slots in use, whether
+ * they may start a Checkout or open the Customer Portal, and each channel they hold, its tier,
+ * whether they own and picked it, and its purge date.
+ * POST /api/me/checkout: opens Stripe's Checkout for the user's Pro subscription, one block, and
+ * answers its URL, which the web app goes to, as it goes to Google's consent. Only a user who owns
+ * a channel may, and only without a live subscription, an ended one's subscribe-again included
+ * (ADR 0022, ADR 0024).
+ * POST /api/me/portal: opens Stripe's Customer Portal for the user's customer and answers its URL.
+ * Only a user with a live subscription may: an ended one subscribes again through Checkout.
+ * POST /api/channels/:channelId/checkout and /portal: the routes of the release before blocks,
+ * kept for a tab opened before the deploy. Each checks the user holds and owns the channel, as it
+ * did, then does what the user's route does. Without Pro's settings, every route but the answer
+ * answers 404 as an unknown route does, and no one may subscribe or manage.
  */
 export function billingRoute(
   signedIn: Hono<SignedIn>,
@@ -39,57 +79,78 @@ export function billingRoute(
 ): void {
   signedIn.get('/me/entitlements', async (c) => {
     const answer = await database.asUser(c.get('user').id, async (tx) => {
+      const account = await proAccountOf(tx)
+      const canSubscribe =
+        billing !== undefined && account.ownedChannels.length > 0 && !account.subscribed
+      const canManage = billing !== undefined && account.subscribed
       const channels: EntitlementsAnswer['channels'] = []
       for (const { channelId, owner } of await heldChannelsOf(tx)) {
-        const { tier } = await entitlementOf(tx, channelId)
+        const { tier, purgeDate } = await entitlementOf(tx, channelId)
+        const picked = account.ownedChannels.some(
+          (each) => each.channelId === channelId && each.picked,
+        )
         channels.push({
           channelId,
           tier,
-          canSubscribe: billing !== undefined && owner && tier === 'free',
-          canManage: billing !== undefined && owner && tier === 'paid',
+          owner,
+          picked,
+          purgeDate: purgeDate?.toISOString() ?? null,
+          canSubscribe: canSubscribe && owner && tier === 'free',
+          canManage: canManage && owner && tier === 'paid',
         })
       }
-      return { paidTierOffered: billing !== undefined, channels }
+      return {
+        paidTierOffered: billing !== undefined,
+        canSubscribe,
+        canManage,
+        blocks: account.blocks,
+        slotsInUse: account.slotsInUse,
+        channels,
+      }
     })
     return c.json(answer satisfies EntitlementsAnswer)
   })
 
-  signedIn.post('/channels/:channelId/checkout', async (c) => {
+  async function startCheckout(c: Context<SignedIn>, channelId?: string) {
     if (!billing) return c.json({ error: 'not_found' } satisfies ErrorAnswer, 404)
-    const channelId = channelIdOf(c)
-    if (!channelId) return refuse(c, 'not_connected')
     const plan = await requestedPlan(c.req.raw)
     if (!plan) return c.json({ error: 'invalid_plan' } satisfies ErrorAnswer, 400)
-    const checked = await database.asUser(c.get('user').id, async (tx) => {
-      const held = (await heldChannelsOf(tx)).find((each) => each.channelId === channelId)
-      if (!held) return { refusal: 'not_connected' } as const
-      if (!held.owner) return { refusal: 'not_owner' } as const
-      if ((await entitlementOf(tx, channelId)).tier === 'paid') {
-        return { refusal: 'already_subscribed' } as const
-      }
-      return { customerId: await stripeCustomerOf(tx, channelId) }
+    const userId = c.get('user').id
+    const checked = await database.asUser(userId, async (tx) => {
+      const refused = channelId && (await ownedChannelCheck(tx, channelId))
+      return refused || checkoutCheck(tx)
     })
     if ('refusal' in checked) return refuse(c, checked.refusal)
     // Outside the transaction, so a slow Stripe never holds one open.
-    const url = await billing.startCheckout({ channelId, plan, customerId: checked.customerId })
+    const url = await billing.startCheckout({ userId, plan, customerId: checked.customerId })
     return c.json({ url } satisfies CheckoutStartAnswer)
-  })
+  }
 
-  signedIn.post('/channels/:channelId/portal', async (c) => {
+  async function openPortal(c: Context<SignedIn>, channelId?: string) {
     if (!billing) return c.json({ error: 'not_found' } satisfies ErrorAnswer, 404)
-    const channelId = channelIdOf(c)
-    if (!channelId) return refuse(c, 'not_connected')
     const checked = await database.asUser(c.get('user').id, async (tx) => {
-      const held = (await heldChannelsOf(tx)).find((each) => each.channelId === channelId)
-      if (!held) return { refusal: 'not_connected' } as const
-      if (!held.owner) return { refusal: 'not_owner' } as const
-      const customerId = await portalCustomerOf(tx, channelId)
-      if (customerId === null) return { refusal: 'not_subscribed' } as const
-      return { customerId }
+      const refused = channelId && (await ownedChannelCheck(tx, channelId))
+      return refused || portalCheck(tx)
     })
     if ('refusal' in checked) return refuse(c, checked.refusal)
     // Outside the transaction, as the Checkout's.
     const url = await billing.openPortal({ customerId: checked.customerId })
     return c.json({ url } satisfies PortalStartAnswer)
+  }
+
+  signedIn.post('/me/checkout', (c) => startCheckout(c))
+  signedIn.post('/me/portal', (c) => openPortal(c))
+
+  signedIn.post('/channels/:channelId/checkout', (c) => {
+    if (!billing) return c.json({ error: 'not_found' } satisfies ErrorAnswer, 404)
+    const channelId = channelIdOf(c)
+    if (!channelId) return refuse(c, 'not_connected')
+    return startCheckout(c, channelId)
+  })
+  signedIn.post('/channels/:channelId/portal', (c) => {
+    if (!billing) return c.json({ error: 'not_found' } satisfies ErrorAnswer, 404)
+    const channelId = channelIdOf(c)
+    if (!channelId) return refuse(c, 'not_connected')
+    return openPortal(c, channelId)
   })
 }

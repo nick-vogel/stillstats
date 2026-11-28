@@ -134,3 +134,31 @@ export const subscriptionCancellations = pgTable(
   },
   (t) => [workerPolicy('subscription_cancellations', t.channelId)],
 )
+
+/**
+ * A user's Stripe subscription that their account deletion still has to cancel and refund
+ * (stillstats#20, ADR 0024). The deletion writes it in the user's scope, before it deletes the user
+ * row, which takes the user's subscription row with it, so it outlives its user and holds no user
+ * id. A user pends only their own: the insert's check reads `user_subscriptions` under the user's
+ * own policy. It exists only while the cancellation is pending: the system scope's cancellation
+ * job deletes it once Stripe accepts the cancellation and the refund, so no Stripe id outlives a
+ * completed cancellation. The user scope writes it and cannot read it back.
+ */
+export const accountCancellations = pgTable(
+  'account_cancellations',
+  {
+    id: uuid('id').primaryKey(),
+    stripeSubscriptionId: text('stripe_subscription_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    webPolicy(
+      'account_cancellations',
+      'insert',
+      sql`${t.stripeSubscriptionId} in (select s.stripe_subscription_id from user_subscriptions s)`,
+      'account_cancellations_web_insert',
+    ),
+    workerScopePolicy('account_cancellations', 'system', 'select'),
+    workerScopePolicy('account_cancellations', 'system', 'delete'),
+  ],
+)

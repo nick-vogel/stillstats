@@ -4,13 +4,11 @@
 // what it stores.
 import type { RetentionCurvesAnswer, VideoListAnswer } from '@creator-analytics/api-types'
 import {
-  proEnds,
   retentionCurveReads,
   retentionCurves,
-  subscriptions,
   type WorkerDatabase,
 } from '@creator-analytics/database'
-import { test } from '@creator-analytics/database/testing'
+import { subscribeOwner, test } from '@creator-analytics/database/testing'
 import type { FakeUpload } from '@creator-analytics/fake-google'
 import { describe, expect } from 'vitest'
 import type { Browser } from '../test/browser.ts'
@@ -61,27 +59,6 @@ async function connectedCreator(api: StartedApi) {
   const channelId = channels[0]?.id
   if (!channelId) throw new Error('The creator has no connected channel')
   return { browser, channelId }
-}
-
-async function subscribe(
-  worker: WorkerDatabase,
-  channelId: string,
-  { status = 'active', purgeAfter = null }: { status?: string; purgeAfter?: Date | null } = {},
-): Promise<void> {
-  await worker.forChannel(channelId, async (tx) => {
-    await tx.sql.insert(subscriptions).values({
-      channelId,
-      stripeCustomerId: 'cus_retention_curves',
-      stripeSubscriptionId: 'sub_retention_curves',
-      status,
-      updatedAt: tx.now,
-    })
-    // The channel's own purge date, 30 days after it stopped being Pro.
-    if (purgeAfter) {
-      const endedAt = new Date(purgeAfter.getTime() - 30 * 24 * 60 * 60 * 1000)
-      await tx.sql.insert(proEnds).values({ channelId, endedAt, purgeAfter })
-    }
-  })
 }
 
 const readOfV1 = new Date('2026-10-06T09:00:05Z')
@@ -145,7 +122,7 @@ describe("seam 2: a Pro channel's stored retention curves", () => {
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeCurves(worker, channelId)
 
     const read = await curvesOf(browser, channelId, { ids: 'v2,v1' })
@@ -180,7 +157,7 @@ describe("seam 2: a Pro channel's stored retention curves", () => {
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeCurves(worker, channelId)
 
     const read = await curvesOf(browser, channelId, { ids: 'v3' })
@@ -198,7 +175,7 @@ describe("seam 2: a Pro channel's stored retention curves", () => {
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeCurves(worker, channelId)
 
     const read = await curvesOf(browser, channelId, { ids: 'v6' })
@@ -217,7 +194,7 @@ describe("seam 2: a Pro channel's stored retention curves", () => {
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
 
     expect((await curvesOf(browser, channelId)).body).toStrictEqual({ curves: [], unread: 6 })
 
@@ -242,7 +219,7 @@ describe("seam 2: a Pro channel's stored retention curves", () => {
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeCurves(worker, channelId)
 
     const five = await curvesOf(browser, channelId, { ids: 'v1,v2,v3,v4,v5' })
@@ -262,7 +239,7 @@ describe("seam 2: a Pro channel's stored retention curves", () => {
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     const before = api.google.dataApiRequests.length
 
     const refused = []
@@ -294,7 +271,7 @@ describe("seam 2: a Pro channel's stored retention curves", () => {
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeCurves(worker, channelId)
 
     const read = await curvesOf(browser, channelId, { ids: 'v1,elsewhere' })
@@ -337,7 +314,7 @@ describe('seam 2: a channel whose history is not readable gets no curve', () => 
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId, { status: 'canceled', purgeAfter })
+    await subscribeOwner(web, worker, channelId, { status: 'canceled', purgeAfter })
     await storeCurves(worker, channelId)
 
     const ended = await curvesOf(browser, channelId, { ids: 'v1' })
@@ -357,7 +334,7 @@ describe('seam 2: a channel whose history is not readable gets no curve', () => 
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId, { status: 'canceled', purgeAfter })
+    await subscribeOwner(web, worker, channelId, { status: 'canceled', purgeAfter })
     await storeCurves(worker, channelId)
 
     const ended = await curvesOf(browser, channelId, { ids: 'v4' })
@@ -375,7 +352,7 @@ describe('seam 2: a channel whose history is not readable gets no curve', () => 
     clock.set(noonToday)
     const api = await startApi(web)
     const { channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeCurves(worker, channelId)
     const other = await signIn(api, otherCreator)
 
@@ -407,7 +384,7 @@ describe('seam 1: the video list lists only the videos with a stored retention c
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeCurves(worker, channelId)
     const other = await signIn(api, otherCreator)
     api.google.pickChannel('UC-other-curves')
@@ -455,7 +432,7 @@ describe('seam 1: the video list lists only the videos with a stored retention c
 
     const free = await listOf(browser, channelId, drawable)
     const purgeAfter = new Date('2026-11-06T01:00:00Z')
-    await subscribe(worker, channelId, { status: 'canceled', purgeAfter })
+    await subscribeOwner(web, worker, channelId, { status: 'canceled', purgeAfter })
     const ended = await listOf(browser, channelId, drawable)
     clock.set(new Date(purgeAfter.getTime() + 1000))
     const purged = await listOf(browser, channelId, drawable)
@@ -473,7 +450,7 @@ describe('seam 1: the video list lists only the videos with a stored retention c
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
 
     const answers = []
     for (const search of [

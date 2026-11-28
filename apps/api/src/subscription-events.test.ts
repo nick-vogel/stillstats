@@ -2,9 +2,20 @@
 // test reaches a real Stripe delivery or the exact body Stripe sends for a Managed Payments
 // subscription. Nick's walk of Pro on production (creator-analytics#791) covers both.
 import { randomUUID } from 'node:crypto'
-import { subscriptions, type WebDatabase, type WorkerDatabase } from '@creator-analytics/database'
-import { type FindJobs, test } from '@creator-analytics/database/testing'
+import {
+  memberships,
+  userSubscriptions,
+  type WebDatabase,
+  type WorkerDatabase,
+} from '@creator-analytics/database'
+import {
+  type FindJobs,
+  ownerOf,
+  recordUserSubscription,
+  test,
+} from '@creator-analytics/database/testing'
 import { entitlementOf } from '@creator-analytics/entitlements'
+import { eq } from 'drizzle-orm'
 import { describe, expect } from 'vitest'
 import { channelsOf, connect, signIn, userIdOf } from '../test/flows.ts'
 import { type StartedApi, startApi } from '../test/start-api.ts'
@@ -37,19 +48,19 @@ async function deliver(api: StartedApi, body: string): Promise<void> {
   expect(response.status).toBe(200)
 }
 
-/** The channel's subscription row, as its owner's scope reads it. */
+/** The owner's subscription row, as their scope reads it. */
 function storedSubscription(web: WebDatabase, ownerId: string) {
   return web.asUser(ownerId, (scope) =>
     scope.sql
       .select({
-        customer: subscriptions.stripeCustomerId,
-        subscription: subscriptions.stripeSubscriptionId,
-        plan: subscriptions.plan,
-        status: subscriptions.status,
-        periodEnd: subscriptions.currentPeriodEnd,
-        updatedAt: subscriptions.updatedAt,
+        customer: userSubscriptions.stripeCustomerId,
+        subscription: userSubscriptions.stripeSubscriptionId,
+        plan: userSubscriptions.plan,
+        status: userSubscriptions.status,
+        periodEnd: userSubscriptions.currentPeriodEnd,
+        updatedAt: userSubscriptions.updatedAt,
       })
-      .from(subscriptions),
+      .from(userSubscriptions),
   )
 }
 
@@ -168,6 +179,14 @@ describe('seam 1: the Stripe webhook records a subscription', () => {
       'a subscription with no Stillstats channel in its metadata',
       () => subscriptionCreatedEvent({ channelId: null }),
     ],
+    [
+      'a Checkout whose metadata names a channel by no internal ID',
+      () => subscriptionCheckoutEvent({ channelId: 'UC-subscriber' }),
+    ],
+    [
+      'a subscription whose metadata names a user by an over-long ID',
+      () => subscriptionCreatedEvent({ userId: 'u'.repeat(129) }),
+    ],
   ] as const)(
     "%s is no Stillstats Checkout's, which records and reports nothing",
     async ([, bodyOf], { web }) => {
@@ -190,7 +209,7 @@ describe('seam 1: the Stripe webhook records a subscription', () => {
 
     expect(api.reporter.reports).toEqual([
       {
-        message: 'A paid Stripe subscription names no channel',
+        message: 'A paid Stripe subscription names no user',
         context: { stripeObject: 'cs_test_gone' },
       },
     ])
@@ -223,8 +242,12 @@ async function downloadsSentBy(findJobs: FindJobs, channelId: string, act: () =>
   return (await reportingJobs()).filter((job) => !before.some((earlier) => earlier.id === job.id))
 }
 
-/** The channel is paid already, as an earlier Checkout left it, a month before the events here. */
-function seedPaid(
+/**
+ * The channel is paid already, its owner's subscription as an earlier Checkout left it a month
+ * before the events here, recorded through the product's write, which sends no job here.
+ */
+async function seedPaid(
+  web: WebDatabase,
   worker: WorkerDatabase,
   channelId: string,
   {
@@ -232,15 +255,16 @@ function seedPaid(
     periodEnd = new Date('2026-12-17T12:00:00.000Z'),
   }: { status?: string; periodEnd?: Date | null } = {},
 ) {
-  return worker.forChannel(channelId, (tx) =>
-    tx.sql.insert(subscriptions).values({
-      channelId,
-      stripeCustomerId: 'cus_test_stillstats',
-      stripeSubscriptionId: 'sub_test_stillstats',
+  const userId = await ownerOf(worker, channelId)
+  await web.asAnonymous((tx) =>
+    recordUserSubscription(tx, {
+      userId,
+      customer: 'cus_test_stillstats',
+      subscription: 'sub_test_stillstats',
       plan: 'monthly',
       status,
-      currentPeriodEnd: periodEnd,
-      updatedAt: new Date('2026-11-17T12:00:00.000Z'),
+      periodEnd,
+      eventCreated: new Date('2026-11-17T12:00:00.000Z'),
     }),
   )
 }
@@ -352,7 +376,7 @@ describe("seam 1: a subscription that turns its channel paid queues the channel'
   }) => {
     const api = await startApi(web, { billing: testBilling })
     const { channelId, ownerId } = await ownedChannel(web, api)
-    await seedPaid(worker, channelId)
+    await seedPaid(web, worker, channelId)
     await deliver(
       api,
       subscriptionDeletedEvent({ channelId, endedAt: new Date('2026-11-18T12:00:00.000Z') }),
@@ -375,7 +399,7 @@ describe("seam 1: a subscription that turns its channel paid queues the channel'
   }) => {
     const api = await startApi(web, { billing: testBilling })
     const { channelId, ownerId } = await ownedChannel(web, api)
-    await seedPaid(worker, channelId, { status: 'past_due' })
+    await seedPaid(web, worker, channelId, { status: 'past_due' })
     await deliver(
       api,
       subscriptionUpdatedEvent({
@@ -443,7 +467,7 @@ describe("seam 1: a subscription that turns its channel paid queues the channel'
   }) => {
     const api = await startApi(web, { billing: testBilling })
     const { channelId, ownerId } = await ownedChannel(web, api)
-    await seedPaid(worker, channelId, { periodEnd: null })
+    await seedPaid(web, worker, channelId, { periodEnd: null })
     const periodEnd = new Date('2026-12-17T12:00:00.000Z')
 
     const sent = await downloadsSentBy(findJobs, channelId, () =>
@@ -512,7 +536,7 @@ describe("seam 1: a subscription that turns its channel paid queues the channel'
     async ([, status, bodyOf], { web, worker, findJobs }) => {
       const api = await startApi(web, { billing: testBilling })
       const { channelId, ownerId } = await ownedChannel(web, api)
-      await seedPaid(worker, channelId, { status })
+      await seedPaid(web, worker, channelId, { status })
       const stored = await storedSubscription(web, ownerId)
 
       const sent = await downloadsSentBy(findJobs, channelId, () => deliver(api, bodyOf(channelId)))
@@ -521,4 +545,169 @@ describe("seam 1: a subscription that turns its channel paid queues the channel'
       expect(sent).toEqual([])
     },
   )
+})
+
+const blockOwner = { sub: '956729', email: 'block-owner@example.com', name: 'A Block Owner' }
+
+/**
+ * A user who owns `count` channels, connected in order, and holds one more channel another user
+ * owns, with the IDs in connection order.
+ */
+async function blockOwnerWithChannels(
+  web: WebDatabase,
+  worker: WorkerDatabase,
+  api: StartedApi,
+  count: number,
+) {
+  const browser = await signIn(api, blockOwner)
+  const owned: string[] = []
+  for (let n = 1; n <= count; n++) {
+    const before = new Set((await channelsOf(browser)).channels.map(({ id }) => id))
+    api.google.pickChannel(`UC-block-${n}`)
+    await connect(browser)
+    const added = (await channelsOf(browser)).channels.find(({ id }) => !before.has(id))
+    if (!added) throw new Error('The connect flow connected no channel')
+    owned.push(added.id)
+  }
+  const userId = await userIdOf(web, blockOwner.email)
+  // The test's one transaction gives every membership the connect writes the same now(), where
+  // production gives each connect its own, so each channel gets its connection time here.
+  for (const [n, channelId] of owned.entries()) {
+    await worker.forChannel(channelId, (tx) =>
+      tx.sql
+        .update(memberships)
+        .set({ createdAt: new Date(Date.UTC(2026, 10, 1, 12, n)) })
+        .where(eq(memberships.channelId, channelId)),
+    )
+  }
+  const other = await signIn(api, owner)
+  api.google.pickChannel('UC-block-held')
+  await connect(other)
+  const [held] = (await channelsOf(other)).channels
+  if (!held) throw new Error('The connect flow connected no channel')
+  // A membership with a role other than owner, inserted as checkout.test.ts explains.
+  await worker.forChannel(held.id, (tx) =>
+    tx.sql.insert(memberships).values({ channelId: held.id, userId, role: 'member' as 'owner' }),
+  )
+  return { userId, owned, held: held.id }
+}
+
+describe("seam 1: a block of Pro covers up to 4 of the user's channels (stillstats#20)", () => {
+  test('a Checkout for the user picks 4 owned channels in connection order, each paid with its download queued, and the fifth and a channel the user holds without owning it stay free', async ({
+    web,
+    worker,
+    findJobs,
+  }) => {
+    const api = await startApi(web, { billing: testBilling })
+    const { userId, owned, held } = await blockOwnerWithChannels(web, worker, api, 5)
+    const before = (await findJobs('ensureReportingJob')).map((job) => job.id)
+
+    await deliver(api, subscriptionCheckoutEvent({ userId }))
+
+    const tiers = await web.asUser(userId, async (tx) => {
+      const each: string[] = []
+      for (const id of [...owned, held]) each.push((await entitlementOf(tx, id)).tier)
+      return each
+    })
+    expect(tiers).toEqual(['paid', 'paid', 'paid', 'paid', 'free', 'free'])
+    const queued = (await findJobs('ensureReportingJob'))
+      .filter((job) => !before.includes(job.id))
+      .map((job) => job.data.channelId)
+    expect(queued.sort()).toEqual(owned.slice(0, 4).sort())
+    expect(await storedSubscription(web, userId)).toMatchObject([{ status: 'active' }])
+    expect(api.reporter.reports).toEqual([])
+  })
+
+  test("a subscription's quantity is its blocks: two cover the fifth channel too", async ({
+    web,
+    worker,
+  }) => {
+    const api = await startApi(web, { billing: testBilling })
+    const { userId, owned } = await blockOwnerWithChannels(web, worker, api, 5)
+
+    await deliver(api, subscriptionCreatedEvent({ userId, quantity: 2 }))
+
+    expect(
+      await web.asUser(userId, async (tx) => (await entitlementOf(tx, owned[4] ?? '')).tier),
+    ).toBe('paid')
+  })
+
+  test('an end gives every picked channel its purge date 30 days on, and a return before it clears them and keeps the same channels', async ({
+    web,
+    worker,
+    clock,
+  }) => {
+    clock.set(new Date('2026-11-26T12:00:00.000Z'))
+    const api = await startApi(web, { billing: testBilling })
+    const { userId, owned } = await blockOwnerWithChannels(web, worker, api, 5)
+    const subscribedAt = new Date('2026-11-17T12:00:00.000Z')
+    const endedAt = new Date('2026-11-20T12:00:00.000Z')
+    await deliver(api, subscriptionCreatedEvent({ userId, created: subscribedAt }))
+    const entitlements = () =>
+      web.asUser(userId, async (tx) => {
+        const each = []
+        for (const id of owned) each.push(await entitlementOf(tx, id))
+        return each
+      })
+
+    await deliver(
+      api,
+      subscriptionDeletedEvent({ userId, endedAt, created: new Date('2026-11-20T12:00:01Z') }),
+    )
+    const ended = await entitlements()
+    await deliver(
+      api,
+      subscriptionCreatedEvent({
+        userId,
+        subscription: 'sub_test_return',
+        created: new Date('2026-11-25T12:00:00Z'),
+      }),
+    )
+    const returned = await entitlements()
+
+    const purgeDate = new Date('2026-12-20T12:00:00.000Z')
+    const endedFree = { tier: 'free', purgeDate }
+    expect(ended).toEqual([
+      endedFree,
+      endedFree,
+      endedFree,
+      endedFree,
+      { tier: 'free', purgeDate: null },
+    ])
+    const paid = { tier: 'paid', purgeDate: null }
+    expect(returned).toEqual([paid, paid, paid, paid, { tier: 'free', purgeDate: null }])
+  })
+
+  test('an update records the quantity it carries', async ({ web, worker }) => {
+    const api = await startApi(web, { billing: testBilling })
+    const { userId } = await blockOwnerWithChannels(web, worker, api, 1)
+    await deliver(api, subscriptionCheckoutEvent({ userId }))
+
+    await deliver(api, subscriptionUpdatedEvent({ userId, quantity: 3 }))
+
+    const answer = (await (
+      await signIn(api, blockOwner)
+    )
+      .fetch('/api/me/entitlements')
+      .then((response) => response.json())) as { blocks: number; slotsInUse: number }
+    expect({ blocks: answer.blocks, slotsInUse: answer.slotsInUse }).toEqual({
+      blocks: 3,
+      slotsInUse: 1,
+    })
+  })
+
+  test('an event naming a user that does not exist records nothing and reports its ID', async ({
+    web,
+  }) => {
+    const api = await startApi(web, { billing: testBilling })
+
+    await deliver(api, subscriptionCheckoutEvent({ userId: 'no-such-user', id: 'cs_test_nobody' }))
+
+    expect(api.reporter.reports).toEqual([
+      {
+        message: 'A paid Stripe subscription names no user',
+        context: { stripeObject: 'cs_test_nobody' },
+      },
+    ])
+  })
 })

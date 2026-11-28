@@ -10,13 +10,12 @@
 // and the schedules test reads back the stored schedule.
 import {
   connections,
-  proEnds,
   quotaUsage,
   retentionCurveReads,
   retentionCurves,
-  subscriptions,
   type WorkerDatabase,
 } from '@creator-analytics/database'
+import { subscribeOwner } from '@creator-analytics/database/testing'
 import type { FakeGoogle, FakeUpload } from '@creator-analytics/fake-google'
 import { quotaDayOf } from '@creator-analytics/youtube-gateway'
 import { asc, eq, sql } from 'drizzle-orm'
@@ -167,7 +166,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
       [revoked, 'UC-curves-c'],
     ] as const) {
       uploadsAt(google, youtubeChannelId, [published('v1', daysBefore(3))])
-      await subscribe(worker, channelId)
+      await subscribe(web, worker, channelId)
     }
     await worker.forChannel(revoked, (tx) => tx.sql.update(connections).set({ status: 'revoked' }))
 
@@ -216,7 +215,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-backfill', 'UC-backfill')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     // 101 videos, published a day apart, the newest 40 days ago: none of them under 28 days.
     const videoIds = Array.from({ length: 101 }, (_, i) => `video-${String(i).padStart(3, '0')}`)
     uploadsAt(
@@ -252,7 +251,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-daily', 'UC-curves-daily')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     uploadsAt(google, 'UC-curves-daily', [published('young', daysBefore(5), 0.8)])
     await seedRead(worker, channelId, 'young', daysBefore(1))
 
@@ -275,7 +274,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-today', 'UC-curves-today')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     uploadsAt(google, 'UC-curves-today', [published('young', daysBefore(5), 0.8)])
     const earlier = new Date('2026-11-17T01:00:00.000Z')
     await seedRead(worker, channelId, 'young', earlier)
@@ -299,7 +298,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-monthly', 'UC-monthly')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     uploadsAt(google, 'UC-monthly', [
       published('read-29-days-ago', daysBefore(60)),
       published('read-30-days-ago', daysBefore(60)),
@@ -326,7 +325,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-large', 'UC-curves-large')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     // 101 videos last read on each of the 30 days before today, so 101 are due today.
     const videos = Array.from({ length: 3030 }, (_, i) => ({
       videoId: `video-${String(i).padStart(4, '0')}`,
@@ -360,7 +359,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-busy', 'UC-curves-busy')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     const youngIds = Array.from({ length: 100 }, (_, i) => `young-${String(i).padStart(3, '0')}`)
     uploadsAt(google, 'UC-curves-busy', [
       ...youngIds.map((videoId, i) => published(videoId, daysBefore(2 + i / 4))),
@@ -390,7 +389,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-order', 'UC-curves-order')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     // 60 videos under 28 days and 120 older ones: the run reads 100 of the 180 due.
     const ids = (group: string) =>
       Array.from({ length: 60 }, (_, i) => `${group}-${String(i).padStart(2, '0')}`)
@@ -429,7 +428,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-cross', 'UC-curves-cross')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     // 26 days and 18 hours old today, 27 days and 18 hours tomorrow, 28 days and 18 hours after.
     const publishedAt = new Date('2026-10-21T18:00:00.000Z')
     uploadsAt(google, 'UC-curves-cross', [published('crossing', publishedAt)])
@@ -478,16 +477,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-ended', 'UC-curves-ended')
-    await worker.forChannel(channelId, async (tx) => {
-      await tx.sql.insert(subscriptions).values({
-        channelId,
-        stripeCustomerId: `cus_${channelId}`,
-        stripeSubscriptionId: `sub_${channelId}`,
-        status: 'canceled',
-        updatedAt: tx.now,
-      })
-      await tx.sql.insert(proEnds).values({ channelId, endedAt: tx.now, purgeAfter: daysAfter(30) })
-    })
+    await subscribeOwner(web, worker, channelId, { status: 'canceled', purgeAfter: daysAfter(30) })
     uploadsAt(google, 'UC-curves-ended', [published('v1', daysBefore(3))])
     await seedRead(worker, channelId, 'v1', daysBefore(1))
 
@@ -510,7 +500,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-none', 'UC-curves-none')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     uploadsAt(google, 'UC-curves-none', [
       { videoId: 'small', title: 'Small', publishedAt: daysBefore(3).toISOString() },
     ])
@@ -533,7 +523,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-sched', 'UC-curves-sched')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     uploadsAt(google, 'UC-curves-sched', [
       { videoId: 'scheduled', title: 'Scheduled', scheduledFor: daysAfter(2).toISOString() },
       { ...published('private', daysBefore(3)), privacyStatus: 'private' },
@@ -557,7 +547,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-quota', 'UC-curves-quota')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     uploadsAt(google, 'UC-curves-quota', [
       published('newest', daysBefore(40)),
       published('older', daysBefore(50)),
@@ -591,7 +581,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-revoked', 'UC-revoked')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     uploadsAt(google, 'UC-revoked', [published('v1', daysBefore(3))])
     await worker.forChannel(channelId, (tx) =>
       tx.sql
@@ -618,7 +608,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-down', 'UC-curves-down')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     uploadsAt(google, 'UC-curves-down', [
       published('newer', daysBefore(2)),
       published('older', daysBefore(3)),
@@ -650,7 +640,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-dberror', 'UC-dberror')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     const repeated = curve(1)[0] as FakeRetentionPoint
     uploadsAt(google, 'UC-dberror', [
       published('newest', daysBefore(40)),
@@ -677,7 +667,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-scopes', 'UC-scopes')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     uploadsAt(google, 'UC-scopes', [
       published('newest', daysBefore(40)),
       published('older', daysBefore(50)),
@@ -713,7 +703,7 @@ describe('seam 2: the daily retention curve refresh of a paid channel', () => {
   }) => {
     setNow(clock, google, today)
     const channelId = await connectedChannel(web, google, keys, 'curves-cols', 'UC-curves-cols')
-    await subscribe(worker, channelId)
+    await subscribe(web, worker, channelId)
     uploadsAt(google, 'UC-curves-cols', [published('v1', daysBefore(3))])
 
     await handlers.retentionCurveRefresh(worker, { channelId })

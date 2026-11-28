@@ -56,18 +56,26 @@ _Avoid_: Ticket, support request, report (the error reports GlitchTip holds)
 Access to a channel's current analytics, including engaged views, with no stored history beyond a short cache.
 
 **Pro**:
-The paid tier, sold as "Stillstats Pro" at $7 a month or $70 a year for each channel: access that adds stored history (CTR and impressions first) for as long as the subscription is active. It was called the Paid tier until 2026-11-19 (creator-analytics#913). Code, database values, API fields and analytics events keep the word `paid`, as the paid Entitlement does.
+The paid tier, sold as "Stillstats Pro" at $7 a month or $70 a year for each Block of 4 channels: access that adds stored history (CTR and impressions first). A channel is Pro while its owner has picked it and the pick sits inside the owner's capacity, 4 slots for each Block of a live paid Subscription or a Pro grant. It was called the Paid tier until 2026-11-19 (creator-analytics#913). Code, database values, API fields and analytics events keep the word `paid`, as the paid Entitlement does.
 _Avoid_: Paid tier, premium
+
+**Block**:
+4 channel slots of Pro, bought at $7 a month or $70 a year. A Subscription buys a number of Blocks, its quantity, and each one lets its user pick 4 of the channels they own as Pro.
+_Avoid_: Seat, bundle
 
 **Entitlement**:
 What a channel may use under its current plan.
 
 **Subscription**:
-A channel's purchase of Pro, monthly or annual, which gives the channel the paid Entitlement. It belongs to the channel, and only the channel's owner starts, changes or cancels it. It keeps its price while it stays active. Monthly or annual is how often it bills, whatever its price, so one on a price Stillstats no longer sells is still monthly or annual.
+A user's purchase of a number of Blocks of Pro, monthly or annual. It belongs to the user, not to a channel, and only its user starts, changes or cancels it; only a channel's owner picks the channel for a slot. It keeps its price while it stays active. Monthly or annual is how often it bills, whatever its price, so one on a price Stillstats no longer sells is still monthly or annual. Before 2026-11-27 it belonged to a channel (ADR 0024).
 _Avoid_: Plan (the tier it buys), membership (a different thing), Pro (the tier, not the purchase)
 
+**Pro grant**:
+Blocks of Pro given to a user with no purchase, which fill slots as a Subscription's Blocks do.
+_Avoid_: Grant (alone), access grant, comp
+
 **Purge date**:
-The day a channel's stored history is deleted: 30 days after its subscription ends. Until then the history stays readable and shows the purge date, and a new subscription before it keeps the history and clears the date.
+The day a channel's stored history is deleted: 30 days after the channel stopped being Pro, because its Subscription ended, or later because it left its Block. Until then the history stays readable and shows the purge date, and picking the channel again for a live Block before it keeps the history and clears the date.
 _Avoid_: Expiry, deletion date
 
 **Tip**:

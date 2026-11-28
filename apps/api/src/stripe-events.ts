@@ -2,7 +2,7 @@ import { billingPlans } from '@creator-analytics/api-types'
 import { isInternalId } from '@creator-analytics/database'
 import { type Plan, purgeDateOf, type SubscriptionFields } from '@creator-analytics/entitlements'
 import Stripe from 'stripe'
-import { channelMetadataKey } from './billing.ts'
+import { channelMetadataKey, userMetadataKey } from './billing.ts'
 
 export type ReadStripeEvent = { ok: true; event: Stripe.Event } | { ok: false }
 
@@ -84,10 +84,36 @@ function idOf(value: string | { id: string } | null): string | null {
   return typeof value === 'string' ? value : (value?.id ?? null)
 }
 
-/** The channel a Stillstats session or subscription names in its metadata, or null for none. */
-function channelOf(metadata: Stripe.Metadata | null): string | null {
+/** Who a Stillstats session or subscription pays for, as its metadata names them. */
+type Subscriber = Pick<SubscriptionFields, 'userId' | 'legacyChannelId'>
+
+// Longer than any user ID the sign-in writes, and far inside Stripe's 500 characters for a
+// metadata value, so a value no Stillstats Checkout wrote is never read as a user.
+const maxUserIdLength = 128
+
+/**
+ * Who a Stillstats session or subscription pays for, or null for one no Stillstats Checkout made:
+ * the user its metadata names (stillstats#20), or, for a subscription made before blocks, the
+ * channel it names, which records onto the channel's owner.
+ */
+function subscriberOf(metadata: Stripe.Metadata | null): Subscriber | null {
+  const userId = metadata?.[userMetadataKey]
+  if (userId && userId.length <= maxUserIdLength) return { userId, legacyChannelId: null }
   const channelId = metadata?.[channelMetadataKey]
-  return channelId && isInternalId(channelId) ? channelId : null
+  if (channelId && isInternalId(channelId)) return { userId: null, legacyChannelId: channelId }
+  return null
+}
+
+/**
+ * The number of blocks a subscription item pays for: its `quantity`, an integer Stripe sends as
+ * null for a metered price (docs.stripe.com/api/subscription_items/object, read 2026-11-27). Null
+ * for none or one below 1, which keeps the stored quantity.
+ */
+function quantityOf(item: Stripe.SubscriptionItem): number | null {
+  const { quantity } = item
+  return typeof quantity === 'number' && Number.isInteger(quantity) && quantity >= 1
+    ? quantity
+    : null
 }
 
 /** The event's time, which Stripe sends in seconds. */
@@ -125,11 +151,12 @@ type SubscriptionRead =
     }
 
 /**
- * What a subscription event says of a Stillstats channel's subscription. A subscription whose
- * metadata names a Stillstats channel is Stillstats', since only Stillstats Checkout writes it, at
- * any price, so one at a price Checkout no longer sells keeps its events recorded. The plan is its
- * first item's billing interval, so a switch of plan records the new one, and the end of the paid
- * period is the same item's, since API version 2025-03-31.basil. An item that bills neither monthly
+ * What a subscription event says of a Stillstats user's subscription. A subscription whose
+ * metadata names a Stillstats user, or a Stillstats channel for one made before blocks, is
+ * Stillstats', since only Stillstats Checkout writes it, at any price, so one at a price Checkout
+ * no longer sells keeps its events recorded. The plan is its first item's billing interval, so a
+ * switch of plan records the new one, the number of blocks is the same item's quantity, and the
+ * end of the paid period is the same item's, since API version 2025-03-31.basil. An item that bills neither monthly
  * nor annually says no plan, so the event records with none, which keeps the plan the row holds for
  * the same subscription (a new or replacing one records no plan until its Checkout lands), and its
  * status, period end and purge date still land: a missed `unpaid` or deletion would keep the
@@ -140,9 +167,9 @@ function subscriptionFieldsOf(
   subscription: Stripe.Subscription,
   purgeAfter: Date | null,
 ): SubscriptionRead {
-  const channelId = channelOf(subscription.metadata)
+  const subscriber = subscriberOf(subscription.metadata)
   const customer = idOf(subscription.customer)
-  if (!channelId || !customer) return { kind: 'ignored' }
+  if (!subscriber || !customer) return { kind: 'ignored' }
   const [item] = subscription.items.data
   if (!item) return { kind: 'no_item' }
   const plan = planOf(item)
@@ -150,22 +177,23 @@ function subscriptionFieldsOf(
     kind: 'fields',
     unexpectedInterval: plan === null,
     fields: {
-      channelId,
+      ...subscriber,
       customer,
       subscription: subscription.id,
       plan,
       status: subscription.status === 'incomplete' ? null : subscription.status,
       periodEnd: dateOf(item.current_period_end),
+      quantity: quantityOf(item),
       purgeAfter,
     },
   }
 }
 
 /**
- * The channel's purge date an update sets: 30 days after the subscription ended, for one Stripe marks
- * `canceled`, or after the event, for one it marks `unpaid` once its retries are exhausted, which
- * ends the channel's Pro subscription as surely. Null for any other status, a cancellation at period end
- * included: the channel stays paid until Stripe ends it.
+ * The purge date an update sets on each picked channel: 30 days after the subscription ended, for
+ * one Stripe marks `canceled`, or after the event, for one it marks `unpaid` once its retries are
+ * exhausted, which ends the user's Pro subscription as surely. Null for any other status, a
+ * cancellation at period end included: the channels stay paid until Stripe ends it.
  */
 function purgeOfUpdate(subscription: Stripe.Subscription, event: Stripe.Event): Date | null {
   if (subscription.status === 'canceled') {
@@ -177,11 +205,13 @@ function purgeOfUpdate(subscription: Stripe.Subscription, event: Stripe.Event): 
 
 /**
  * What a verified event says of a Pro subscription. Only a Checkout Session or a subscription
- * that names a Stillstats channel in its metadata is read, at whatever price, and one whose item
- * bills neither monthly nor annually records with no plan. A paid subscription Checkout makes the
- * channel's subscription active. A created or an updated subscription carries its plan, its status
- * and the end of its paid period; a deleted one has ended, and sets the channel's purge date 30 days
- * after its `ended_at` (ADR 0022), the event's own time when it carries none. Each carries the event's
+ * that names a Stillstats user in its metadata, or a Stillstats channel for one made before
+ * blocks, is read, at whatever price, and anything else is ignored before it is read further. One
+ * whose item bills neither monthly nor annually records with no plan. A paid subscription Checkout
+ * makes the user's subscription active, and carries no quantity, which keeps the stored one, 1 for
+ * a new row. A created or an updated subscription carries its plan, its status, its quantity and
+ * the end of its paid period; a deleted one has ended, and sets each picked channel's purge date
+ * 30 days after its `ended_at` (ADR 0022), the event's own time when it carries none. Each carries the event's
  * time, which orders it against the others, since Stripe delivers them in no order and a failed
  * one again later. Invoice events, paid or failed, change no subscription: the subscription events
  * carry every change they cause (a failed renewal makes it `past_due`, still paid, and a paid retry
@@ -191,8 +221,8 @@ function purgeOfUpdate(subscription: Stripe.Subscription, event: Stripe.Event): 
 export function subscriptionEventOf(event: Stripe.Event): SubscriptionEvent {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
-    const channelId = channelOf(session.metadata)
-    if (session.mode !== 'subscription' || !channelId || session.payment_status !== 'paid')
+    const subscriber = subscriberOf(session.metadata)
+    if (session.mode !== 'subscription' || !subscriber || session.payment_status !== 'paid')
       return { kind: 'ignored' }
     const customer = idOf(session.customer)
     const subscription = idOf(session.subscription)
@@ -207,12 +237,13 @@ export function subscriptionEventOf(event: Stripe.Event): SubscriptionEvent {
       kind: 'subscription',
       stripeObject: session.id,
       fields: {
-        channelId,
+        ...subscriber,
         customer,
         subscription,
         plan,
         status: 'active',
         periodEnd: null,
+        quantity: null,
         purgeAfter: null,
         eventCreated: dateOf(event.created),
       },
@@ -250,7 +281,10 @@ export type SubscriptionPayment =
   | {
       kind: 'payment'
       invoiceId: string
-      channelId: string
+      /** The user the subscription's metadata names, or null for one made before blocks. */
+      userId: string | null
+      /** The channel a subscription made before blocks names, whose owner it records onto. */
+      legacyChannelId: string | null
       /**
        * In the currency's smallest unit, as Stripe sends it: the invoice's total after discounts,
        * prorations included, and before tax. Null when Stripe sends none.
@@ -262,7 +296,8 @@ export type SubscriptionPayment =
 /**
  * What a verified event says of a paid invoice of a Stillstats subscription, by the rule the
  * subscription events use: the subscription's metadata, which the invoice carries as a snapshot
- * under `parent.subscription_details`, names a Stillstats channel, at whatever price. Its lines
+ * under `parent.subscription_details`, names a Stillstats user, or a Stillstats channel for one made
+ * before blocks, at whatever price. Its lines
  * are not read: since API version 2025-03-31.basil a line names its price by ID alone, under
  * `pricing.price_details.price`, with no billing interval (docs.stripe.com/api/invoice-line-item/
  * object), and a payment needs no plan. Every paid invoice counts, the first payment and each
@@ -281,12 +316,12 @@ export type SubscriptionPayment =
 export function subscriptionPaymentOf(event: Stripe.Event): SubscriptionPayment {
   if (event.type !== 'invoice.paid') return { kind: 'ignored' }
   const invoice = event.data.object
-  const channelId = channelOf(invoice.parent?.subscription_details?.metadata ?? null)
-  if (!channelId) return { kind: 'ignored' }
+  const subscriber = subscriberOf(invoice.parent?.subscription_details?.metadata ?? null)
+  if (!subscriber) return { kind: 'ignored' }
   return {
     kind: 'payment',
     invoiceId: invoice.id,
-    channelId,
+    ...subscriber,
     amountExcludingTax: invoice.total_excluding_tax,
     currency: invoice.currency,
   }

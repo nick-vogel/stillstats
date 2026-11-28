@@ -178,12 +178,14 @@ function storedDays(worker: WorkerDatabase, channelId: string) {
 function recordPaidCheckout(web: WebDatabase, channelId: string, at: Date) {
   return web.asAnonymous((tx) =>
     recordSubscription(tx, {
-      channelId,
+      userId: null,
+      legacyChannelId: channelId,
       customer: 'cus_test_return',
       subscription: 'sub_test_return',
       plan: 'monthly',
       status: 'active',
       periodEnd: null,
+      quantity: null,
       purgeAfter: null,
       eventCreated: at,
     }),

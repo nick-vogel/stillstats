@@ -1,4 +1,4 @@
-// Limits: these run the deletion and its cancellation job against the fake Stripe server, so they
+// Limits: these run the account deletion's cancellation job against the fake Stripe server, so they
 // show which calls the canceller makes and what it does with Stripe's answers. They cannot prove
 // that Stripe accepts the parameters, that Managed Payments lets Stillstats refund its customer,
 // the exchange rate a refund of a payment in another currency takes, or that the customer is told:
@@ -7,28 +7,29 @@
 // each retry is a handler run on a clock the test moves.
 import { randomUUID } from 'node:crypto'
 import {
+  accountCancellations,
   type DeletionReason,
   type Scoped,
   type ScopeKind,
   subscriptionCancellations,
-  subscriptions,
+  userSubscriptions,
   type WebDatabase,
   type WorkerDatabase,
 } from '@creator-analytics/database'
 import {
-  channelRowCounts,
   test as databaseTest,
   type FindJobs,
   seedChannel,
+  subscribeOwner,
   type TestClock,
 } from '@creator-analytics/database/testing'
+import { requestAccountCancellation } from '@creator-analytics/entitlements'
 import { type FakeStripe, startFakeStripe } from '@creator-analytics/fake-stripe'
 import { type RecordingReporter, recordingReporter } from '@creator-analytics/reporter'
-import { eq } from 'drizzle-orm'
 import { describe, expect } from 'vitest'
 import {
+  accountCancellationJobData,
   createRetention,
-  deletionJobData,
   type Retention,
   requestDeletion,
 } from './retention-engine.ts'
@@ -87,101 +88,66 @@ interface Scene {
 }
 
 /**
- * A channel on Pro ten days into its 30-day period, paid $7.00: its subscriptions row is
- * active, and the fake Stripe server holds its subscription, latest invoice and PaymentIntent.
- * Both clocks read ten days in.
+ * An owner on Pro ten days into their 30-day period, paid $7.00, whose one channel is picked: the
+ * owner's subscription is active, and the fake Stripe server holds it, its latest invoice and its
+ * PaymentIntent. Both clocks read ten days in.
  */
-async function paidChannel({ web, worker, clock, stripe }: Scene, owner: string) {
+async function paidOwner({ web, worker, clock, stripe }: Scene, owner: string) {
   const channelId = await seedChannel(web, worker, owner)
-  await worker.forChannel(channelId, (tx) =>
-    tx.sql
-      .update(subscriptions)
-      .set({ status: 'active' })
-      .where(eq(subscriptions.channelId, channelId)),
-  )
+  clock.set(tenDaysIn)
+  stripe.setNow(tenDaysIn)
+  await subscribeOwner(web, worker, channelId)
   const { paymentIntent } = stripe.addSubscription({
     id: `sub_${channelId}`,
-    customer: `cus_${channelId}`,
+    customer: `cus_${owner}`,
     periodStart,
     periodEnd,
     amountPaid: 700,
   })
-  clock.set(tenDaysIn)
-  stripe.setNow(tenDaysIn)
   return { channelId, paymentIntent }
 }
 
-async function deleted(
+/** What the account deletion pends, in the owner's scope, and the cancellation jobs it sends. */
+async function accountDeleted({ web, findJobs }: Scene, owner: string) {
+  const pended = await web.asUser(owner, (tx) => requestAccountCancellation(tx))
+  const jobs = await findJobs('cancelAccountSubscription')
+  return {
+    cancellationId: pended?.cancellationId,
+    cancellationJobs: jobs.map((job) =>
+      accountCancellationJobData('cancelAccountSubscription', job.data),
+    ),
+  }
+}
+
+function runCancellation({ worker, retention }: Scene, data: { cancellationId: string }) {
+  return worker.asSystem((tx) => retention.cancelAccountSubscription(tx, data))
+}
+
+function pendingCancellations({ worker }: Scene) {
+  return worker.asSystem((tx) => tx.sql.select().from(accountCancellations))
+}
+
+/** A channel deletion, which cancels nothing, and the cancellation jobs it sends. */
+async function channelDeleted(
   { worker, retention, findJobs }: Scene,
   channelId: string,
-  reason: DeletionReason = 'in_app_revocation',
+  reason: DeletionReason,
 ) {
   const { requestId } = await worker.forChannel(channelId, (tx) =>
     requestDeletion(tx, channelId, reason),
   )
   await worker.forChannel(channelId, (tx) => retention.deleteChannel(tx, { requestId, channelId }))
-  const jobs = await findJobs('cancelSubscription')
-  return {
-    requestId,
-    cancellationJobs: jobs.map((job) => deletionJobData('cancelSubscription', job.data)),
-  }
-}
-
-function runCancellation(
-  { worker, retention }: Scene,
-  data: { requestId: string; channelId: string },
-) {
-  return worker.forChannel(data.channelId, (tx) => retention.cancelSubscription(tx, data))
-}
-
-function pendingCancellations({ worker }: Scene, channelId: string) {
-  return worker.forChannel(channelId, (tx) => tx.sql.select().from(subscriptionCancellations))
+  return [
+    ...(await findJobs('cancelSubscription')),
+    ...(await findJobs('cancelAccountSubscription')),
+  ]
 }
 
 // 700 x 20 of 30 days, 466.67 rounded to the cent.
 const unusedTwentyDays = '467'
 
-describe('seam 2: a channel deletion cancels its subscription', () => {
-  for (const [reason, cause] of [
-    ['google_revocation', 'a revocation'],
-    ['in_app_revocation', 'a disconnect'],
-    ['user_deletion', 'an account deletion'],
-  ] as const) {
-    test(`${cause} of a paid channel cancels its subscription at once and refunds the unused part of the period`, async ({
-      web,
-      worker,
-      clock,
-      stripe,
-      retention,
-      findJobs,
-    }) => {
-      const scene = { web, worker, clock, stripe, retention, findJobs }
-      const { channelId, paymentIntent } = await paidChannel(scene, 'cancel-owner')
-
-      const { requestId, cancellationJobs } = await deleted(scene, channelId, reason)
-      for (const data of cancellationJobs) await runCancellation(scene, data)
-
-      expect(cancellationJobs).toEqual([{ requestId, channelId }])
-      expect(
-        stripe.cancellations.map(({ subscription, params }) => ({
-          subscription,
-          ...Object.fromEntries(params),
-        })),
-      ).toEqual([
-        expect.objectContaining({
-          subscription: `sub_${channelId}`,
-          prorate: 'false',
-          invoice_now: 'false',
-        }),
-      ])
-      expect(stripe.refunds.map((body) => Object.fromEntries(body))).toEqual([
-        expect.objectContaining({ payment_intent: paymentIntent, amount: unusedTwentyDays }),
-      ])
-      expect(await pendingCancellations(scene, channelId)).toEqual([])
-    })
-  }
-
-  test("a free channel's deletion enqueues no cancellation and makes no Stripe call", async ({
+describe('seam 2: an account deletion cancels its subscription, and a channel deletion cancels nothing', () => {
+  test('an account deletion cancels its subscription at once and refunds the unused part of the period', async ({
     web,
     worker,
     clock,
@@ -190,17 +156,79 @@ describe('seam 2: a channel deletion cancels its subscription', () => {
     findJobs,
   }) => {
     const scene = { web, worker, clock, stripe, retention, findJobs }
-    // The seeded channel's subscription is canceled, as every free channel's that once paid is.
-    const channelId = await seedChannel(web, worker, 'cancel-owner')
+    const { channelId, paymentIntent } = await paidOwner(scene, 'cancel-owner')
 
-    const { cancellationJobs } = await deleted(scene, channelId)
+    const { cancellationId, cancellationJobs } = await accountDeleted(scene, 'cancel-owner')
+    for (const data of cancellationJobs) await runCancellation(scene, data)
 
+    expect(cancellationJobs).toEqual([{ cancellationId }])
+    expect(
+      stripe.cancellations.map(({ subscription, params }) => ({
+        subscription,
+        ...Object.fromEntries(params),
+      })),
+    ).toEqual([
+      expect.objectContaining({
+        subscription: `sub_${channelId}`,
+        prorate: 'false',
+        invoice_now: 'false',
+      }),
+    ])
+    expect(stripe.refunds.map((body) => Object.fromEntries(body))).toEqual([
+      expect.objectContaining({ payment_intent: paymentIntent, amount: unusedTwentyDays }),
+    ])
+    expect(await pendingCancellations(scene)).toEqual([])
+  })
+
+  for (const [reason, cause] of [
+    ['google_revocation', 'a revocation'],
+    ['in_app_revocation', 'a disconnect'],
+  ] as const) {
+    test(`${cause} of a paid channel cancels nothing, makes no Stripe call, and leaves the subscription running`, async ({
+      web,
+      worker,
+      clock,
+      stripe,
+      retention,
+      findJobs,
+    }) => {
+      const scene = { web, worker, clock, stripe, retention, findJobs }
+      const { channelId } = await paidOwner(scene, 'cancel-owner')
+      const requestsBefore = stripe.requests.length
+
+      const jobs = await channelDeleted(scene, channelId, reason)
+
+      expect(jobs).toEqual([])
+      expect(stripe.requests).toHaveLength(requestsBefore)
+      expect(
+        await web.asUser('cancel-owner', (tx) =>
+          tx.sql.select({ status: userSubscriptions.status }).from(userSubscriptions),
+        ),
+      ).toEqual([{ status: 'active' }])
+    })
+  }
+
+  test('a user with no live subscription pends no cancellation, and its deletion makes no Stripe call', async ({
+    web,
+    worker,
+    clock,
+    stripe,
+    retention,
+    findJobs,
+  }) => {
+    const scene = { web, worker, clock, stripe, retention, findJobs }
+    // The seeded owner's subscription is canceled, as every free user's that once paid is.
+    await seedChannel(web, worker, 'cancel-owner')
+
+    const { cancellationId, cancellationJobs } = await accountDeleted(scene, 'cancel-owner')
+
+    expect(cancellationId).toBeUndefined()
     expect(cancellationJobs).toEqual([])
-    expect(await pendingCancellations(scene, channelId)).toEqual([])
+    expect(await pendingCancellations(scene)).toEqual([])
     expect(stripe.requests).toEqual([])
   })
 
-  test('a Stripe outage deletes the rows on time, retries the cancellation, and raises the alarm at 12 hours; the first run after it ends cancels and refunds once', async ({
+  test('a Stripe outage retries the cancellation, and raises the alarm at 12 hours; the first run after it ends cancels and refunds once', async ({
     web,
     worker,
     clock,
@@ -210,42 +238,41 @@ describe('seam 2: a channel deletion cancels its subscription', () => {
     reporter,
   }) => {
     const scene = { web, worker, clock, stripe, retention, findJobs }
-    const { channelId } = await paidChannel(scene, 'cancel-owner')
+    await paidOwner(scene, 'cancel-owner')
     stripe.failAll(503)
 
-    const { requestId, cancellationJobs } = await deleted(scene, channelId)
-    const data = { requestId, channelId }
-    const counts = await worker.forChannel(channelId, (tx) => channelRowCounts(tx, channelId))
-    expect(Object.values(counts).every((n) => n === 0)).toBe(true)
+    const { cancellationId = '', cancellationJobs } = await accountDeleted(scene, 'cancel-owner')
+    const data = { cancellationId }
     expect(cancellationJobs).toEqual([data])
     for (let run = 0; run < 12; run += 1) {
       await expect(runCancellation(scene, data)).rejects.toThrow()
       clock.advance(hourMs)
     }
-    expect(await pendingCancellations(scene, channelId)).toHaveLength(1)
-    const [alarm] = await findJobs('deletionAlarm')
+    expect(await pendingCancellations(scene)).toHaveLength(1)
+    const [alarm] = await findJobs('accountCancellationAlarm')
+    expect(alarm?.data).toEqual(data)
     expect(alarm?.startAfter).toEqual(new Date(tenDaysIn.getTime() + 12 * hourMs))
     clock.set(alarm?.startAfter ?? new Date(0))
 
-    await worker.forChannel(channelId, (tx) => retention.deletionAlarm(tx, data))
+    await worker.asSystem((tx) => retention.accountCancellationAlarm(tx, data))
 
     expect(reporter.reports).toEqual([
       {
-        message: 'A subscription cancellation is still pending 12 hours after its deletion request',
-        context: { requestId, channelId },
+        message: 'A subscription cancellation is still pending 12 hours after its account deletion',
+        context: { cancellationId },
       },
     ])
 
     stripe.failAll(null)
     stripe.setNow(clock.now())
     await runCancellation(scene, data)
-    await worker.forChannel(channelId, (tx) => retention.deletionAlarm(tx, data))
+    await worker.asSystem((tx) => retention.accountCancellationAlarm(tx, data))
 
     expect(stripe.cancellations).toHaveLength(1)
     // 700 x 19.5 of 30 days, exactly 455: the subscription ended in Stripe 12 hours after the
-    // request.
+    // deletion.
     expect(stripe.refunds.map((body) => body.get('amount'))).toEqual(['455'])
-    expect(await pendingCancellations(scene, channelId)).toEqual([])
+    expect(await pendingCancellations(scene)).toEqual([])
     expect(reporter.reports).toHaveLength(1)
   })
 
@@ -258,10 +285,10 @@ describe('seam 2: a channel deletion cancels its subscription', () => {
     findJobs,
   }) => {
     const scene = { web, worker, clock, stripe, retention, findJobs }
-    const { channelId } = await paidChannel(scene, 'cancel-owner')
+    await paidOwner(scene, 'cancel-owner')
     stripe.failRefunds(503)
-    const { requestId } = await deleted(scene, channelId)
-    const data = { requestId, channelId }
+    const { cancellationId = '' } = await accountDeleted(scene, 'cancel-owner')
+    const data = { cancellationId }
 
     await expect(runCancellation(scene, data)).rejects.toThrow()
     stripe.failRefunds(null)
@@ -269,7 +296,7 @@ describe('seam 2: a channel deletion cancels its subscription', () => {
 
     expect(stripe.cancellations).toHaveLength(1)
     expect(stripe.refunds.map((body) => body.get('amount'))).toEqual([unusedTwentyDays])
-    expect(await pendingCancellations(scene, channelId)).toEqual([])
+    expect(await pendingCancellations(scene)).toEqual([])
   })
 
   test('a cancellation pending with no Stripe key fails, keeps its pending row, and raises the alarm', async ({
@@ -282,24 +309,21 @@ describe('seam 2: a channel deletion cancels its subscription', () => {
   }) => {
     const retention = createRetention({ deletionLogKey: 'a deletion log key', reporter })
     const scene = { web, worker, clock, stripe, retention, findJobs }
-    const { channelId } = await paidChannel(scene, 'cancel-owner')
-    const { requestId } = await worker.forChannel(channelId, (tx) =>
-      requestDeletion(tx, channelId, 'in_app_revocation'),
-    )
-    const data = { requestId, channelId }
-    await worker.forChannel(channelId, (tx) => retention.deleteChannel(tx, data))
+    await paidOwner(scene, 'cancel-owner')
+    const { cancellationId = '' } = await accountDeleted(scene, 'cancel-owner')
+    const data = { cancellationId }
 
-    const running = worker.forChannel(channelId, (tx) => retention.cancelSubscription(tx, data))
+    const running = worker.asSystem((tx) => retention.cancelAccountSubscription(tx, data))
 
     await expect(running).rejects.toThrow('Stripe is not configured')
-    expect(await pendingCancellations(scene, channelId)).toHaveLength(1)
-    await worker.forChannel(channelId, (tx) => retention.deletionAlarm(tx, data))
+    expect(await pendingCancellations(scene)).toHaveLength(1)
+    await worker.asSystem((tx) => retention.accountCancellationAlarm(tx, data))
     expect(reporter.reports.map(({ message }) => message)).toEqual([
-      'A subscription cancellation is still pending 12 hours after its deletion request',
+      'A subscription cancellation is still pending 12 hours after its account deletion',
     ])
   })
 
-  test("only the deletion's own channel scope reads its pending cancellation", async ({
+  test('only the system scope reads a pending account cancellation, and a user pends only their own subscription', async ({
     web,
     worker,
     clock,
@@ -308,16 +332,67 @@ describe('seam 2: a channel deletion cancels its subscription', () => {
     findJobs,
   }) => {
     const scene = { web, worker, clock, stripe, retention, findJobs }
-    const { channelId } = await paidChannel(scene, 'cancel-owner')
-    stripe.failAll(503)
-    await deleted(scene, channelId)
-    const read = (scope: Scoped<ScopeKind>) => scope.sql.select().from(subscriptionCancellations)
+    const { channelId } = await paidOwner(scene, 'cancel-owner')
+    await seedChannel(web, worker, 'cancel-stranger')
+    await accountDeleted(scene, 'cancel-owner')
+    const read = (scope: Scoped<ScopeKind>) => scope.sql.select().from(accountCancellations)
+    const pendOthers = (scope: Scoped<ScopeKind>) =>
+      scope.sql
+        .transaction((attempt) =>
+          attempt.insert(accountCancellations).values({
+            id: randomUUID(),
+            stripeSubscriptionId: `sub_${channelId}`,
+            createdAt: scope.now,
+          }),
+        )
+        .then(
+          () => undefined,
+          (error: unknown) => error,
+        )
 
-    expect(await worker.forChannel(channelId, read)).toHaveLength(1)
-    expect(await worker.forChannel(randomUUID(), read)).toEqual([])
-    expect(await worker.asSystem(read)).toEqual([])
+    expect(await worker.asSystem(read)).toHaveLength(1)
+    expect(await worker.forChannel(channelId, read)).toEqual([])
     expect(await web.asUser('cancel-owner', read)).toEqual([])
     expect(await web.asAnonymous(read)).toEqual([])
+    expect(await web.asUser('cancel-stranger', pendOthers)).toMatchObject({
+      cause: {
+        message: 'new row violates row-level security policy for table "account_cancellations"',
+      },
+    })
+  })
+
+  test('a channel cancellation an old worker left pending is still cancelled and refunded, with its channel in the refund', async ({
+    web,
+    worker,
+    clock,
+    stripe,
+    retention,
+  }) => {
+    const { channelId, paymentIntent } = await paidOwner(
+      { web, worker, clock, stripe, retention, findJobs: async () => [] },
+      'cancel-owner',
+    )
+    const requestId = randomUUID()
+    await worker.forChannel(channelId, (tx) =>
+      tx.sql.insert(subscriptionCancellations).values({
+        channelId,
+        deletionRequestId: requestId,
+        stripeSubscriptionId: `sub_${channelId}`,
+        createdAt: tx.now,
+      }),
+    )
+
+    await worker.forChannel(channelId, (tx) =>
+      retention.cancelSubscription(tx, { requestId, channelId }),
+    )
+
+    expect(stripe.cancellations).toHaveLength(1)
+    expect(stripe.refunds.map((body) => Object.fromEntries(body))).toEqual([
+      expect.objectContaining({
+        payment_intent: paymentIntent,
+        'metadata[stillstats_channel_id]': channelId,
+      }),
+    ])
   })
 })
 

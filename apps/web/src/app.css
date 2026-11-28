@@ -228,7 +228,9 @@
   overflow-wrap: anywhere;
 }
 
-.channel-consent {
+/* The line under a channel on Settings: its revenue consent, and whether it is Pro or Free. */
+.channel-consent,
+.channel-tier {
   color: var(--ink-soft);
   font-size: 0.9375rem;
 }

@@ -61,22 +61,24 @@ async function receiveTip(
 }
 
 /**
- * A Stillstats subscription's event records what it carries for its channel, once, at whatever
- * price: its plan is its billing interval. A session or subscription that names no Stillstats
- * channel came from no Stillstats Checkout, and records and reports nothing. One whose item bills
+ * A Stillstats subscription's event records what it carries for its user, once, at whatever
+ * price: its plan is its billing interval and its quantity the number of blocks. A session or
+ * subscription that names no Stillstats user, nor a Stillstats channel as one made before blocks
+ * does, came from no Stillstats Checkout, and records and reports nothing. One whose item bills
  * neither monthly nor annually says no plan: it records with none, which keeps the plan the row
  * holds for the same subscription (a new or replacing one records no plan until its Checkout
  * lands), so its status, period end and purge date still land, and reports to GlitchTip with the
- * subscription's ID only, since Stillstats sells no such price, once the write shows its channel is
+ * subscription's ID only, since Stillstats sells no such price, once the write shows its user is
  * there. One with no item records nothing and reports to GlitchTip with the subscription's ID on
- * every event, whether or not its channel exists. One that names a channel that no longer exists,
- * such as one deleted while its owner was on Stripe's page, reports to GlitchTip with the session's
- * or the subscription's ID only; but not a deleted subscription's, since a channel's deletion
- * cancels its subscription (#784) and Stripe then tells of it for a channel already gone. A live
- * subscription other than a paid channel's own, such as a second Checkout paid in another tab,
- * records nothing and reports the same way, since Stripe charges for it. An event whose write turns
- * the stored subscription paid sends the channel's history download in the same transaction
- * (`recordSubscription`), so Pro's impressions and CTR do not wait for the next daily run.
+ * every event, whether or not its user exists. One that names a user that no longer exists, or a
+ * channel with no owner, such as one deleted while its owner was on Stripe's page, reports to
+ * GlitchTip with the session's or the subscription's ID only; but not a deleted subscription's,
+ * since an account deletion cancels its subscription and Stripe then tells of it for a user
+ * already gone. A live subscription other than a paid user's own, such as a second Checkout paid
+ * in another tab, records nothing and reports the same way, since Stripe charges for it. An event
+ * whose write turns the user's subscription paid sends the history download of each channel it
+ * turned Pro in the same transaction (`recordSubscription`), so Pro's impressions and CTR do not
+ * wait for the next daily run.
  */
 async function receiveSubscription(
   event: Stripe.Event,
@@ -91,21 +93,21 @@ async function receiveSubscription(
   }
   if (subscribed.kind !== 'subscription') return
   const outcome = await database.asAnonymous((tx) => recordSubscription(tx, subscribed.fields))
-  if (subscribed.unexpectedInterval && outcome !== 'no_channel') {
+  if (subscribed.unexpectedInterval && outcome !== 'no_user') {
     reporter.report({
       message: 'A Stillstats Stripe subscription bills neither monthly nor annually',
       context: { stripeObject: subscribed.stripeObject },
     })
   }
-  if (outcome === 'no_channel' && event.type !== 'customer.subscription.deleted') {
+  if (outcome === 'no_user' && event.type !== 'customer.subscription.deleted') {
     reporter.report({
-      message: 'A paid Stripe subscription names no channel',
+      message: 'A paid Stripe subscription names no user',
       context: { stripeObject: subscribed.stripeObject },
     })
   }
   if (outcome === 'other_subscription') {
     reporter.report({
-      message: 'A second Stripe subscription names a paid channel',
+      message: 'A second Stripe subscription names a paid user',
       context: { stripeObject: subscribed.stripeObject },
     })
   }
@@ -116,9 +118,9 @@ async function receiveSubscription(
  * once per invoice, and a newly recorded one, never a repeat, sends OpenPanel `revenue` with its
  * amount before tax as `__revenue` and its currency, and no user, channel, customer or
  * subscription ID, user agent or IP, as a tip does. An invoice whose subscription names no
- * Stillstats channel, or one of a channel that no longer exists, records and sends nothing: a
- * channel's deletion cancels its subscription and refunds the unused part of its latest invoice
- * (#784). An OpenPanel failure is the relay's report and never changes the answer.
+ * Stillstats user or channel, or one of a user that no longer exists, records and sends nothing:
+ * an account deletion cancels its subscription and refunds the unused part of its latest invoice.
+ * An OpenPanel failure is the relay's report and never changes the answer.
  */
 async function receiveSubscriptionPayment(
   event: Stripe.Event,

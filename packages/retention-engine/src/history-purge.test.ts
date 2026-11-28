@@ -14,7 +14,11 @@ import {
   subscriptions,
   type WorkerDatabase,
 } from '@creator-analytics/database'
-import { test as databaseTest, seedChannel } from '@creator-analytics/database/testing'
+import {
+  test as databaseTest,
+  seedChannel,
+  subscribeOwner,
+} from '@creator-analytics/database/testing'
 import { purgeDateOf } from '@creator-analytics/entitlements'
 import { eq } from 'drizzle-orm'
 import { describe, expect } from 'vitest'
@@ -34,20 +38,17 @@ function setPurgeDate(scope: Scoped<'channel'>, channelId: string, ended: Date) 
     .onConflictDoUpdate({ target: proEnds.channelId, set: values })
 }
 
-/** Ends the channel's subscription at `endedAt`, as the `deleted` webhook leaves it. */
+/**
+ * Ends the channel's Pro at `endedAt`, as the `deleted` webhook leaves it: the seeded owner's
+ * subscription is already canceled, so the channel's purge date is what the end adds.
+ */
 async function endSubscription(worker: WorkerDatabase, channelId: string): Promise<void> {
-  await worker.forChannel(channelId, async (scope) => {
-    await scope.sql
-      .update(subscriptions)
-      .set({ status: 'canceled' })
-      .where(eq(subscriptions.channelId, channelId))
-    await setPurgeDate(scope, channelId, endedAt)
-  })
+  await worker.forChannel(channelId, (scope) => setPurgeDate(scope, channelId, endedAt))
 }
 
 /**
- * The channel's history, its days, its retention curves, their reads and its subscription row,
- * read in the channel's scope.
+ * The channel's history, its days, its retention curves, their reads and its subscription row of
+ * the release before blocks, which the seed still writes, read in the channel's scope.
  */
 async function stored(scope: Scoped<'channel'>, channelId: string) {
   const history = await scope.sql
@@ -152,12 +153,7 @@ describe('seam 2: the history purge', () => {
     const ahead = await seedChannel(web, worker, 'purge-user-b')
     await worker.forChannel(ahead, (scope) => setPurgeDate(scope, ahead, scope.now))
     const paid = await seedChannel(web, worker, 'purge-user-c')
-    await worker.forChannel(paid, (scope) =>
-      scope.sql
-        .update(subscriptions)
-        .set({ status: 'active' })
-        .where(eq(subscriptions.channelId, paid)),
-    )
+    await subscribeOwner(web, worker, paid)
     const neverEnded = await seedChannel(web, worker, 'purge-user-d')
     const before = await Promise.all(
       [ahead, paid, neverEnded].map((id) => worker.forChannel(id, (scope) => stored(scope, id))),

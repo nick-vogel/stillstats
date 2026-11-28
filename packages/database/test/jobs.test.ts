@@ -175,6 +175,19 @@ describe('queues', () => {
     expect((queue?.retryLimit ?? 0) * (queue?.retryDelay ?? 0)).toBeLessThan(12 * 60 * 60)
   })
 
+  // The account cancellation's alarm at 12 hours reports one still pending, in the same way.
+  test('a failed account subscription cancellation retries hourly, its last retry before its alarm at 12 hours', async ({
+    boss,
+  }) => {
+    const queue = await boss.getQueue('cancelAccountSubscription')
+
+    expect({ retryLimit: queue?.retryLimit, retryDelay: queue?.retryDelay }).toEqual({
+      retryLimit: 11,
+      retryDelay: 3600,
+    })
+    expect((queue?.retryLimit ?? 0) * (queue?.retryDelay ?? 0)).toBeLessThan(12 * 60 * 60)
+  })
+
   test('the migrate step spaces the retries of an active user count queue it created before', async () => {
     const migrator = new pg.Pool({ connectionString: databaseUrls().migrator })
     const app = new pg.Pool({ connectionString: databaseUrls().app })

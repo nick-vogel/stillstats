@@ -3,10 +3,12 @@ import { createContext, use } from 'react'
 
 /**
  * Whether the user may subscribe the channel on view to Pro, from the entitlements answer: only its
- * owner, while it is free and Pro is offered. False until the answer lands, with Pro not offered
- * (no billing settings), for a paid channel, for another member, and for a channel the answer does
- * not name. It decides the upgrade screen's pricing cards, the sidebar's "Upgrade" item and an
- * ended channel's subscribe-again link.
+ * owner, while it is free and they may subscribe, so Pro is offered and they hold no live
+ * subscription (the channel entry's `canSubscribe`). False until the answer lands, with Pro not
+ * offered (no billing settings), for a paid channel, for another member, for a free channel of
+ * their own while their subscription is live (a slot of it is the way to Pro), and for a channel
+ * the answer does not name. It decides the upgrade screen's pricing cards, the sidebar's "Upgrade"
+ * item and an ended channel's subscribe-again link.
  */
 export function canUpgradeOf(
   entitlements: EntitlementsAnswer | null,
@@ -14,7 +16,7 @@ export function canUpgradeOf(
 ): boolean {
   if (!entitlements?.paidTierOffered || channelId === null) return false
   const entry = entitlements.channels.find((channel) => channel.channelId === channelId)
-  return entry?.tier === 'free' && entry.canSubscribe
+  return entry?.canSubscribe ?? false
 }
 
 /**

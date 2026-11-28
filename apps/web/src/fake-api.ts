@@ -504,9 +504,10 @@ export interface FakeApi {
    */
   support: SupportAnswer
   /**
-   * The entitlements answer: Pro not offered, each channel free, and none the creator may
-   * subscribe or manage, unless set, as with Pro not configured. A Checkout for any
-   * channel answers `fakeCheckoutUrl`, and a Customer Portal `fakePortalUrl`.
+   * The entitlements answer: Pro not offered, no blocks, each channel the creator's own and free,
+   * and nothing they may subscribe or manage, unless set, as with Pro not configured. The user's
+   * Checkout, `POST /api/me/checkout`, answers `fakeCheckoutUrl`, and their Customer Portal,
+   * `POST /api/me/portal`, `fakePortalUrl`.
    */
   entitlements: EntitlementsAnswer
   /**
@@ -555,15 +556,11 @@ export const fakePrices: UpgradeAnswer['prices'] = {
 /** Where the fake API's Checkout sends the creator. */
 export const fakeCheckoutUrl = 'https://checkout.stripe.com/c/pay/cs_test_fake'
 
-const checkoutPattern = /^\/api\/channels\/[^/]+\/checkout$/
-
 /** Where the fake API's Customer Portal sends the creator. */
 export const fakePortalUrl = 'https://billing.stripe.com/p/session/test_fake'
 
 /** The Google page the fake API answers a sign-in or a connect with. */
 export const fakeGoogleUrl = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=fake'
-
-const portalPattern = /^\/api\/channels\/[^/]+\/portal$/
 
 /** The time the fake API's admin routes set as a message's "Done" time. */
 export const fakeDoneAt = '2026-11-15T13:00:00.000Z'
@@ -611,8 +608,8 @@ function answerOf(api: FakeApi, { method, path, query, body }: FakeRequest): Ans
     return ok(dismissed ? { ...api.support, prompt: false } : api.support)
   }
   if (route === 'GET /api/me/entitlements') return ok(api.entitlements)
-  if (method === 'POST' && checkoutPattern.test(path)) return ok({ url: fakeCheckoutUrl })
-  if (method === 'POST' && portalPattern.test(path)) return ok({ url: fakePortalUrl })
+  if (route === 'POST /api/me/checkout') return ok({ url: fakeCheckoutUrl })
+  if (route === 'POST /api/me/portal') return ok({ url: fakePortalUrl })
   if (route === 'PUT /api/me/preferences') {
     api.preferences = { ...api.preferences, ...(body as Preferences) }
     return ok(api.preferences)
@@ -763,8 +760,20 @@ export function installFakeApi(preferences: Preferences = {}): FakeApi {
     support: { link: null, prompt: false },
     entitlements: {
       paidTierOffered: false,
+      canSubscribe: false,
+      canManage: false,
+      blocks: 0,
+      slotsInUse: 0,
       channels: [
-        { channelId: fakeChannel.id, tier: 'free', canSubscribe: false, canManage: false },
+        {
+          channelId: fakeChannel.id,
+          tier: 'free',
+          owner: true,
+          picked: false,
+          purgeDate: null,
+          canSubscribe: false,
+          canManage: false,
+        },
       ],
     },
     clientSettings: {

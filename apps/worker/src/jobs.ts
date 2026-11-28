@@ -1,6 +1,8 @@
 import type { JobData, JobName, Scoped, WorkerDatabase } from '@creator-analytics/database'
 import type { Reporter } from '@creator-analytics/reporter'
 import {
+  type AccountCancellationJobName,
+  accountCancellationJobData,
   type DeletionJobName,
   deletionJobData,
   enqueueHistoryPurges,
@@ -71,6 +73,14 @@ export function jobHandlers(
       const deletion = deletionJobData(name, data)
       return worker.forChannel(deletion.channelId, (tx) => retention[name](tx, deletion))
     }
+  // An account deletion's cancellation outlives the account and its channels, so it runs in the
+  // system scope, with the pending cancellation's uuid as its data.
+  const forAccountCancellation =
+    (name: AccountCancellationJobName): Handler =>
+    (worker, data) => {
+      const cancellation = accountCancellationJobData(name, data)
+      return worker.asSystem((tx) => retention[name](tx, cancellation))
+    }
   // A scheduled job carries no data: each runs over every channel, in the system scope.
   const inSystemScope =
     (handle: (tx: Scoped<'system'>) => Promise<unknown>): Handler =>
@@ -80,6 +90,8 @@ export function jobHandlers(
   return {
     deleteChannel: inChannelScope('deleteChannel'),
     cancelSubscription: inChannelScope('cancelSubscription'),
+    cancelAccountSubscription: forAccountCancellation('cancelAccountSubscription'),
+    accountCancellationAlarm: forAccountCancellation('accountCancellationAlarm'),
     deletionCheck: inChannelScope('deletionCheck'),
     deletionAlarm: inChannelScope('deletionAlarm'),
     cacheSweep: inSystemScope(sweepExpiredCache),

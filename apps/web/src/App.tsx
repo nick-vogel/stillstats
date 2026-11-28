@@ -76,12 +76,7 @@ import {
   preferencesResetNotice,
   resetPreferencesWarning,
 } from './settings.ts'
-import {
-  checkoutStartedEvent,
-  manageableChannelsOf,
-  portalOpenedEvent,
-  subscribableChannelsOf,
-} from './subscribe.ts'
+import { checkoutStartedEvent, portalOpenedEvent, proSectionOf } from './subscribe.ts'
 import {
   sidebarSupportLinkOf,
   supportOpenedEvent,
@@ -172,10 +167,10 @@ async function readEntitlements(): Promise<EntitlementsAnswer> {
   return (await response.json()) as EntitlementsAnswer
 }
 
-/** Opens Stripe's Checkout for the channel's Pro subscription, as a Google consent opens. */
-async function startCheckout(channelId: string, plan: BillingPlan): Promise<void> {
+/** Opens Stripe's Checkout for the user's Pro subscription, one block, as a Google consent opens. */
+async function startCheckout(plan: BillingPlan): Promise<void> {
   track(checkoutStartedEvent(plan))
-  const response = await fetch(`/api/channels/${channelId}/checkout`, {
+  const response = await fetch('/api/me/checkout', {
     ...jsonPost,
     body: JSON.stringify({ plan }),
   })
@@ -185,11 +180,11 @@ async function startCheckout(channelId: string, plan: BillingPlan): Promise<void
 }
 
 /**
- * Opens Stripe's Customer Portal for the channel, as Checkout opens. The event goes once the API
- * has answered the Portal's URL, so a refused open is not counted.
+ * Opens Stripe's Customer Portal for the user's subscription, as Checkout opens. The event goes
+ * once the API has answered the Portal's URL, so a refused open is not counted.
  */
-async function openPortal(channelId: string): Promise<void> {
-  const response = await fetch(`/api/channels/${channelId}/portal`, jsonPost)
+async function openPortal(): Promise<void> {
+  const response = await fetch('/api/me/portal', jsonPost)
   assertAnswered(response)
   const { url } = (await response.json()) as PortalStartAnswer
   track(portalOpenedEvent)
@@ -767,15 +762,14 @@ export function App({
                       channelsFailed={channelsFailed}
                       supportLink={support?.link ?? null}
                       supportThanks={supportThanks}
-                      subscribable={subscribableChannelsOf(entitlements)}
-                      manageable={manageableChannelsOf(entitlements)}
+                      pro={proSectionOf(entitlements)}
                       theme={theme}
                       onDisconnect={(channelId) =>
                         start(() => disconnect(channelId), disconnectAlertOf(channelId))
                       }
                       onGiveRevenueConsent={giveRevenueConsent}
-                      onSubscribe={(channelId, plan) => start(() => startCheckout(channelId, plan))}
-                      onManage={(channelId) => start(() => openPortal(channelId))}
+                      onSubscribe={(plan) => start(() => startCheckout(plan))}
+                      onManage={() => start(openPortal)}
                       onConnect={() => openConsentScreen({ consent: 'connection' })}
                       onResetPreferences={() => start(resetPreferences, resetAlert)}
                       onSignOut={() => start(signOut)}
@@ -814,9 +808,7 @@ export function App({
                       channelId={shownChannelId}
                       route={route}
                       canUpgrade={canUpgrade}
-                      onSubscribe={(plan) => {
-                        if (shownChannelId) start(() => startCheckout(shownChannelId, plan))
-                      }}
+                      onSubscribe={(plan) => start(() => startCheckout(plan))}
                     />
                   ) : screenShown && route.video && route.sponsorReport ? (
                     <SponsorReport

@@ -62,6 +62,7 @@
 import type {
   AdminFeedbackMessage,
   ChannelEntitlement,
+  EntitlementsAnswer,
   ListedChannel,
   Preferences,
   StoredRetentionCurve,
@@ -133,8 +134,10 @@ import {
   startScreenTiming,
 } from './screen-timing.ts'
 import {
+  channelTierTexts,
   currencySavedNotice,
   preferencesResetNotice,
+  proHeading,
   themeLabel,
   themeOptions,
 } from './settings.ts'
@@ -194,6 +197,36 @@ vi.mock('./analytics.ts', () => ({ track: vi.fn() }))
 vi.mock('./youtube-player.ts', () => import('./fake-youtube-player.ts'))
 
 const savePreferences = 'PUT /api/me/preferences'
+
+/**
+ * An entitlements answer with Pro offered and the user's fields as given, else no blocks and
+ * nothing to subscribe or manage. Each channel is the user's own, picked when it is paid, with no
+ * purge date and nothing to subscribe or manage, unless given.
+ */
+function entitlementsOf(
+  user: Partial<Omit<EntitlementsAnswer, 'channels'>>,
+  ...channels: (Pick<ChannelEntitlement, 'channelId' | 'tier'> & Partial<ChannelEntitlement>)[]
+): EntitlementsAnswer {
+  return {
+    paidTierOffered: true,
+    canSubscribe: false,
+    canManage: false,
+    blocks: 0,
+    slotsInUse: 0,
+    ...user,
+    channels: channels.map((channel) => ({
+      owner: true,
+      picked: channel.tier === 'paid',
+      purgeDate: null,
+      canSubscribe: false,
+      canManage: false,
+      ...channel,
+    })),
+  }
+}
+
+/** The user's live subscription of one block, its slot taken by the channel. */
+const subscribedToOneBlock = { canManage: true, blocks: 1, slotsInUse: 1 }
 
 /**
  * The toasts' landmark, which Base UI portals to the document's body, outside the app's container,
@@ -3479,10 +3512,11 @@ describe('the history filters leaving the controls row with focus in one', () =>
    */
   async function readingAfterAnAnswerWithHistory() {
     const api = installFakeApi()
-    api.entitlements = {
-      paidTierOffered: true,
-      channels: [{ channelId: fakeChannel.id, tier: 'paid', canSubscribe: false, canManage: true }],
-    }
+    api.entitlements = entitlementsOf(subscribedToOneBlock, {
+      channelId: fakeChannel.id,
+      tier: 'paid',
+      canManage: true,
+    })
     api.listHistory = { firstDay: '2026-10-03', newestDay: '2026-10-04' }
     await render()
     rendered?.unmount()
@@ -3494,10 +3528,11 @@ describe('the history filters leaving the controls row with focus in one', () =>
 
   async function renderProWithMinimumField(search?: string) {
     const api = installFakeApi()
-    api.entitlements = {
-      paidTierOffered: true,
-      channels: [{ channelId: fakeChannel.id, tier: 'paid', canSubscribe: false, canManage: true }],
-    }
+    api.entitlements = entitlementsOf(subscribedToOneBlock, {
+      channelId: fakeChannel.id,
+      tier: 'paid',
+      canManage: true,
+    })
     api.listHistory = { firstDay: '2026-10-03', newestDay: '2026-10-04' }
     const { container } = await render(search)
     const minimum = minimumFieldIn(container)
@@ -7664,47 +7699,72 @@ describe("the Settings screen's Support section", () => {
   })
 })
 
-describe("the Settings screen's subscribe action (creator-analytics#780)", () => {
+describe("the Settings screen's Pro section (creator-analytics#780, stillstats#20)", () => {
   const subscribeButtons = (container: HTMLElement) =>
     [subscribeTexts.monthly, subscribeTexts.annual].flatMap((name) => buttonsNamed(container, name))
 
-  test('shows a button for each plan on a channel the entitlements answer lets the creator subscribe', async () => {
+  const memberChannel: ListedChannel = { ...fakeChannel, id: 'c-3', title: 'A channel of others' }
+
+  /** The line under each channel on Settings that says whether it is Pro, or null for none. */
+  const tierLinesIn = (container: HTMLElement) =>
+    [...container.querySelectorAll('.channel')].map(
+      (channel) => channel.querySelector('.channel-tier')?.textContent ?? null,
+    )
+
+  /** The Pro section, found by its heading, or null with none on view. */
+  const proSectionIn = (container: HTMLElement) =>
+    [...container.querySelectorAll('section')].find(
+      (section) => section.querySelector('h2')?.textContent === proHeading,
+    ) ?? null
+
+  test('shows Pro or Free under each channel the user owns and nothing under one they do not, and the slots in use of their blocks', async () => {
     const api = installFakeApi()
-    api.entitlements = {
-      paidTierOffered: true,
-      channels: [{ channelId: fakeChannel.id, tier: 'free', canSubscribe: true, canManage: false }],
-    }
+    api.channels = [fakeChannel, anotherChannel, memberChannel]
+    api.entitlements = entitlementsOf(
+      subscribedToOneBlock,
+      { channelId: fakeChannel.id, tier: 'paid', canManage: true },
+      { channelId: anotherChannel.id, tier: 'free' },
+      { channelId: memberChannel.id, tier: 'free', owner: false },
+    )
+    const { container } = await render('settings')
+
+    expect(tierLinesIn(container)).toEqual([channelTierTexts.paid, channelTierTexts.free, null])
+    const section = proSectionIn(container)
+    expect([...(section?.querySelectorAll('p') ?? [])].map((p) => p.textContent)).toEqual([
+      '1 of 4 slots in use',
+    ])
+    expect(subscribeButtons(container)).toEqual([])
+    expect(
+      [...(section?.querySelectorAll('button') ?? [])].map(({ textContent }) => textContent),
+    ).toEqual([manageSubscriptionText])
+  })
+
+  test('shows one button for each plan, and no slots, while the user may subscribe', async () => {
+    const api = installFakeApi()
+    api.channels = [fakeChannel, anotherChannel]
+    api.entitlements = entitlementsOf(
+      { canSubscribe: true },
+      { channelId: fakeChannel.id, tier: 'free', canSubscribe: true },
+      { channelId: anotherChannel.id, tier: 'free', canSubscribe: true },
+    )
     const { container } = await render('settings')
 
     expect(subscribeButtons(container).map((each) => each.textContent)).toEqual([
       subscribeTexts.monthly,
       subscribeTexts.annual,
     ])
-  })
-
-  test('shows none on a channel the creator may not subscribe, such as one they do not own', async () => {
-    const api = installFakeApi()
-    api.entitlements = {
-      paidTierOffered: true,
-      channels: [
-        { channelId: fakeChannel.id, tier: 'free', canSubscribe: false, canManage: false },
-      ],
-    }
-    const { container } = await render('settings')
-
-    expect(subscribeButtons(container)).toEqual([])
+    expect(proSectionIn(container)?.querySelectorAll('p')).toHaveLength(0)
+    expect(buttonsNamed(container, manageSubscriptionText)).toEqual([])
   })
 
   test.for(['monthly', 'annual'] as const)(
-    'a click on %s sends checkout_started with the plan alone, and goes to the Checkout the API answers',
+    "a click on %s sends checkout_started with the plan alone, and goes to the user's Checkout the API answers",
     async (plan) => {
       const api = installFakeApi()
-      api.entitlements = {
-        paidTierOffered: true,
-        channels: [
-          { channelId: fakeChannel.id, tier: 'free', canSubscribe: true, canManage: false },
-        ],
-      }
+      api.entitlements = entitlementsOf(
+        { canSubscribe: true },
+        { channelId: fakeChannel.id, tier: 'free', canSubscribe: true },
+      )
       const { container } = await render('settings')
       const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
       vi.mocked(track).mockClear()
@@ -7717,7 +7777,7 @@ describe("the Settings screen's subscribe action (creator-analytics#780)", () =>
           api.requests
             .filter(({ method }) => method === 'POST')
             .map(({ path, body }) => ({ path, body })),
-        ).toEqual([{ path: `/api/channels/${fakeChannel.id}/checkout`, body: { plan } }])
+        ).toEqual([{ path: '/api/me/checkout', body: { plan } }])
         expect(assign.mock.calls).toEqual([[fakeCheckoutUrl]])
       } finally {
         assign.mockRestore()
@@ -8026,17 +8086,11 @@ describe("the sidebar's Upgrade item (creator-analytics#907)", () => {
     paidTierOffered = true,
   ) {
     const tier = channel.tier ?? 'free'
-    api.entitlements = {
-      paidTierOffered,
-      channels: [
-        {
-          channelId: fakeChannel.id,
-          tier,
-          canSubscribe: channel.canSubscribe ?? (paidTierOffered && tier === 'free'),
-          canManage: false,
-        },
-      ],
-    }
+    const canSubscribe = channel.canSubscribe ?? (paidTierOffered && tier === 'free')
+    api.entitlements = entitlementsOf(
+      { paidTierOffered, canSubscribe },
+      { channelId: fakeChannel.id, tier, canSubscribe },
+    )
   }
 
   /** The item's link and its hide button in `within`, or undefined for each that is absent. */
@@ -8098,13 +8152,11 @@ describe("the sidebar's Upgrade item (creator-analytics#907)", () => {
   test('follows the channel on view: shown on the free channel the creator owns, absent on the one they do not', async () => {
     const api = installFakeApi()
     api.channels = [fakeChannel, anotherChannel]
-    api.entitlements = {
-      paidTierOffered: true,
-      channels: [
-        { channelId: fakeChannel.id, tier: 'free', canSubscribe: true, canManage: false },
-        { channelId: anotherChannel.id, tier: 'free', canSubscribe: false, canManage: false },
-      ],
-    }
+    api.entitlements = entitlementsOf(
+      { canSubscribe: true },
+      { channelId: fakeChannel.id, tier: 'free', canSubscribe: true },
+      { channelId: anotherChannel.id, tier: 'free', owner: false },
+    )
     const owned = await render(`?channel=${fakeChannel.id}`)
     expect(upgradeItemIn(sidebarIn(owned.container)).link).toBeDefined()
     owned.unmount()
@@ -9476,17 +9528,11 @@ describe('a free channel shows only its own numbers, and the upgrade screen (cre
   /** A free channel on a product that offers Pro, seen by its owner or another member. */
   function freeApi(who: Who): FakeApi {
     const api = installFakeApi()
-    api.entitlements = {
-      paidTierOffered: true,
-      channels: [
-        {
-          channelId: fakeChannel.id,
-          tier: 'free',
-          canSubscribe: who === 'owner',
-          canManage: false,
-        },
-      ],
-    }
+    const owner = who === 'owner'
+    api.entitlements = entitlementsOf(
+      { canSubscribe: owner },
+      { channelId: fakeChannel.id, tier: 'free', owner, canSubscribe: owner },
+    )
     api.summaryDays = api.days
     api.trafficSources = [{ type: 'YT_SEARCH', engagedViews: 50, views: 60 }]
     api.upgrade = {
@@ -9504,12 +9550,10 @@ describe('a free channel shows only its own numbers, and the upgrade screen (cre
   /** The paid channel of the same product, whose answers carry its history. */
   function paidApi(): FakeApi {
     const api = installFakeApi()
-    api.entitlements = {
-      paidTierOffered: true,
-      channels: [
-        { channelId: fakeChannel.id, tier: 'paid', canSubscribe: false, canManage: false },
-      ],
-    }
+    api.entitlements = entitlementsOf(
+      { blocks: 1, slotsInUse: 1 },
+      { channelId: fakeChannel.id, tier: 'paid' },
+    )
     const ends = { firstDay: '2026-10-03', newestDay: '2026-10-04' }
     api.summaryDays = api.days.map((day) => ({ ...day, impressions: 100, ctr: 0.05 }))
     api.summaryHistory = { impressions: 200, ctr: 0.05, ...ends }
@@ -9655,8 +9699,8 @@ describe('a free channel shows only its own numbers, and the upgrade screen (cre
 
   // creator-analytics#913: the approved copy, word for word, creator-analytics#945's drafted
   // Repackaging view card, and creator-analytics#952's Retention comparison card, held to its place.
-  test('the owner\'s "Upgrade" item opens the upgrade screen with its approved copy, the feature cards with the channel\'s own count, the two pricing cards at the configured prices, and a subscribe button sends checkout_started and goes to Checkout', async () => {
-    freeApi('owner')
+  test("the owner's \"Upgrade\" item opens the upgrade screen with its approved copy, the feature cards with the channel's own count, the two pricing cards at the configured prices, and a subscribe button sends checkout_started and goes to the user's Checkout", async () => {
+    const api = freeApi('owner')
     const { container } = await render('?window=last90')
     const [action] = upgradeLinksIn(container)
     if (!action) throw new Error('No "Upgrade" item')
@@ -9749,6 +9793,11 @@ describe('a free channel shows only its own numbers, and the upgrade screen (cre
       await click(buttonNamed(container, subscribeTexts.annual))
 
       expect(vi.mocked(track).mock.calls).toEqual([[{ name: 'checkout_started', plan: 'annual' }]])
+      expect(
+        api.requests
+          .filter(({ method }) => method === 'POST')
+          .map(({ path, body }) => ({ path, body })),
+      ).toEqual([{ path: '/api/me/checkout', body: { plan: 'annual' } }])
       expect(assign.mock.calls).toEqual([[fakeCheckoutUrl]])
     } finally {
       assign.mockRestore()
@@ -9909,17 +9958,17 @@ describe('an ended channel and the Customer Portal (creator-analytics#787)', () 
   /** A channel whose subscription has ended, its history still stored, seen by its owner or not. */
   function endedApi(who: Who): FakeApi {
     const api = installFakeApi()
-    api.entitlements = {
-      paidTierOffered: true,
-      channels: [
-        {
-          channelId: fakeChannel.id,
-          tier: 'free',
-          canSubscribe: who === 'owner',
-          canManage: false,
-        },
-      ],
-    }
+    const owner = who === 'owner'
+    api.entitlements = entitlementsOf(
+      { canSubscribe: owner },
+      {
+        channelId: fakeChannel.id,
+        tier: 'free',
+        owner,
+        purgeDate: '2026-12-17',
+        canSubscribe: owner,
+      },
+    )
     api.summaryDays = api.days.map((day) => ({ ...day, impressions: 100, ctr: 0.05 }))
     api.summaryHistory = {
       impressions: 200,
@@ -9934,17 +9983,14 @@ describe('an ended channel and the Customer Portal (creator-analytics#787)', () 
   /** A paid channel, seen by its owner, who may manage it, or by another member, who may not. */
   function paidApi(who: Who): FakeApi {
     const api = installFakeApi()
-    api.entitlements = {
-      paidTierOffered: true,
-      channels: [
-        {
+    const owner = who === 'owner'
+    api.entitlements = owner
+      ? entitlementsOf(subscribedToOneBlock, {
           channelId: fakeChannel.id,
           tier: 'paid',
-          canSubscribe: false,
-          canManage: who === 'owner',
-        },
-      ],
-    }
+          canManage: true,
+        })
+      : entitlementsOf({}, { channelId: fakeChannel.id, tier: 'paid', owner, picked: false })
     return api
   }
 
@@ -10026,7 +10072,7 @@ describe('an ended channel and the Customer Portal (creator-analytics#787)', () 
     expect(container.textContent).not.toContain('Your subscription has ended')
   })
 
-  test('the owner of a paid channel sees "Manage subscription" on Settings, whose click sends customer_portal_opened with no property and goes to the Portal the API answered', async () => {
+  test('the owner of a paid channel sees "Manage subscription" on Settings, whose click sends customer_portal_opened with no property and goes to the user\'s Portal the API answered', async () => {
     const api = paidApi('owner')
     const { container } = await render('settings')
     const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
@@ -10039,7 +10085,7 @@ describe('an ended channel and the Customer Portal (creator-analytics#787)', () 
       expect(vi.mocked(track).mock.calls).toEqual([[{ name: 'customer_portal_opened' }]])
       expect(
         api.requests.filter(({ method }) => method === 'POST').map(({ path }) => path),
-      ).toEqual([`/api/channels/${fakeChannel.id}/portal`])
+      ).toEqual(['/api/me/portal'])
       expect(assign.mock.calls).toEqual([[fakePortalUrl]])
     } finally {
       assign.mockRestore()
@@ -10049,7 +10095,7 @@ describe('an ended channel and the Customer Portal (creator-analytics#787)', () 
   test('a refused Portal sends no event and goes nowhere', async () => {
     const api = paidApi('owner')
     const { container } = await render('settings')
-    api.failNext(`POST /api/channels/${fakeChannel.id}/portal`)
+    api.failNext('POST /api/me/portal')
     const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
     vi.mocked(track).mockClear()
 

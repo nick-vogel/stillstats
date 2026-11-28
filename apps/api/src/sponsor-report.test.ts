@@ -16,14 +16,12 @@ import {
 } from '@creator-analytics/api-types'
 import {
   memberships,
-  proEnds,
   reachHistory,
   reachHistoryDays,
-  subscriptions,
   type WebDatabase,
   type WorkerDatabase,
 } from '@creator-analytics/database'
-import { test } from '@creator-analytics/database/testing'
+import { subscribeOwner, test } from '@creator-analytics/database/testing'
 import type { FakeUpload, VideoNumbers } from '@creator-analytics/fake-google'
 import { describe, expect } from 'vitest'
 import type { Browser } from '../test/browser.ts'
@@ -606,27 +604,6 @@ describe("seam 1: the sponsor report's figure choice, stored for the channel", (
   })
 })
 
-async function subscribe(
-  worker: WorkerDatabase,
-  channelId: string,
-  { status = 'active', purgeAfter = null }: { status?: string; purgeAfter?: Date | null } = {},
-): Promise<void> {
-  await worker.forChannel(channelId, async (tx) => {
-    await tx.sql.insert(subscriptions).values({
-      channelId,
-      stripeCustomerId: 'cus_sponsor_report',
-      stripeSubscriptionId: 'sub_sponsor_report',
-      status,
-      updatedAt: tx.now,
-    })
-    // The channel's own purge date, 30 days after it stopped being Pro.
-    if (purgeAfter) {
-      const endedAt = new Date(purgeAfter.getTime() - 30 * 24 * 60 * 60 * 1000)
-      await tx.sql.insert(proEnds).values({ channelId, endedAt, purgeAfter })
-    }
-  })
-}
-
 /** The days from `first` to `last`, both included. */
 function daysBetween(first: string, last: string): string[] {
   const days: string[] = []
@@ -695,7 +672,7 @@ describe("seam 1: impressions and CTR from a Pro channel's stored history", () =
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api, [oldUpload])
     api.google.setLastProcessedDay('2026-10-04')
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeHistory(worker, channelId)
 
     const report = await sponsorReport(browser, channelId, 'video-1', {
@@ -724,7 +701,7 @@ describe("seam 1: impressions and CTR from a Pro channel's stored history", () =
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api, [oldUpload])
     api.google.setLastProcessedDay('2026-10-04')
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeHistory(worker, channelId)
 
     const report = await sponsorReport(browser, channelId, 'video-1')
@@ -747,7 +724,7 @@ describe("seam 1: impressions and CTR from a Pro channel's stored history", () =
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api, [oldUpload])
     api.google.setLastProcessedDay('2026-10-04')
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeHistory(worker, channelId)
     await putChoice(browser, channelId, { figures: ['ctr', 'impressions'] })
 
@@ -766,7 +743,7 @@ describe("seam 1: impressions and CTR from a Pro channel's stored history", () =
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api, [oldUpload])
     api.google.setLastProcessedDay('2026-10-04')
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeHistory(worker, channelId, { missing: ['2026-09-10'] })
 
     const report = await sponsorReport(browser, channelId, 'video-1', {
@@ -789,7 +766,7 @@ describe("seam 1: impressions and CTR from a Pro channel's stored history", () =
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api, [oldUpload])
     api.google.setLastProcessedDay('2026-10-04')
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeHistory(worker, channelId, { firstDay: '2026-09-05' })
 
     const report = await sponsorReport(browser, channelId, 'video-1', { figures: 'impressions' })
@@ -816,7 +793,7 @@ describe("seam 1: impressions and CTR from a Pro channel's stored history", () =
       upload({ publishedAt: '2026-09-25T15:00:00Z' }),
     ])
     api.google.setLastProcessedDay('2026-10-04')
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeHistory(worker, channelId)
 
     const report = await sponsorReport(browser, channelId, 'video-1', { figures: 'impressions' })
@@ -840,7 +817,7 @@ describe("seam 1: impressions and CTR from a Pro channel's stored history", () =
       upload({ publishedAt: '2026-10-05T15:00:00Z' }),
     ])
     api.google.setLastProcessedDay('2026-10-04')
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeHistory(worker, channelId)
 
     const report = await sponsorReport(browser, channelId, 'video-1', {
@@ -868,7 +845,7 @@ describe("seam 1: impressions and CTR from a Pro channel's stored history", () =
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api, [oldUpload])
     api.google.setLastProcessedDay('2026-10-04')
-    await subscribe(worker, channelId, {
+    await subscribeOwner(web, worker, channelId, {
       status: 'canceled',
       purgeAfter: new Date('2026-10-20T00:00:00Z'),
     })
@@ -890,7 +867,8 @@ describe("seam 1: impressions and CTR from a Pro channel's stored history", () =
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api, [oldUpload])
       api.google.setLastProcessedDay('2026-10-04')
-      if (purgeAfter) await subscribe(worker, channelId, { status: 'canceled', purgeAfter })
+      if (purgeAfter)
+        await subscribeOwner(web, worker, channelId, { status: 'canceled', purgeAfter })
       await storeHistory(worker, channelId)
 
       const saved = await putChoice(browser, channelId, {
@@ -926,7 +904,8 @@ describe("seam 1: impressions and CTR from a Pro channel's stored history", () =
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api, [oldUpload])
       api.google.setLastProcessedDay('2026-10-04')
-      if (purgeAfter) await subscribe(worker, channelId, { status: 'canceled', purgeAfter })
+      if (purgeAfter)
+        await subscribeOwner(web, worker, channelId, { status: 'canceled', purgeAfter })
       await storeHistory(worker, channelId)
 
       await putChoice(browser, channelId, { figures: ['impressions'] })
@@ -957,7 +936,7 @@ describe("seam 1: impressions and CTR from a Pro channel's stored history", () =
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api, [oldUpload])
     api.google.setLastProcessedDay('2026-10-04')
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeHistory(worker, channelId)
 
     await sponsorReport(browser, channelId, 'video-1', { figures: 'impressions,ctr' })

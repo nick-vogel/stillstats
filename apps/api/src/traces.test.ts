@@ -3,8 +3,7 @@
 // is checked by hand when the baseline (#1056) sets the rate on production. The SDK is global per
 // test worker and its client spans are set up at its first start, so this file starts it once, at
 // a rate of 1.0, and traces-off.test.ts holds the API with no rate.
-import { subscriptions, type WorkerDatabase } from '@creator-analytics/database'
-import { test } from '@creator-analytics/database/testing'
+import { subscribeOwner, test } from '@creator-analytics/database/testing'
 import type { FakeUpload } from '@creator-analytics/fake-google'
 import { initErrorTracking } from '@creator-analytics/reporter'
 import {
@@ -68,20 +67,6 @@ async function connectedCreator(api: StartedApi) {
   return { browser, channelId }
 }
 
-/** Makes the channel Pro, as retention-curves.test.ts does. */
-async function subscribe(worker: WorkerDatabase, channelId: string): Promise<void> {
-  await worker.forChannel(channelId, (tx) =>
-    tx.sql.insert(subscriptions).values({
-      channelId,
-      stripeCustomerId: 'cus_request_trace',
-      stripeSubscriptionId: 'sub_request_trace',
-      status: 'active',
-      purgeAfter: null,
-      updatedAt: tx.now,
-    }),
-  )
-}
-
 /** Fetches each path in turn, and answers the envelopes and the traces the requests sent. */
 async function traced(browser: Browser, paths: readonly string[]) {
   await flushErrorTracking()
@@ -104,7 +89,7 @@ describe('with a rate of 1.0', () => {
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     const userId = await userIdOf(web, creator.email)
 
     const { text, traces } = await traced(browser, [
@@ -165,7 +150,7 @@ describe('with a rate of 1.0', () => {
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     // The retention comparison makes one read, the uploads, which the connect did not make.
     const path = `/api/channels/${channelId}/retention-curves?ids=${videoId}`
 

@@ -1049,15 +1049,23 @@ export async function startStubApi(
     }
     if (route === 'GET /api/me/preferences') return sendJson(response, 200, preferences)
     if (route === 'GET /api/me/support') return sendJson(response, 200, sampleSupport)
-    // Unless Pro is offered (`setTier('free')`), every channel free, and none to subscribe, as
-    // with Pro not configured, so Settings draws as it did before Pro.
+    // Every channel the sample user's own and free, with no block. Unless Pro is offered
+    // (`setTier('free')`), none to subscribe, as with Pro not configured, so Settings draws as it
+    // did before Pro, with no Pro section.
     if (route === 'GET /api/me/entitlements') {
       const listed = secondChannelListed ? [sampleChannel, sampleSecondChannel] : [sampleChannel]
       return sendJson(response, 200, {
         paidTierOffered,
+        canSubscribe: paidTierOffered,
+        canManage: false,
+        blocks: 0,
+        slotsInUse: 0,
         channels: listed.map(({ id }) => ({
           channelId: id,
           tier: 'free',
+          owner: true,
+          picked: false,
+          purgeDate: null,
           canSubscribe: paidTierOffered,
           canManage: false,
         })),
