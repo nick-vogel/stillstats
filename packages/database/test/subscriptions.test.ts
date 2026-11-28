@@ -687,6 +687,12 @@ describe("a block of Pro covers 4 of the user's channels (stillstats#20)", () =>
 
     expect(turnedPro).toEqual([owned])
     expect(await proStates(web, [owned, held])).toEqual([true, false])
+    // The stored pick, which the answer and the Pro state both filter on ownership again.
+    expect(
+      await worker.forChannel(held, (scope) =>
+        scope.sql.select({ userId: proPicks.userId }).from(proPicks),
+      ),
+    ).toEqual([])
   })
 
   test('a second block covers 4 more channels', async ({ web, worker }) => {
