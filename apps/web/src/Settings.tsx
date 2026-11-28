@@ -52,9 +52,9 @@ import {
 
 /**
  * The creator's channels, each by its name on YouTube, with disconnect and revenue consent, and
- * under each one the user owns whether it is Pro or Free while there is a Pro section, with its
- * purge date while it has one, that it stays Free while every slot is in use, and its pick or
- * unpick control while the user holds a block; the Pro
+ * under each one the user owns whether it is Pro or Free while there is a Pro section, and while
+ * the user holds a block its purge date while it has one, that it stays Free while every slot is
+ * in use, and its pick or unpick control; the Pro
  * section, with the slots in use once the user holds a block, a subscribe action for each plan
  * while they may subscribe and the Customer Portal's while they may manage; the Support section
  * when the support answer has a link; and account: the currency revenue shows in, the theme, the
@@ -180,7 +180,8 @@ export function Settings({
                     </QuietButton>
                   )}
                   {owned && <p className="channel-tier">{channelTierTexts[owned.tier]}</p>}
-                  {owned?.tier === 'free' && owned.purgeDate && (
+                  {/* Without a block, only subscribing again keeps the history, not a pick. */}
+                  {pro && pro.blocks > 0 && owned?.tier === 'free' && owned.purgeDate && (
                     <p className="channel-pro-note">{proPurgeTextOf(owned.purgeDate)}</p>
                   )}
                   {owned?.slotsFull && <p className="channel-pro-note">{slotsFullText}</p>}

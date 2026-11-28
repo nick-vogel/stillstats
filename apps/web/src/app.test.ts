@@ -7923,6 +7923,19 @@ describe("the Settings screen's Pro section (creator-analytics#780, stillstats#2
       expect(memberControls).toEqual([[unpickChannelText], []])
       expect(controls(container)).toEqual([[]])
     })
+
+    test('a channel whose subscription ended shows Free and no line about a pick, since only subscribing again keeps its history', async () => {
+      const api = installFakeApi()
+      api.channels = [fakeChannel]
+      api.entitlements = entitlementsOf(
+        { canSubscribe: true },
+        { channelId: fakeChannel.id, tier: 'free', purgeDate: fakePurgeDate, canSubscribe: true },
+      )
+      const { container } = await render('settings')
+
+      expect(channelLinesIn(container)).toEqual([[channelTierTexts.free]])
+      expect(buttonsNamed(container, subscribeTexts.monthly)).toHaveLength(1)
+    })
   })
 })
 
