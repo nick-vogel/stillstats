@@ -124,7 +124,9 @@ describe('seam 1: the owner previews one more block, read from Stripe (stillstat
     const api = await startApi(web, { billing: testBilling })
     const { browser, stripe } = await subscribedOwner(web, worker, api)
 
+    const before = Math.floor(Date.now() / 1000)
     const response = await preview(browser)
+    const after = Math.floor(Date.now() / 1000)
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
@@ -134,15 +136,38 @@ describe('seam 1: the owner previews one more block, read from Stripe (stillstat
       prorated: { amount: 350, currency: 'usd' },
       periodEnd: periodEnd.toISOString(),
     } satisfies BlockPreviewAnswer)
-    expect(stripe.invoicePreviews.map((body) => Object.fromEntries(body))).toEqual([
-      {
-        subscription: 'sub_test_stillstats',
-        'subscription_details[items][0][id]': 'si_sub_test_stillstats',
-        'subscription_details[items][0][quantity]': '2',
-        'subscription_details[proration_behavior]': 'create_prorations',
-      },
-    ])
+    const [body] = stripe.invoicePreviews.map((params) => Object.fromEntries(params))
+    expect(stripe.invoicePreviews).toHaveLength(1)
+    expect(body).toEqual({
+      subscription: 'sub_test_stillstats',
+      'subscription_details[items][0][id]': 'si_sub_test_stillstats',
+      'subscription_details[items][0][quantity]': '2',
+      'subscription_details[proration_behavior]': 'create_prorations',
+      'subscription_details[proration_date]': expect.stringMatching(/^\d+$/),
+    })
+    const prorationDate = Number(body?.['subscription_details[proration_date]'])
+    expect(prorationDate).toBeGreaterThanOrEqual(before)
+    expect(prorationDate).toBeLessThanOrEqual(after)
     expect(stripe.subscriptionUpdates).toEqual([])
+  })
+
+  test("a second add in one period previews only its own prorated charge, not the first add's, which Stripe still holds pending", async ({
+    web,
+    worker,
+  }) => {
+    const api = await startApi(web, { billing: testBilling })
+    const { browser, stripe } = await subscribedOwner(web, worker, api)
+    // The first add, ten days ago, leaves its proration pending on the next invoice.
+    stripe.setNow(new Date(Date.now() - 10 * 86_400_000))
+    await addBlock(browser, { blocks: 2 })
+
+    const response = await preview(browser)
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      blocks: 3,
+      prorated: { amount: 350, currency: 'usd' },
+    } satisfies Partial<BlockPreviewAnswer>)
   })
 })
 

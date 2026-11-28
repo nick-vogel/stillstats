@@ -478,6 +478,39 @@ describe('a block added to a seeded subscription in the fake Stripe server (stil
     ])
   })
 
+  test("a change of quantity leaves the seeded proration pending, and a later preview answers it from the update's proration_date beside the preview's own", async () => {
+    const { stripe, client } = await seededWithItem()
+    stripe.setProration('sub_fake', 450)
+    const periodEndSeconds = Math.floor(periodEnd.getTime() / 1000)
+    const updatedAt = periodEndSeconds - 20 * 86_400
+    const previewedAt = periodEndSeconds - 10 * 86_400
+    await client.subscriptions.update('sub_fake', {
+      items: [{ id: 'si_fake', quantity: 2 }],
+      proration_date: updatedAt,
+    })
+    await client.subscriptions.update('sub_fake', {
+      items: [{ id: 'si_fake', quantity: 3 }],
+      proration_behavior: 'none',
+    })
+
+    const preview = await client.invoices.createPreview({
+      subscription: 'sub_fake',
+      subscription_details: {
+        items: [{ id: 'si_fake', quantity: 3 }],
+        proration_date: previewedAt,
+      },
+    })
+
+    expect(
+      preview.lines.data
+        .filter((line) => line.parent?.subscription_item_details?.proration === true)
+        .map(({ amount, period }) => ({ amount, period })),
+    ).toEqual([
+      { amount: 450, period: { start: updatedAt, end: periodEndSeconds } },
+      { amount: 450, period: { start: previewedAt, end: periodEndSeconds } },
+    ])
+  })
+
   test('a preview of a subscription it does not hold answers 404', async () => {
     const { client } = await started()
 

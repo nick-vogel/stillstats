@@ -128,7 +128,7 @@ export interface BlockPreview {
   plan: Plan
   /** The item's own price of one block for each period. */
   price: PlanPrice
-  /** The sum of the preview's proration lines, on the next invoice. */
+  /** The sum of the preview's proration lines of this add, on the next invoice. */
   prorated: PlanPrice
   /** The end of the current paid period. */
   periodEnd: Date
@@ -167,7 +167,10 @@ export function createBilling({
   /** The API's own origin, which Stripe's page returns to. */
   baseURL: string
   stripeApi?: StripeApi
-  /** The clock a failed price read's window runs on. Unset, system time. */
+  /**
+   * The clock a failed price read's window and a block preview's proration date run on. Unset,
+   * system time.
+   */
   now?: () => Date
   /** The deadline of one price read, in milliseconds. Unset, 3 seconds. */
   priceTimeoutMs?: number
@@ -331,16 +334,25 @@ export function createBilling({
       // preview of the next invoice with the item at one block more and `create_prorations`
       // carries the proration lines the raise would make, which Stripe names as the lines whose
       // `parent.subscription_item_details.proration` is true. `GET /v1/invoices/upcoming` is gone
-      // at 2026-10-28.endive.
+      // at 2026-10-28.endive. The preview also shows every pending invoice item, an earlier add's
+      // proration in this period among them, so only the lines whose period starts at the
+      // preview's own `proration_date` are this add's (docs.stripe.com/billing/subscriptions/
+      // prorations, "Preview a proration", read 2026-11-27).
+      const prorationDate = Math.floor(now().getTime() / 1000)
       const preview = await stripe.invoices.createPreview({
         subscription: subscriptionId,
         subscription_details: {
           items: [{ id: block.itemId, quantity: blocks }],
           proration_behavior: 'create_prorations',
+          proration_date: prorationDate,
         },
       })
       const prorated = preview.lines.data
-        .filter((line) => line.parent?.subscription_item_details?.proration === true)
+        .filter(
+          (line) =>
+            line.parent?.subscription_item_details?.proration === true &&
+            line.period.start === prorationDate,
+        )
         .reduce((sum, line) => sum + line.amount, 0)
       return {
         blocks,

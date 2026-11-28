@@ -14,7 +14,9 @@ import type { AddressInfo } from 'node:net'
  * event itself; the update it serves is the one a block of Pro sends (stillstats#22).
  *
  * It checks none of Stripe's own rules for a session, a configuration, an update or a
- * cancellation, prorates nothing (a preview answers the proration a test seeds), and refuses a
+ * cancellation, prorates nothing of its own (a preview answers the proration a test seeds, and an
+ * accepted change of quantity leaves that amount pending for the next preview, as Stripe leaves a
+ * pending proration invoice item), and refuses a
  * refund only over its payment's unrefunded remainder, so it cannot prove Stripe accepts what the
  * client sends, or that Managed Payments takes it. The walk of Pro on production
  * (creator-analytics#791) covers those.
@@ -56,7 +58,8 @@ export interface FakeStripe {
   addPrice(price: FakePrice): void
   /**
    * The amount, in the currency's smallest unit, of the proration line a preview of the
-   * subscription's next invoice answers: 0 until a test sets it.
+   * subscription's next invoice answers for the change it previews, and of the proration an
+   * accepted change of quantity leaves pending: 0 until a test sets it.
    */
   setProration(subscriptionId: string, amount: number): void
   /** Seeds a Customer Portal configuration, active unless given, and answers its ID. */
@@ -224,6 +227,9 @@ export async function startFakeStripe(): Promise<FakeStripe> {
   }[] = []
   const invoicePreviews: URLSearchParams[] = []
   const prorations = new Map<string, number>()
+  // The proration invoice items each accepted change of quantity left pending, by subscription:
+  // their amount and the start of the period they prorate, the update's `proration_date` or now.
+  const pendingProrations = new Map<string, { amount: number; start: number }[]>()
   const heldConfigurations: HeldPortalConfiguration[] = []
   const refunds: URLSearchParams[] = []
   const subscriptions = new Map<string, HeldSubscription>()
@@ -303,7 +309,8 @@ export async function startFakeStripe(): Promise<FakeStripe> {
   }
 
   // The update a block of Pro sends: `items[0][id]` and `items[0][quantity]`, with whatever
-  // `proration_behavior` it names, which it records and does not apply.
+  // `proration_behavior` it names, which it records. A change of quantity under any behaviour but
+  // `none` leaves the seeded proration pending from its `proration_date`, or now.
   async function updateSubscription(
     subscription: HeldSubscription,
     req: IncomingMessage,
@@ -319,16 +326,28 @@ export async function startFakeStripe(): Promise<FakeStripe> {
     if (itemId !== null && itemId !== subscription.itemId) {
       return stripeError(res, 400, `No such subscription item: '${itemId}'`)
     }
-    if (quantity !== null) subscription.quantity = Number(quantity)
+    if (quantity !== null && Number(quantity) !== subscription.quantity) {
+      if (body.get('proration_behavior') !== 'none') {
+        const start = Number(body.get('proration_date') ?? seconds(now ?? new Date()))
+        const amount = prorations.get(subscription.id) ?? 0
+        pendingProrations.set(subscription.id, [
+          ...(pendingProrations.get(subscription.id) ?? []),
+          { amount, start },
+        ])
+      }
+      subscription.quantity = Number(quantity)
+    }
     subscriptionUpdates.push({ subscription: subscription.id, params: body, idempotencyKey })
     json(res, 200, subscriptionObject(subscription))
   }
 
   // docs.stripe.com/api/invoices/create_preview and the invoice line item object, read 2026-11-27
   // at 2026-10-28.endive: a line is a proration when `parent.subscription_item_details.proration`
-  // is true, which Stripe names the way to find the prorations a preview shows. It answers one
-  // proration line of the seeded amount and one line for the next period at the previewed
-  // quantity times the item's price.
+  // is true, which Stripe names the way to find the prorations a preview shows; a preview also
+  // shows every pending invoice item. It answers a proration line for each pending proration,
+  // from its own start, one proration line of the seeded amount from the preview's
+  // `subscription_details[proration_date]`, or now, and one line for the next period at the
+  // previewed quantity times the item's price. A proration line runs to the period's end.
   async function previewInvoice(req: IncomingMessage, res: ServerResponse) {
     const body = await formBody(req)
     const subscriptionId = body.get('subscription') ?? ''
@@ -340,12 +359,18 @@ export async function startFakeStripe(): Promise<FakeStripe> {
       body.get('subscription_details[items][0][quantity]') ?? subscription.quantity,
     )
     const currency = price?.currency ?? 'usd'
-    const line = (id: string, amount: number, proration: boolean) => ({
+    const line = (
+      id: string,
+      amount: number,
+      proration: boolean,
+      period: { start: number; end: number },
+    ) => ({
       id,
       object: 'line_item',
       amount,
       currency,
       quantity,
+      period,
       parent: {
         type: 'subscription_item_details',
         invoice_item_details: null,
@@ -364,16 +389,28 @@ export async function startFakeStripe(): Promise<FakeStripe> {
     })
     const proration = prorations.get(subscription.id) ?? 0
     const next = quantity * (price?.unitAmount ?? 0)
+    const end = subscription.periodEnd
+    const pending = (pendingProrations.get(subscription.id) ?? []).map(({ amount, start }) =>
+      line(nextId('il'), amount, true, { start, end }),
+    )
+    const previewedStart = Number(
+      body.get('subscription_details[proration_date]') ?? seconds(now ?? new Date()),
+    )
+    const lines = [
+      ...pending,
+      line(nextId('il'), proration, true, { start: previewedStart, end }),
+      line(nextId('il'), next, false, { start: end, end: end + (end - subscription.periodStart) }),
+    ]
     json(res, 200, {
       id: `upcoming_${nextId('in')}`,
       object: 'invoice',
       currency,
       customer: subscription.customer,
       status: 'draft',
-      total: proration + next,
+      total: lines.reduce((sum, { amount }) => sum + amount, 0),
       lines: {
         object: 'list',
-        data: [line(nextId('il'), proration, true), line(nextId('il'), next, false)],
+        data: lines,
         has_more: false,
         url: '/v1/invoices/upcoming/lines',
       },
