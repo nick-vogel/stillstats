@@ -71,11 +71,11 @@ A user's purchase of a number of Blocks of Pro, monthly or annual. It belongs to
 _Avoid_: Plan (the tier it buys), membership (a different thing), Pro (the tier, not the purchase)
 
 **Pro grant**:
-Blocks of Pro given to a user with no purchase, which fill slots as a Subscription's Blocks do.
+Blocks of Pro given to a user with no purchase, from the admin screen, which fill slots as a Subscription's Blocks do and add to them. A Pro grant is not a Subscription: it has no Stripe customer and no invoice, and never counts as revenue. It may have an end date, and Nick may remove it at any time; at its end or removal the user's capacity shrinks, and the newest picks leave first, each starting the 30 days to its purge date. Nick's admin list labels its Blocks "granted" beside the paid ones.
 _Avoid_: Grant (alone), access grant, comp
 
 **Purge date**:
-The day a channel's stored history is deleted: 30 days after the channel stopped being Pro, because its Subscription ended, or later because it left its Block. Until then the history stays readable and shows the purge date, and picking the channel again for a live Block before it keeps the history and clears the date.
+The day a channel's stored history is deleted: 30 days after the channel stopped being Pro, because its Subscription ended, because its Pro grant ended or was removed, or later because it left its Block. Until then the history stays readable and shows the purge date, and picking the channel again for a live Block before it keeps the history and clears the date.
 _Avoid_: Expiry, deletion date
 
 **Tip**:

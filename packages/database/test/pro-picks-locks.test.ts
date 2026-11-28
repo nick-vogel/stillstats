@@ -3,10 +3,17 @@ import { sql } from 'drizzle-orm'
 import type pg from 'pg'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { openWebDatabase, openWorkerDatabase } from '../src/open.ts'
-import { channels, memberships } from '../src/schema.ts'
+import { channels, memberships, proEnds } from '../src/schema.ts'
 import type { Scoped, WebDatabase, WorkerDatabase } from '../src/scopes.ts'
 import { type MigrationDatabase, migrationDatabase, noJobs } from './migration-database.ts'
-import { type PickAnswer, pickChannel, recordUserSubscription, unpickChannel } from './pro.ts'
+import {
+  endGrant,
+  grantBlocks,
+  type PickAnswer,
+  pickChannel,
+  recordUserSubscription,
+  unpickChannel,
+} from './pro.ts'
 import { seedUser } from './seed.ts'
 
 // stillstats#21: pick_pro_channel and unpick_pro_channel lock the user's subscription row and
@@ -104,13 +111,18 @@ function proStatesOf({ web }: Databases, ownerId: string, ids: string[]) {
 }
 
 /** Whether a session of this database waits on a lock in a pick or an unpick, until `settled`. */
-async function seenWaiting(pool: pg.Pool, settled: () => boolean): Promise<boolean> {
+async function seenWaiting(
+  pool: pg.Pool,
+  settled: () => boolean,
+  call = '%pro_channel(%',
+): Promise<boolean> {
   const deadline = Date.now() + 5_000
   while (!settled() && Date.now() < deadline) {
     const { rows } = await pool.query(
       `select 1 from pg_stat_activity
         where datname = current_database() and pid <> pg_backend_pid()
-          and wait_event_type = 'Lock' and query like '%pro_channel(%'`,
+          and wait_event_type = 'Lock' and query like $1`,
+      [call],
     )
     if (rows.length > 0) return true
     await new Promise((resolve) => setTimeout(resolve, 20))
@@ -196,6 +208,159 @@ describe('the locks of pick_pro_channel and unpick_pro_channel, on connections o
         waited: true,
       })
       expect(await proStatesOf(databases, ownerId, ids)).toEqual([false, true, true, true])
+    })
+  })
+})
+
+/**
+ * A user with `count` channels, connected in order, and no subscription, whose grant of one block
+ * filled a slot with each of the first `picked`, committed; answers the user, the channels and the
+ * grant.
+ */
+async function grantedWithChannels(
+  { web, worker }: Databases,
+  count: number,
+  picked: number,
+): Promise<{ ownerId: string; ids: string[]; grantId: string }> {
+  const ownerId = `locks-granted-${randomUUID()}`
+  await seedUser(web, ownerId)
+  const connect = async (n: number) => {
+    const channelId = randomUUID()
+    await worker.forChannel(channelId, async (scope) => {
+      await scope.sql.insert(channels).values({ id: channelId, youtubeChannelId: `UC${channelId}` })
+      await scope.sql.insert(memberships).values({
+        channelId,
+        userId: ownerId,
+        role: 'owner',
+        createdAt: new Date(now.getTime() - (count - n) * 60 * 1000),
+      })
+    })
+    return channelId
+  }
+  const ids: string[] = []
+  for (let n = 1; n <= picked; n++) ids.push(await connect(n))
+  const { grantId } = await grantBlocks(web, { email: `${ownerId}@example.com`, blocks: 1 })
+  for (let n = picked + 1; n <= count; n++) ids.push(await connect(n))
+  if (!grantId) throw new Error('The grant was not made')
+  return { ownerId, ids, grantId }
+}
+
+function purgesOf({ web }: Databases, ownerId: string, ids: string[]) {
+  return web.asUser(ownerId, async (scope) => {
+    const rows = await scope.sql
+      .select({ channelId: proEnds.channelId, purgeAfter: proEnds.purgeAfter })
+      .from(proEnds)
+    return ids.map((id) => rows.find((row) => row.channelId === id)?.purgeAfter ?? null)
+  })
+}
+
+/**
+ * Runs `first` and holds its transaction open while `second` runs, until `second` is seen waiting
+ * on a lock in a statement like `call`, or has answered; answers both, and whether `second` waited.
+ */
+async function holding<A, B>(
+  pool: pg.Pool,
+  first: (hold: <T>(answer: T) => Promise<T>) => Promise<A>,
+  second: () => Promise<B>,
+  call: string,
+) {
+  let release = () => {}
+  const released = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let answered = () => {}
+  const firstAnswered = new Promise<void>((resolve) => {
+    answered = resolve
+  })
+  const firstScope = first(async (answer) => {
+    answered()
+    await released
+    return answer
+  })
+  await Promise.race([firstAnswered, firstScope])
+  let settled = false
+  const secondScope = second().finally(() => {
+    settled = true
+  })
+  const waited = await seenWaiting(pool, () => settled, call)
+  release()
+  const [firstAnswer, secondAnswer] = await Promise.all([firstScope, secondScope])
+  return { first: firstAnswer, second: secondAnswer, waited }
+}
+
+describe('the locks of a user with grants and no subscription row (stillstats#24)', () => {
+  const purgeAfter = new Date(now.getTime() + 30 * dayMs)
+
+  test("two picks of a granted user's last free slot at once: the second waits on the grants, counts the first's pick and is refused", async () => {
+    await withDatabases(async (databases) => {
+      const { ownerId, ids } = await grantedWithChannels(databases, 5, 3)
+      const [, , , fourth = '', fifth = ''] = ids
+
+      const answers = await whileTheFirstHolds(
+        databases,
+        ownerId,
+        (scope) => pickChannel(scope, fourth),
+        (scope) => pickChannel(scope, fifth),
+      )
+
+      expect(answers).toEqual({
+        first: { outcome: 'picked', turnedPro: [fourth] },
+        second: { outcome: 'no_free_slot', turnedPro: [] },
+        waited: true,
+      })
+      expect(await proStatesOf(databases, ownerId, ids)).toEqual([true, true, true, true, false])
+    })
+  })
+
+  test('a grant ending while a pick of the last slot runs waits for it, and takes the pick out with the others', async () => {
+    await withDatabases(async (databases) => {
+      const { ownerId, ids, grantId } = await grantedWithChannels(databases, 4, 3)
+      const [, , , fourth = ''] = ids
+
+      const answers = await holding(
+        databases.pool,
+        (hold) => databases.web.asUser(ownerId, (scope) => pickChannel(scope, fourth).then(hold)),
+        () => databases.web.asAdmin('locks-admin', (scope) => endGrant(scope, grantId, purgeAfter)),
+        '%end_pro_grant(%',
+      )
+
+      expect(answers).toEqual({
+        first: { outcome: 'picked', turnedPro: [fourth] },
+        second: 'ended',
+        waited: true,
+      })
+      expect(await proStatesOf(databases, ownerId, ids)).toEqual([false, false, false, false])
+      expect(await purgesOf(databases, ownerId, ids)).toEqual(ids.map(() => purgeAfter))
+    })
+  })
+
+  test('a pick while a grant ends waits for the end, and finds no free slot', async () => {
+    await withDatabases(async (databases) => {
+      const { ownerId, ids, grantId } = await grantedWithChannels(databases, 4, 3)
+      const [, , , fourth = ''] = ids
+
+      const answers = await holding(
+        databases.pool,
+        (hold) =>
+          databases.web.asAdmin('locks-admin', (scope) =>
+            endGrant(scope, grantId, purgeAfter).then(hold),
+          ),
+        () => databases.web.asUser(ownerId, (scope) => pickChannel(scope, fourth)),
+        '%pro_channel(%',
+      )
+
+      expect(answers).toEqual({
+        first: 'ended',
+        second: { outcome: 'no_free_slot', turnedPro: [] },
+        waited: true,
+      })
+      expect(await proStatesOf(databases, ownerId, ids)).toEqual([false, false, false, false])
+      expect(await purgesOf(databases, ownerId, ids)).toEqual([
+        purgeAfter,
+        purgeAfter,
+        purgeAfter,
+        null,
+      ])
     })
   })
 })

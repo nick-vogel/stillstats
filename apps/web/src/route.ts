@@ -117,10 +117,16 @@ interface RouteControls {
    */
   feedback?: FeedbackScreen
   /**
-   * Nick's admin screen of the feedback messages is open, in the path. Nothing links to it, and
-   * its page and filter live in the screen, not the address. Never with a video.
+   * Nick's admin screen of the feedback messages is open, in the path. Only the admin screens' tab
+   * strip links to it, and its page and filter live in the screen, not the address. Never with a
+   * video.
    */
   adminFeedback?: true
+  /**
+   * The admin screen's Grants tab is open, in the path (stillstats#24). Only the admin screens'
+   * tab strip links to it. Never with a video.
+   */
+  adminGrants?: true
 }
 
 /**
@@ -259,7 +265,7 @@ function videoOf(path: string): Pick<Route, 'video' | 'sponsorReport'> | null {
 /**
  * Reads the route from a path under the web app's base and a query string. A path that names
  * neither Settings, the Audience screen, the retention comparison, "What's new", the feedback
- * form, the admin feedback screen nor a video, or names a video in a malformed escape, is the list. The old profile path opens Settings too (creator-analytics#589),
+ * form, the admin feedback screen, its Grants tab nor a video, or names a video in a malformed escape, is the list. The old profile path opens Settings too (creator-analytics#589),
  * since Stripe's Payment Link still returns to /app/profile: `readAddress` then writes back the
  * settings path with the route's query, replacing the entry, as it does for any address that
  * differs from the route's.
@@ -270,6 +276,7 @@ export function routeOf(path: string, search: string): Route {
   if (path === 'whats-new') return { ...route, whatsNew: true }
   if (path === 'upgrade') return { ...route, upgrade: true }
   if (path === 'admin/feedback') return { ...route, adminFeedback: true }
+  if (path === 'admin/grants') return { ...route, adminGrants: true }
   const query = new URLSearchParams(search)
   const list = query.has(listWindowKeys.window) ? windowChoiceOf(query, listWindowKeys) : null
   if (path === 'audience') return audienceRouteOf(route, list)
@@ -502,6 +509,7 @@ function pathOf(route: Route): string {
   if (route.upgrade) return 'upgrade'
   if (route.feedback) return 'feedback'
   if (route.adminFeedback) return 'admin/feedback'
+  if (route.adminGrants) return 'admin/grants'
   if (!route.video) return ''
   const videoPath = `videos/${encodeURIComponent(route.video)}`
   return route.sponsorReport ? `${videoPath}/sponsor-report` : videoPath
@@ -531,8 +539,8 @@ export function routeToSponsorReport(route: Route, video: string): Route {
 }
 
 /**
- * The list a detail screen, Settings, the Audience screen, "What's new", the feedback form or the
- * admin feedback screen was opened from, on
+ * The list a detail screen, Settings, the Audience screen, "What's new", the feedback form, the
+ * admin feedback screen or its Grants tab was opened from, on
  * the same channel, window, sort, format, page, chart mode, chart card, page size and visibility.
  * The list's own window, kept by the Audience screen or the retention comparison when the screen's
  * is another (`listWindow`), comes back, and a sort it cannot sort by is newest first.
@@ -548,6 +556,7 @@ export function routeToList({
   upgrade: _upgrade,
   feedback: _feedback,
   adminFeedback: _adminFeedback,
+  adminGrants: _adminGrants,
   listWindow,
   ...route
 }: Route): Route {
@@ -620,6 +629,16 @@ export function routeToWhatsNew(route: Route): Route {
 /** The upgrade screen, keeping the list's route, so the "Videos" link returns to the same view. */
 export function routeToUpgrade(route: Route): Route {
   return { ...routeToList(route), upgrade: true }
+}
+
+/** The admin screen's Feedback tab, keeping the list's route, as the tab strip links to it. */
+export function routeToAdminFeedback(route: Route): Route {
+  return { ...routeToList(route), adminFeedback: true }
+}
+
+/** The admin screen's Grants tab, keeping the list's route, as the tab strip links to it. */
+export function routeToAdminGrants(route: Route): Route {
+  return { ...routeToList(route), adminGrants: true }
 }
 
 /** The name of the screen a route shows, as a feedback message carries it. */

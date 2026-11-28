@@ -4,11 +4,14 @@
 import { CSPProvider } from '@base-ui/react/csp-provider'
 import {
   type AdminFeedbackMessage,
+  type AdminGrant,
+  type AdminGrantRequest,
   type AgeGroup,
   type AudienceAnswer,
   type AudienceRetentionPoint,
   type AudienceWindow,
   adminFeedbackPageSize,
+  adminGrantMaxBlocks,
   type BlockPreviewAnswer,
   type ChannelSummaryAnswer,
   type City,
@@ -509,9 +512,9 @@ export interface FakeApi {
    * and nothing they may subscribe or manage, unless set, as with Pro not configured. The user's
    * Checkout, `POST /api/me/checkout`, answers `fakeCheckoutUrl`, and their Customer Portal,
    * `POST /api/me/portal`, `fakePortalUrl`. A pick, `PUT /api/channels/:channelId/pro-pick`, makes
-   * an owned channel paid and picked while a slot is free and answers 409 `no_free_slot` while
-   * none is; an unpick, `DELETE`, makes it free and unpicked with `fakePurgeDate`. Both answer the
-   * changed entitlements. The block preview, `GET /api/me/block-preview`, answers
+   * an owned channel paid and picked while a slot of the paid or granted blocks is free and
+   * answers 409 `no_free_slot` while none is; an unpick, `DELETE`, makes it free and unpicked with
+   * `fakePurgeDate`. Both answer the changed entitlements. The block preview, `GET /api/me/block-preview`, answers
    * `fakeBlockPreviewOf` one block more while `canAddBlock`, and 409 `not_subscribed` otherwise;
    * an add, `POST /api/me/blocks`, of one block more raises `blocks` and answers it, and of any
    * other count answers 409 `blocks_changed`.
@@ -533,6 +536,17 @@ export interface FakeApi {
    * earlier time, else takes `fakeDoneAt`, and a clear empties it, as the server does.
    */
   adminFeedback?: AdminFeedbackMessage[]
+  /**
+   * The Pro grants the Grants tab's routes answer, newest first, for a creator on the allowlist
+   * (stillstats#24): unset, every grant route answers 404, as it does for anyone not on it. A grant
+   * posted to an email of `adminGrantUsers` goes first, made at `fakeGrantCreatedAt`; a body that
+   * breaks a rule, an end day not after `fakeGrantToday` among them, answers 400 `invalid_grant`,
+   * and any other email 404 `unknown_email`. A removal of an unknown grant answers 404 `not_found`.
+   * Each change answers the whole list, with every grant's `grantedBlocks` summed again.
+   */
+  adminGrants?: AdminGrant[]
+  /** The users a grant may go to, by email, each with their paid blocks: none unless set. */
+  adminGrantUsers?: Record<string, number>
   /**
    * Whether the summary, the list, a video's detail and Audience answer from the API's cache:
    * false, as a read from Google, unless set.
@@ -610,7 +624,8 @@ function proPickAnswerOf(api: FakeApi, { method, path }: FakeRequest): Answer | 
   if (!channel.owner) return { status: 403, body: { refusal: 'not_owner' } }
   const pick = method === 'PUT'
   if (channel.picked === pick) return { status: 200, body: entitlements }
-  if (pick && entitlements.slotsInUse >= entitlements.blocks * 4) {
+  const granted = entitlements.grants.reduce((total, grant) => total + grant.blocks, 0)
+  if (pick && entitlements.slotsInUse >= (entitlements.blocks + granted) * 4) {
     return { status: 409, body: { refusal: 'no_free_slot' } }
   }
   const changed = pick
@@ -660,6 +675,76 @@ function adminAnswerOf(api: FakeApi, { method, path, query }: FakeRequest): Answ
   return undefined
 }
 
+/** The day the fake API's grant routes take as today, in UTC. */
+export const fakeGrantToday = '2026-11-27'
+
+/** The time the fake API's grant routes give a new grant. */
+export const fakeGrantCreatedAt = '2026-11-27T12:00:00.000Z'
+
+const grantRoutePattern = /^\/api\/admin\/grants\/([^/]+)$/
+
+/** Whether a grant's body keeps every rule the API checks. */
+function isValidGrant(body: unknown): body is AdminGrantRequest {
+  const { email, blocks, endsOn } = (body ?? {}) as Partial<Record<string, unknown>>
+  return (
+    typeof email === 'string' &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
+    Number.isInteger(blocks) &&
+    (blocks as number) >= 1 &&
+    (blocks as number) <= adminGrantMaxBlocks &&
+    (endsOn === null ||
+      (typeof endsOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(endsOn) && endsOn > fakeGrantToday))
+  )
+}
+
+/** The grants with each one's `grantedBlocks` the sum of its user's grants, as the API answers. */
+function summedGrantsOf(grants: AdminGrant[]): AdminGrant[] {
+  return grants.map((grant) => ({
+    ...grant,
+    grantedBlocks: grants
+      .filter(({ email }) => email === grant.email)
+      .reduce((total, { blocks }) => total + blocks, 0),
+  }))
+}
+
+/** The grant routes' answer, or undefined for any other route. */
+function adminGrantsAnswerOf(
+  api: FakeApi,
+  { method, path, body }: FakeRequest,
+): Answer | undefined {
+  const grants = api.adminGrants
+  if (!grants) return undefined
+  const changed = (after: AdminGrant[], status = 200): Answer => {
+    api.adminGrants = summedGrantsOf(after)
+    return { status, body: { grants: api.adminGrants } }
+  }
+  if (path === '/api/admin/grants' && method === 'GET') return { status: 200, body: { grants } }
+  if (path === '/api/admin/grants' && method === 'POST') {
+    if (!isValidGrant(body)) return { status: 400, body: { error: 'invalid_grant' } }
+    const paidBlocks = api.adminGrantUsers?.[body.email]
+    if (paidBlocks === undefined) return { status: 404, body: { error: 'unknown_email' } }
+    const grant: AdminGrant = {
+      // The request's place among every request the app made, so no two grants share an ID.
+      id: `00000000-0000-4000-8000-${String(api.requests.length).padStart(12, '0')}`,
+      email: body.email,
+      blocks: body.blocks,
+      endsAt: body.endsOn === null ? null : `${body.endsOn}T00:00:00.000Z`,
+      createdAt: fakeGrantCreatedAt,
+      paidBlocks,
+      grantedBlocks: body.blocks,
+    }
+    return changed([grant, ...grants], 201)
+  }
+  const id = grantRoutePattern.exec(path)?.[1]
+  if (id !== undefined && method === 'DELETE') {
+    if (!grants.some((grant) => grant.id === id)) {
+      return { status: 404, body: { error: 'not_found' } }
+    }
+    return changed(grants.filter((grant) => grant.id !== id))
+  }
+  return undefined
+}
+
 function answerOf(api: FakeApi, { method, path, query, body }: FakeRequest): Answer {
   const route = `${method} ${path}`
   const ok = (answer: unknown): Answer => ({ status: 200, body: answer })
@@ -694,6 +779,8 @@ function answerOf(api: FakeApi, { method, path, query, body }: FakeRequest): Ans
   if (route === 'POST /api/feedback') return { status: 201, body: null }
   const admin = adminAnswerOf(api, { method, path, query, body })
   if (admin) return admin
+  const adminGrants = adminGrantsAnswerOf(api, { method, path, query, body })
+  if (adminGrants) return adminGrants
   const disconnected = api.channels.find(({ id }) => path === `/api/channels/${id}/disconnect`)
   if (method === 'POST' && disconnected) {
     api.channels = api.channels.filter((channel) => channel !== disconnected)
@@ -833,6 +920,7 @@ export function installFakeApi(preferences: Preferences = {}): FakeApi {
       canManage: false,
       canAddBlock: false,
       blocks: 0,
+      grants: [],
       slotsInUse: 0,
       channels: [
         {

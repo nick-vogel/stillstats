@@ -193,6 +193,14 @@ describe("the sidebar's links", () => {
     expect(links.map(({ address }) => address)).not.toContainEqual(expect.stringContaining('admin'))
     expect(feedbackLinkOf(routeOf('admin/feedback', '')).current).toBe(false)
   })
+
+  test('on the Grants tab, none is current, and none leads to it (stillstats#24)', () => {
+    const links = linksOn('admin/grants', '?window=last90')
+
+    expect(links.map(({ current }) => current)).toEqual([false, false, false, false])
+    expect(links.map(({ address }) => address)).not.toContainEqual(expect.stringContaining('admin'))
+    expect(feedbackLinkOf(routeOf('admin/grants', '')).current).toBe(false)
+  })
 })
 
 describe('the sidebar\'s "Send feedback" item', () => {

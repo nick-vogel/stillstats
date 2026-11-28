@@ -139,3 +139,51 @@ export async function unpickChannel(
   if (!row?.outcome) throw new Error('unpick_pro_channel answered no outcome')
   return { outcome: row.outcome, turnedPro: row.turned_pro }
 }
+
+/** What create_pro_grant answered: the grant's ID, null for `no_user`, and the picks turned Pro. */
+export interface GrantAnswer {
+  outcome: string
+  grantId: string | null
+  turnedPro: string[]
+}
+
+/**
+ * Grants the user whose email is given `blocks` blocks of Pro, ending at `endsAt` or never,
+ * through create_pro_grant in the admin scope, as the admin screen does, with `adminId` as the
+ * admin whose scope it is.
+ */
+export async function grantBlocks(
+  web: WebDatabase,
+  {
+    email,
+    blocks,
+    endsAt = null,
+    adminId = 'grants-admin',
+  }: { email: string; blocks: number; endsAt?: Date | null; adminId?: string },
+): Promise<GrantAnswer> {
+  const { rows } = await web.asAdmin(adminId, (scope) =>
+    scope.sql.execute<{ outcome: string; grant_id: string | null; turned_pro: string[] }>(
+      sql`select outcome, grant_id, turned_pro from create_pro_grant(${email}, ${blocks}::integer, ${endsAt?.toISOString() ?? null}::timestamptz)`,
+    ),
+  )
+  const [row] = rows
+  if (!row?.outcome) throw new Error('create_pro_grant answered no outcome')
+  return { outcome: row.outcome, grantId: row.grant_id, turnedPro: row.turned_pro }
+}
+
+/**
+ * Ends the grant through end_pro_grant in the scope given, the admin's removal or the worker's end,
+ * which gives each pick that falls out of the capacity the purge date given.
+ */
+export async function endGrant(
+  scope: Scoped<'admin' | 'system'>,
+  grantId: string,
+  purgeAfter: Date,
+): Promise<string> {
+  const { rows } = await scope.sql.execute<{ outcome: string }>(
+    sql`select outcome from end_pro_grant(${grantId}::uuid, ${purgeAfter.toISOString()}::timestamptz)`,
+  )
+  const [row] = rows
+  if (!row?.outcome) throw new Error('end_pro_grant answered no outcome')
+  return row.outcome
+}

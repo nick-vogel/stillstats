@@ -14,6 +14,7 @@ import {
   claimPolicy,
   inScope,
   isScopeUser,
+  proGrantPolicy,
   proPickRole,
   proStateRole,
   userChannelIds,
@@ -86,5 +87,8 @@ export const memberships = pgTable(
       to: proPickRole,
       using: inScope('user', isScopeUser(t.userId)),
     }),
+    // Only the Pro grant functions run as app_pro_grant: a grant's creation fills the user's free
+    // slots with their owned channels, and its end counts the picks that still own their channel.
+    proGrantPolicy('memberships', 'select'),
   ],
 )

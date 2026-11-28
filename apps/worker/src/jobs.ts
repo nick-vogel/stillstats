@@ -1,4 +1,5 @@
 import type { JobData, JobName, Scoped, WorkerDatabase } from '@creator-analytics/database'
+import { endProGrant, proGrantEndJobData } from '@creator-analytics/entitlements'
 import type { Reporter } from '@creator-analytics/reporter'
 import {
   type AccountCancellationJobName,
@@ -130,6 +131,8 @@ export function jobHandlers(
     },
     retentionCurveRoster: inSystemScope(enqueueRetentionCurveRefreshes),
     retentionCurveRefresh: (worker, data) => refreshCurves(worker, retentionCurveRefreshData(data)),
+    proGrantEnd: (worker, data) =>
+      worker.asSystem((tx) => endProGrant(tx, proGrantEndJobData(data))),
   }
 }
 

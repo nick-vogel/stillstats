@@ -29,6 +29,7 @@ export const jobNames = [
   'historyPurge',
   'retentionCurveRoster',
   'retentionCurveRefresh',
+  'proGrantEnd',
 ] as const
 
 export type JobName = (typeof jobNames)[number]

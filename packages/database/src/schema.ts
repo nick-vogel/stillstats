@@ -3,6 +3,7 @@ export {
   claimRole,
   feedbackCountRole,
   migrationRole,
+  proGrantRole,
   proPickRole,
   proStateRole,
   rosterRole,
@@ -36,6 +37,7 @@ export { retentionCurveReads, retentionCurves } from './retention-curves.ts'
 export { sponsorReportFigureChoices } from './sponsor-report.ts'
 export {
   proEnds,
+  proGrants,
   proPicks,
   subscriptionPayments,
   subscriptionPlans,

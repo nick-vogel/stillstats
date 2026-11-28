@@ -1,6 +1,7 @@
 import type {
   BillingPlan,
   BlockPreviewAnswer,
+  EntitlementGrant,
   EntitlementsAnswer,
   Tier,
 } from '@creator-analytics/api-types'
@@ -55,7 +56,7 @@ export function addBlockQuestionOf(preview: BlockPreviewAnswer, locale?: string)
   return `Add a block of 4 more Pro slots for ${price} a ${periodNames[preview.plan]}? Your next invoice, on ${next}, also charges ${prorated} for the rest of this ${periodNames[preview.plan]}.`
 }
 
-/** The toast once the block is added: the slots the user's blocks now hold. */
+/** The toast once the block is added: the slots the user's paid and granted blocks now hold. */
 export function blockAddedTextOf(blocks: number): string {
   return `Block added. You now have ${blocks * slotsPerBlock} Pro slots.`
 }
@@ -89,6 +90,17 @@ export interface ProChannel {
   slotsFull: boolean
 }
 
+/**
+ * The blocks the user holds, 4 slots each: those of their live paid subscription and those of
+ * every grant they hold (stillstats#24).
+ */
+export function totalBlocksOf({
+  blocks,
+  grants,
+}: Pick<EntitlementsAnswer, 'blocks' | 'grants'>): number {
+  return grants.reduce((total, grant) => total + grant.blocks, blocks)
+}
+
 /** What the Settings screen shows of the user's Pro, from the entitlements answer. */
 export interface ProSection {
   /** Whether the user may start a Checkout, so the section shows a subscribe action for each plan. */
@@ -97,8 +109,10 @@ export interface ProSection {
   canManage: boolean
   /** Whether the user may add a block to their live paid subscription, "Add a block". */
   canAddBlock: boolean
-  /** The blocks the user holds, 4 slots each: the section says the slots in use once there is one. */
+  /** The blocks of the user's live paid subscription, 4 slots each; 0 without one. */
   blocks: number
+  /** The Pro grants the user holds, the oldest first, each a line under the slots. */
+  grants: EntitlementGrant[]
   slotsInUse: number
   /** Each channel the user owns, by ID. */
   channels: ReadonlyMap<string, ProChannel>
@@ -107,20 +121,22 @@ export interface ProSection {
 /**
  * The Settings screen's Pro section: null before the answer lands, with Pro not offered, so Settings
  * draws as it did before Pro, and for a user with nothing in it, who may neither subscribe nor
- * manage and holds no block, such as a member who owns none of their channels. While the user
- * holds a block, each owned channel gets its control: unpick for a picked one, pick for any other,
- * which the API refuses while every slot is in use.
+ * manage and holds no block, such as a member who owns none of their channels. The blocks the user
+ * holds are the paid ones and the granted ones (`totalBlocksOf`). While the user holds a block,
+ * each owned channel gets its control: unpick for a picked one, pick for any other, which the API
+ * refuses while every slot is in use.
  */
 export function proSectionOf(answer: EntitlementsAnswer | null): ProSection | null {
   if (!answer?.paidTierOffered) return null
-  const { canSubscribe, canManage, canAddBlock, blocks, slotsInUse } = answer
-  if (!canSubscribe && !canManage && blocks === 0) return null
-  const slotsFull = blocks > 0 && slotsInUse >= blocks * slotsPerBlock
+  const { canSubscribe, canManage, canAddBlock, blocks, grants, slotsInUse } = answer
+  const total = totalBlocksOf(answer)
+  if (!canSubscribe && !canManage && total === 0) return null
+  const slotsFull = total > 0 && slotsInUse >= total * slotsPerBlock
   const channels = new Map(
     answer.channels
       .filter(({ owner }) => owner)
       .map(({ channelId, tier, picked, purgeDate }) => {
-        const control: PickControl | null = blocks === 0 ? null : picked ? 'unpick' : 'pick'
+        const control: PickControl | null = total === 0 ? null : picked ? 'unpick' : 'pick'
         const channel = {
           tier,
           picked,
@@ -131,5 +147,5 @@ export function proSectionOf(answer: EntitlementsAnswer | null): ProSection | nu
         return [channelId, channel]
       }),
   )
-  return { canSubscribe, canManage, canAddBlock, blocks, slotsInUse, channels }
+  return { canSubscribe, canManage, canAddBlock, blocks, grants, slotsInUse, channels }
 }

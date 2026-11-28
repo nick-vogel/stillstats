@@ -1,5 +1,6 @@
 import type { AdminFeedbackMessage } from '@creator-analytics/api-types'
 import { useEffect, useId, useState } from 'react'
+import { AdminTabs } from './AdminTabs.tsx'
 import {
   type AdminFeedbackView,
   adminFeedbackHeading,
@@ -86,9 +87,10 @@ function MessageItem({
 
 /**
  * Nick's admin screen of the feedback messages, newest first, 50 to a page, with the open filter
- * and a "Done" box on each. Nothing of it shows before the first read lands, and anyone the API
- * answers 404, as it answers anyone not on the allowlist, sees the not-found screen in its place.
- * The page and the filter live here, not in the address.
+ * and a "Done" box on each, under the tab strip it shares with the Grants tab. Nothing of it shows
+ * before the first read lands, and anyone the API answers 404, as it answers anyone not on the
+ * allowlist, sees the not-found screen in its place. The page and the filter live here, not in the
+ * address.
  */
 export function AdminFeedback({ route, navigate }: { route: Route; navigate: Navigate }) {
   const [page, setPage] = useState(1)
@@ -135,6 +137,7 @@ export function AdminFeedback({ route, navigate }: { route: Route; navigate: Nav
   if (view.kind === 'not-found') return <NotFound route={route} navigate={navigate} />
   return (
     <div className="admin-feedback">
+      <AdminTabs route={route} navigate={navigate} />
       <h1>{adminFeedbackHeading}</h1>
       <div className="admin-feedback-filter">
         <input

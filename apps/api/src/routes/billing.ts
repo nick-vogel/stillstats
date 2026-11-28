@@ -74,7 +74,8 @@ async function ownedChannelCheck(tx: Scoped<'user'>, channelId: string) {
 }
 
 /**
- * The user's Pro as Settings draws it: whether Pro is offered, their blocks and slots in use,
+ * The user's Pro as Settings draws it: whether Pro is offered, their paid blocks, their grants and
+ * slots in use,
  * whether they may start a Checkout or open the Customer Portal, and each channel they hold, its
  * tier, whether they own and picked it, and its purge date.
  */
@@ -107,6 +108,10 @@ async function entitlementsAnswerOf(
     canManage,
     canAddBlock,
     blocks: account.blocks,
+    grants: account.grants.map(({ blocks, endsAt }) => ({
+      blocks,
+      endsAt: endsAt?.toISOString() ?? null,
+    })),
     slotsInUse: account.slotsInUse,
     channels,
   }

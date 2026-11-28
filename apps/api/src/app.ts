@@ -37,7 +37,7 @@ import type { FeedbackNotifier } from './feedback-notice.ts'
 import { requestTiming } from './request-timing.ts'
 import { requestTrace } from './request-trace.ts'
 import type { SecurityEventReader } from './risc.ts'
-import { adminFeedbackRoute } from './routes/admin-feedback.ts'
+import { adminRoute } from './routes/admin.ts'
 import { audienceRoute } from './routes/audience.ts'
 import { billingRoute } from './routes/billing.ts'
 import { channelSummaryRoute } from './routes/channel-summary.ts'
@@ -299,7 +299,7 @@ export function createApi({
   clientSettingsRoute(app, { clientSettings })
   // Before the signed-in routes too, as their check would answer a signed-out visitor 401: every
   // path under /api/admin answers 404 to anyone not on the allowlist, as an unknown route does.
-  adminFeedbackRoute(app, { auth, database, adminUserIds })
+  adminRoute(app, { auth, database, adminUserIds })
 
   const signedIn = new Hono<SignedIn>()
   signedIn.use(async (c, next) => {

@@ -8,12 +8,14 @@ import {
   primaryKey,
   text,
   timestamp,
+  uuid,
 } from 'drizzle-orm/pg-core'
 import {
   billingRole,
   inScope,
   isScopeChannel,
   isScopeUser,
+  proGrantPolicy,
   proPickRole,
   proStateRole,
   userChannelIds,
@@ -107,6 +109,46 @@ export const userSubscriptions = pgTable(
     // policy; neither updates it.
     proPickPolicy('user_subscriptions', 'select', isScopeUser(t.userId)),
     proPickPolicy('user_subscriptions', 'update', isScopeUser(t.userId)),
+    // A grant's creation and end read the paid blocks and lock the row in the same order; neither
+    // updates it.
+    proGrantPolicy('user_subscriptions', 'select'),
+    proGrantPolicy('user_subscriptions', 'update'),
+  ],
+)
+
+/**
+ * Blocks of Pro given to a user without a purchase (stillstats#24, ADR 0024): its user, its
+ * blocks, each 4 channel slots beside the paid ones, and its optional end. A grant is never a
+ * Subscription: it has no Stripe customer, no invoice and no revenue, and it cascades from its
+ * user. A user may hold several, and their granted blocks are the sum. A grant counts while its
+ * row exists; its end, at the end date through the worker's proGrantEnd job or at once through
+ * the admin's removal, deletes the row and gives the picks that fall out of the capacity, the
+ * newest first, their purge date. Only the grant functions write it (migration 0044), as
+ * `app_pro_grant` in the admin scope, and the system scope for the end; the user reads their own.
+ */
+export const proGrants = pgTable(
+  'pro_grants',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    blocks: integer('blocks').notNull(),
+    /** When the grant ends; null for a grant with no end. */
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    check('pro_grants_blocks', sql`${t.blocks} >= 1`),
+    index('pro_grants_user_id_idx').on(t.userId),
+    webPolicy('pro_grants', 'select', isScopeUser(t.userId)),
+    // Each role that counts a user's capacity reads their grants through granted_blocks, and each
+    // that changes their picks locks them, after the subscription row and before the picks.
+    proStatePolicy('pro_grants'),
+    billingPolicy('pro_grants'),
+    proPickPolicy('pro_grants', 'select', isScopeUser(t.userId)),
+    proPickPolicy('pro_grants', 'update', isScopeUser(t.userId)),
+    proGrantPolicy('pro_grants', 'all'),
   ],
 )
 
@@ -115,10 +157,11 @@ export const userSubscriptions = pgTable(
  * channel is Pro while its pick counts, its user still holding the channel's owner membership,
  * and ranks inside its user's capacity, 4 slots for each live paid block, by `pickedAt` and then
  * the order the channels were connected (pro_state, migration 0041). A disconnect ends the
- * membership at once, so the slot frees before the deletion cascades the pick away. Two paths
- * write it: the webhook's fill, through record_user_subscription, and the owner's own pick and
+ * membership at once, so the slot frees before the deletion cascades the pick away. Three paths
+ * write it: the webhook's fill, through record_user_subscription, the owner's own pick and
  * unpick, through pick_pro_channel and unpick_pro_channel (migration 0042), which run as
- * `app_pro_pick` in the user scope. The channel's members and the picking user read it, and the
+ * `app_pro_pick` in the user scope, and a Pro grant's fill, through create_pro_grant (migration
+ * 0044), which runs as `app_pro_grant` in the admin scope. The channel's members and the picking user read it, and the
  * channel scope reads its own channel's.
  */
 export const proPicks = pgTable(
@@ -149,6 +192,8 @@ export const proPicks = pgTable(
       'all',
       sql`(${isScopeUser(t.userId)} or ${t.channelId} in ${userOwnedChannelIds})`,
     ),
+    // A grant's creation fills the user's free slots, as a turn to paid does.
+    proGrantPolicy('pro_picks', 'all'),
   ],
 )
 
@@ -216,7 +261,9 @@ export const subscriptions = channelOwned(
  * end event sets the purge date 30 days after the end on every pick inside the user's capacity,
  * and a turn to paid deletes the row of every pick inside it, so a return before the date keeps
  * the history. The owner's unpick of a Pro channel, through unpick_pro_channel (migration 0042),
- * sets its purge date 30 days on, and a pick that turns it Pro again deletes the row. The history
+ * sets its purge date 30 days on, and a pick that turns it Pro again deletes the row. A Pro
+ * grant's end or removal, through end_pro_grant (migration 0044), sets the purge date of each pick
+ * that falls out of the capacity, and a grant's fill deletes the row of each it turns Pro. The history
  * purge's channel scope clears the purge date once it has deleted the channel's history (#789),
  * and keeps the end.
  */
@@ -232,6 +279,9 @@ export const proEnds = channelOwned(
     extraConfig: (t) => [
       billingPolicy('pro_ends'),
       proPickPolicy('pro_ends', 'all', sql`${t.channelId} in ${userOwnedChannelIds}`),
+      // A grant's end gives the picks that fall out of the capacity their purge date, and its
+      // creation deletes the row of each pick it turns Pro again.
+      proGrantPolicy('pro_ends', 'all'),
     ],
   },
 )

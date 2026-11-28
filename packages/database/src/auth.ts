@@ -1,5 +1,5 @@
 import { boolean, index, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
-import { anonymousPolicy, ownRowsPolicies } from './access.ts'
+import { anonymousPolicy, ownRowsPolicies, proGrantPolicy } from './access.ts'
 
 // Better Auth's core tables, as Better Auth 1.7 defines them, under plural names. They hold no
 // channel data, so they sit outside the channel policies. The anonymous scope, which serves
@@ -24,7 +24,13 @@ export const users = pgTable(
     image: text('image'),
     ...timestamps(),
   },
-  (t) => [anonymousPolicy('users'), ...ownRowsPolicies('users', t.id)],
+  (t) => [
+    anonymousPolicy('users'),
+    ...ownRowsPolicies('users', t.id),
+    // Only the Pro grant functions run as app_pro_grant: a grant finds its user by email, and the
+    // admin list names each grant's user. The role's column grant holds it to the ID and email.
+    proGrantPolicy('users', 'select'),
+  ],
 )
 
 export const sessions = pgTable(

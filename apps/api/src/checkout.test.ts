@@ -277,7 +277,7 @@ describe('seam 1: the owner starts a Pro Checkout', () => {
   })
 })
 
-const freeAnswer = { blocks: 0, slotsInUse: 0 }
+const freeAnswer = { blocks: 0, grants: [], slotsInUse: 0 }
 
 describe("seam 1: what the web app reads of the user's Pro and each channel", () => {
   test('the owner of a free channel may subscribe, and a member who does not own it may not', async ({
@@ -321,6 +321,7 @@ describe("seam 1: what the web app reads of the user's Pro and each channel", ()
       canManage: true,
       canAddBlock: true,
       blocks: 1,
+      grants: [],
       slotsInUse: 1,
       channels: [
         {

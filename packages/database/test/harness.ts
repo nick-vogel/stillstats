@@ -25,6 +25,9 @@ export { channelRowCounts } from './channel-rows.ts'
 export { readFeedbackMessages } from './feedback-rows.ts'
 export { fixtureNotes } from './fixtures.ts'
 export {
+  endGrant,
+  type GrantAnswer,
+  grantBlocks,
   ownerOf,
   type PickAnswer,
   pickChannel,

@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SidebarProvider, useSidebarColumn } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/toast'
 import { AdminFeedback } from './AdminFeedback.tsx'
+import { AdminGrants } from './AdminGrants.tsx'
 import { Audience } from './Audience.tsx'
 import { track } from './analytics.ts'
 import { ChannelSummaryFigures } from './ChannelSummaryFigures.tsx'
@@ -91,6 +92,7 @@ import {
   checkoutStartedEvent,
   portalOpenedEvent,
   proSectionOf,
+  totalBlocksOf,
 } from './subscribe.ts'
 import {
   sidebarSupportLinkOf,
@@ -588,7 +590,8 @@ export function App({
 
   /**
    * Picks the channel, and redraws Settings from the answer. An accepted pick sends
-   * `pro_channel_selected` with the user's blocks; a refused one shows why in the alert.
+   * `pro_channel_selected` with the user's blocks, paid and granted; a refused one shows why in
+   * the alert.
    */
   async function pickChannel(channelId: string) {
     const showError = alertOnFailure(proPickAlertOf(channelId))
@@ -599,7 +602,7 @@ export function App({
     }
     clearAlertFrom(proPickAlertOf(channelId))
     setEntitlements(answer)
-    track(proChannelSelectedEvent(answer.blocks))
+    track(proChannelSelectedEvent(totalBlocksOf(answer)))
   }
 
   /** Takes the channel out of Pro once the user confirms, and redraws Settings from the answer. */
@@ -633,8 +636,10 @@ export function App({
     }
     clearAlertFrom(addBlockAlert)
     track(blockAddedEvent(added.blocks))
-    setEntitlements(await readEntitlements())
-    showSuccess(blockAddedTextOf(added.blocks))
+    const answer = await readEntitlements()
+    setEntitlements(answer)
+    // The toast says the slots the user now holds, a grant's included; the event, the paid blocks.
+    showSuccess(blockAddedTextOf(totalBlocksOf(answer)))
   }
 
   async function deleteYourself() {
@@ -901,6 +906,9 @@ export function App({
                   ) : route.adminFeedback ? (
                     // Before the no-channel branch too: a message belongs to no channel.
                     <AdminFeedback route={route} navigate={navigate} />
+                  ) : route.adminGrants ? (
+                    // Before the no-channel branch too: a grant belongs to no channel.
+                    <AdminGrants route={route} navigate={navigate} />
                   ) : channels?.length === 0 ? (
                     // After a cancelled or refused connect too: the app starts a consent only on a
                     // click. On the upgrade screen's address the connect lands back there, for the

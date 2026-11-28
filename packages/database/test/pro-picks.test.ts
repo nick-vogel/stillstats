@@ -4,7 +4,7 @@ import { describe, expect } from 'vitest'
 import { channels, memberships, proEnds, proPicks } from '../src/schema.ts'
 import type { Scoped, ScopeKind, WebDatabase, WorkerDatabase } from '../src/scopes.ts'
 import { test } from './harness.ts'
-import { pickChannel, recordUserSubscription, unpickChannel } from './pro.ts'
+import { grantBlocks, pickChannel, recordUserSubscription, unpickChannel } from './pro.ts'
 import { seedUser } from './seed.ts'
 
 const ownerId = 'picks-owner'
@@ -265,6 +265,40 @@ describe("pick_pro_channel, the owner's pick of a channel into a free slot (stil
     ).toMatchObject({
       cause: { message: 'new row violates row-level security policy for table "pro_picks"' },
     })
+  })
+})
+
+describe('the pick of a user with grants and no subscription (stillstats#24)', () => {
+  const grant = (web: WebDatabase) =>
+    grantBlocks(web, { email: `${ownerId}@example.com`, blocks: 1 })
+
+  test('a granted user picks into a free slot of the grant, and it turns Pro', async ({
+    web,
+    worker,
+  }) => {
+    const [first = ''] = await ownedChannels(web, worker, 1)
+    await grant(web)
+    await web.asUser(ownerId, (scope) => unpickChannel(scope, first, connected(200)))
+    const second = await heldChannel(web, worker, ownerId, connected(2))
+
+    const answer = await web.asUser(ownerId, (scope) => pickChannel(scope, second))
+
+    expect(answer).toEqual({ outcome: 'picked', turnedPro: [second] })
+    expect(await proStatesOf(web, [first, second])).toEqual([false, true])
+  })
+
+  test('a granted user whose 4 granted slots are in use is refused no_free_slot', async ({
+    web,
+    worker,
+  }) => {
+    const ids = await ownedChannels(web, worker, 4)
+    await grant(web)
+    const fifth = await heldChannel(web, worker, ownerId, connected(5))
+
+    const answer = await web.asUser(ownerId, (scope) => pickChannel(scope, fifth))
+
+    expect(answer).toEqual({ outcome: 'no_free_slot', turnedPro: [] })
+    expect(await proStatesOf(web, [...ids, fifth])).toEqual([true, true, true, true, false])
   })
 })
 

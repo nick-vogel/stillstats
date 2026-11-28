@@ -5,7 +5,7 @@ import type {
   ErrorAnswer,
 } from '@creator-analytics/api-types'
 import { isInternalId, type Scoped } from '@creator-analytics/database'
-import { type Context, Hono } from 'hono'
+import type { Context, Hono } from 'hono'
 import {
   clearFeedbackDone,
   type FeedbackListRequest,
@@ -13,13 +13,7 @@ import {
   setFeedbackDone,
 } from '../admin-feedback.ts'
 import type { ApiDependencies } from '../app.ts'
-
-type Admin = { Variables: { adminId: string } }
-
-/** The answer of an unknown route, so an admin route tells no one else it exists. */
-function notFound(c: Context): Response {
-  return c.json({ error: 'not_found' } satisfies ErrorAnswer, 404)
-}
+import { type Admin, asAdmin as inAdminScope, notFound } from './admin.ts'
 
 /** The list's page and filter, or undefined for a malformed one: a page a whole number from 1. */
 function listRequestOf(page: string | undefined, open: string | undefined) {
@@ -30,26 +24,16 @@ function listRequestOf(page: string | undefined, open: string | undefined) {
 }
 
 /**
- * The admin routes under /api/admin, for a signed-in user on the allowlist only: anyone else, a
- * signed-out visitor included, gets the 404 of an unknown route from every path under the prefix,
- * and so does the admin from a path no route has. Registered on the app itself, before the
- * signed-in routes, whose check would answer a signed-out visitor 401. Each route runs in the
- * admin scope, which reads every feedback message and changes only its "Done" time.
+ * The admin routes of the feedback messages, on the admin router (`adminRoute`), behind its
+ * allowlist. Each runs in the admin scope, which reads every feedback message and changes only its
+ * "Done" time.
  */
-export function adminFeedbackRoute(
-  app: Hono,
-  { auth, database, adminUserIds }: Pick<ApiDependencies, 'auth' | 'database' | 'adminUserIds'>,
+export function adminFeedbackRoutes(
+  admin: Hono<Admin>,
+  { database }: Pick<ApiDependencies, 'database'>,
 ): void {
-  const admin = new Hono<Admin>()
-  admin.use(async (c, next) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers })
-    if (!session || !adminUserIds.has(session.user.id)) return notFound(c)
-    c.set('adminId', session.user.id)
-    await next()
-  })
-
   const asAdmin = <T>(c: Context<Admin>, work: (scope: Scoped<'admin'>) => Promise<T>) =>
-    database.asAdmin(c.get('adminId'), work)
+    inAdminScope(database, c, work)
 
   admin.get('/feedback', async (c) => {
     const request = listRequestOf(c.req.query('page'), c.req.query('open'))
@@ -70,7 +54,4 @@ export function adminFeedbackRoute(
     }
   admin.put('/feedback/:id/done', doneRoute(setFeedbackDone))
   admin.delete('/feedback/:id/done', doneRoute(clearFeedbackDone))
-
-  admin.all('*', notFound)
-  app.route('/api/admin', admin)
 }

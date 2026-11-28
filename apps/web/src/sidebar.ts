@@ -81,7 +81,8 @@ export function sidebarLinksOf(route: Route): SidebarLink[] {
         !route.whatsNew &&
         !route.upgrade &&
         !route.feedback &&
-        !route.adminFeedback,
+        !route.adminFeedback &&
+        !route.adminGrants,
     },
     {
       text: audienceLinkText,

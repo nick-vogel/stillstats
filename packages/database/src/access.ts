@@ -33,6 +33,13 @@ export const proStateRole = pgRole('app_pro_state')
 // user's picks and their owned channels' pro_ends rows, which the user scope writes none of itself.
 export const proPickRole = pgRole('app_pro_pick')
 
+// Owns the Pro grant functions (create_pro_grant, end_pro_grant, pro_grant_end_of,
+// pro_grants_list) and nothing else, and no login role is a member of it. The admin scope gives a
+// user blocks without a purchase and removes them, and the system scope ends a grant at its end
+// date; each finds the user by email, locks their subscription row and writes their picks and
+// pro_ends rows, which neither scope reads or writes as app_web or app_worker.
+export const proGrantRole = pgRole('app_pro_grant')
+
 export type SettingName = 'app.scope' | 'app.user_id' | 'app.channel_id' | 'app.now'
 
 // A setting never set reads as null, but one set by an earlier transaction on the same connection
@@ -141,6 +148,20 @@ export function adminPolicies(table: string): PgPolicy[] {
       withCheck: admitted,
     }),
   ]
+}
+
+/**
+ * Admits every row to `app_pro_grant` in the admin and system scopes, for the command given. Only
+ * the Pro grant functions run as `app_pro_grant` (migration 0044), and each checks its own scope.
+ */
+export function proGrantPolicy(table: string, command: 'select' | 'update' | 'all'): PgPolicy {
+  const admitted = sql`(${inScope('admin')} or ${inScope('system')})`
+  return pgPolicy(`${table}_pro_grant_${command}`, {
+    for: command,
+    to: proGrantRole,
+    using: admitted,
+    ...(command === 'select' ? {} : { withCheck: admitted }),
+  })
 }
 
 export function isScopeChannel(channelId: SQLWrapper): SQL {
