@@ -5,6 +5,7 @@
 // sends its event only after the preferences are cleared. `app.test.ts` renders App and shows the
 // toast a reset and a currency change raise, but no test shows the one a disconnect raises. Nick
 // checks those at /app/settings in a real browser.
+import type { ChannelEntitlement, EntitlementsAnswer } from '@creator-analytics/api-types'
 import { describe, expect, test } from 'vitest'
 import { preferencesResetEvent } from './preferences.ts'
 import {
@@ -12,10 +13,13 @@ import {
   consentGivenTextOf,
   currencyChangedEvent,
   currencyOptionsOf,
+  proChannelSelectedEvent,
+  proPurgeTextOf,
   proSlotsTextOf,
   rpmSourcesToggledEvent,
   settingsOpenedEvent,
 } from './settings.ts'
+import { proSectionOf } from './subscribe.ts'
 
 describe('the event the Settings screen sends', () => {
   test('is settings_opened, with no other value', () => {
@@ -115,5 +119,96 @@ describe("the Pro section's slots on the Settings screen (stillstats#20)", () =>
 
   test('says none are in use before a channel is picked', () => {
     expect(proSlotsTextOf(0, 1)).toBe('0 of 4 slots in use')
+  })
+})
+
+describe('the event a pick of a Pro channel sends (stillstats#21)', () => {
+  test('is pro_channel_selected with the block count, and no channel or figure', () => {
+    expect(proChannelSelectedEvent(2)).toEqual({ name: 'pro_channel_selected', blocks: 2 })
+  })
+})
+
+describe("each owned channel's pick control in the Pro section (stillstats#21)", () => {
+  function answerOf(
+    user: Partial<Omit<EntitlementsAnswer, 'channels'>>,
+    ...channels: (Pick<ChannelEntitlement, 'channelId' | 'tier'> & Partial<ChannelEntitlement>)[]
+  ): EntitlementsAnswer {
+    return {
+      paidTierOffered: true,
+      canSubscribe: false,
+      canManage: true,
+      blocks: 1,
+      slotsInUse: 1,
+      ...user,
+      channels: channels.map((channel) => ({
+        owner: true,
+        picked: channel.tier === 'paid',
+        purgeDate: null,
+        canSubscribe: false,
+        canManage: false,
+        ...channel,
+      })),
+    }
+  }
+
+  test("gives a picked channel unpick and an unpicked one pick, and a member's channel none", () => {
+    const section = proSectionOf(
+      answerOf(
+        {},
+        { channelId: 'c-1', tier: 'paid' },
+        { channelId: 'c-2', tier: 'free' },
+        { channelId: 'c-3', tier: 'free', owner: false },
+      ),
+    )
+
+    expect(section?.channels.get('c-1')).toMatchObject({ control: 'unpick', slotsFull: false })
+    expect(section?.channels.get('c-2')).toMatchObject({ control: 'pick', slotsFull: false })
+    expect(section?.channels.get('c-3')).toBeUndefined()
+  })
+
+  test('gives no control to a user without a block', () => {
+    const section = proSectionOf(
+      answerOf(
+        { canSubscribe: true, canManage: false, blocks: 0, slotsInUse: 0 },
+        { channelId: 'c-1', tier: 'free', canSubscribe: true },
+      ),
+    )
+
+    expect(section?.channels.get('c-1')).toMatchObject({ control: null, slotsFull: false })
+  })
+
+  test('says an unpicked channel stays free only while every slot is in use', () => {
+    const full = Array.from({ length: 4 }, (_, n) => ({
+      channelId: `c-${n + 1}`,
+      tier: 'paid' as const,
+    }))
+    const fullSection = proSectionOf(
+      answerOf({ slotsInUse: 4 }, ...full, { channelId: 'c-5', tier: 'free' }),
+    )
+    const freeSlotSection = proSectionOf(
+      answerOf({ slotsInUse: 3 }, ...full.slice(1), { channelId: 'c-5', tier: 'free' }),
+    )
+
+    expect(fullSection?.channels.get('c-5')).toMatchObject({ control: 'pick', slotsFull: true })
+    expect(fullSection?.channels.get('c-1')).toMatchObject({ slotsFull: false })
+    expect(freeSlotSection?.channels.get('c-5')).toMatchObject({ slotsFull: false })
+  })
+
+  test("carries a channel's purge date", () => {
+    const purgeDate = '2026-12-26T12:00:00.000Z'
+    const section = proSectionOf(answerOf({}, { channelId: 'c-1', tier: 'free', purgeDate }))
+
+    expect(section?.channels.get('c-1')).toMatchObject({ tier: 'free', purgeDate })
+  })
+})
+
+describe('the purge date line under a channel taken out of Pro (stillstats#21)', () => {
+  test('names the day its history is deleted on, in the locale', () => {
+    expect(proPurgeTextOf('2026-12-26T12:00:00.000Z', 'en-GB')).toBe(
+      'Its stored history is deleted on 26 December 2026 unless you pick it for Pro again.',
+    )
+    expect(proPurgeTextOf('2026-12-26T12:00:00.000Z', 'en-US')).toBe(
+      'Its stored history is deleted on December 26, 2026 unless you pick it for Pro again.',
+    )
   })
 })

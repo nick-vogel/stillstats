@@ -106,3 +106,36 @@ export async function subscribeOwner(
     }
   })
 }
+
+/** What pick_pro_channel or unpick_pro_channel answered, and the channels that turned Pro. */
+export interface PickAnswer {
+  outcome: string
+  turnedPro: string[]
+}
+
+/** The scope user picks the channel for one of their Pro slots, through pick_pro_channel. */
+export async function pickChannel(scope: Scoped<'user'>, channelId: string): Promise<PickAnswer> {
+  const { rows } = await scope.sql.execute<{ outcome: string; turned_pro: string[] }>(
+    sql`select outcome, turned_pro from pick_pro_channel(${channelId}::uuid)`,
+  )
+  const [row] = rows
+  if (!row?.outcome) throw new Error('pick_pro_channel answered no outcome')
+  return { outcome: row.outcome, turnedPro: row.turned_pro }
+}
+
+/**
+ * The scope user unpicks the channel, through unpick_pro_channel, which gives a channel that was
+ * Pro the purge date given, as the product passes 30 days after the scope's clock.
+ */
+export async function unpickChannel(
+  scope: Scoped<'user'>,
+  channelId: string,
+  purgeAfter: Date,
+): Promise<PickAnswer> {
+  const { rows } = await scope.sql.execute<{ outcome: string; turned_pro: string[] }>(
+    sql`select outcome, turned_pro from unpick_pro_channel(${channelId}::uuid, ${purgeAfter.toISOString()}::timestamptz)`,
+  )
+  const [row] = rows
+  if (!row?.outcome) throw new Error('unpick_pro_channel answered no outcome')
+  return { outcome: row.outcome, turnedPro: row.turned_pro }
+}

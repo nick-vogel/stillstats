@@ -30,6 +30,9 @@ const refusalStatus: Record<Refusal, ContentfulStatusCode> = {
   not_owner: 403,
   already_subscribed: 409,
   not_subscribed: 409,
+  // A pick of a channel needs a free slot of a live paid subscription: swapping one in takes
+  // another out first.
+  no_free_slot: 409,
 }
 
 export function refuse(c: Context, refusal: Refusal): Response {

@@ -9,9 +9,11 @@ import type { Scoped } from '@creator-analytics/database'
 import {
   entitlementOf,
   heldChannelsOf,
+  pickProChannel,
   portalCustomerOf,
   proAccountOf,
   stripeCustomerOf,
+  unpickProChannel,
 } from '@creator-analytics/entitlements'
 import type { Context, Hono } from 'hono'
 import type { ApiDependencies } from '../app.ts'
@@ -59,6 +61,43 @@ async function ownedChannelCheck(tx: Scoped<'user'>, channelId: string) {
 }
 
 /**
+ * The user's Pro as Settings draws it: whether Pro is offered, their blocks and slots in use,
+ * whether they may start a Checkout or open the Customer Portal, and each channel they hold, its
+ * tier, whether they own and picked it, and its purge date.
+ */
+async function entitlementsAnswerOf(
+  tx: Scoped<'user'>,
+  billing: ApiDependencies['billing'],
+): Promise<EntitlementsAnswer> {
+  const account = await proAccountOf(tx)
+  const canSubscribe =
+    billing !== undefined && account.ownedChannels.length > 0 && !account.subscribed
+  const canManage = billing !== undefined && account.subscribed
+  const channels: EntitlementsAnswer['channels'] = []
+  for (const { channelId, owner } of await heldChannelsOf(tx)) {
+    const { tier, purgeDate } = await entitlementOf(tx, channelId)
+    const picked = account.ownedChannels.some((each) => each.channelId === channelId && each.picked)
+    channels.push({
+      channelId,
+      tier,
+      owner,
+      picked,
+      purgeDate: purgeDate?.toISOString() ?? null,
+      canSubscribe: canSubscribe && owner && tier === 'free',
+      canManage: canManage && owner && tier === 'paid',
+    })
+  }
+  return {
+    paidTierOffered: billing !== undefined,
+    canSubscribe,
+    canManage,
+    blocks: account.blocks,
+    slotsInUse: account.slotsInUse,
+    channels,
+  }
+}
+
+/**
  * GET /api/me/entitlements: whether Pro is offered, the user's blocks and slots in use, whether
  * they may start a Checkout or open the Customer Portal, and each channel they hold, its tier,
  * whether they own and picked it, and its purge date.
@@ -70,44 +109,25 @@ async function ownedChannelCheck(tx: Scoped<'user'>, channelId: string) {
  * Only a user with a live subscription may: an ended one subscribes again through Checkout.
  * POST /api/channels/:channelId/checkout and /portal: the routes of the release before blocks,
  * kept for a tab opened before the deploy. Each checks the user holds and owns the channel, as it
- * did, then does what the user's route does. Without Pro's settings, every route but the answer
- * answers 404 as an unknown route does, and no one may subscribe or manage.
+ * did, then does what the user's route does.
+ * PUT /api/channels/:channelId/pro-pick: the owner picks the channel for one of their Pro slots;
+ * 409 `no_free_slot` without a free slot of a live paid subscription, so a swap takes another
+ * channel out first.
+ * DELETE /api/channels/:channelId/pro-pick: the owner takes the channel out, which frees its slot
+ * and, for a channel that was Pro, starts its 30 days to its purge date. Both answer 404
+ * `not_connected` for a channel the user does not hold and 403 `not_owner` for one they do not
+ * own, and otherwise the GET's answer after the change, so Settings redraws from it.
+ * Without Pro's settings, every route but the answer answers 404 as an unknown route does, and no
+ * one may subscribe, manage or pick.
  */
 export function billingRoute(
   signedIn: Hono<SignedIn>,
   { billing, database }: Pick<ApiDependencies, 'billing' | 'database'>,
 ): void {
   signedIn.get('/me/entitlements', async (c) => {
-    const answer = await database.asUser(c.get('user').id, async (tx) => {
-      const account = await proAccountOf(tx)
-      const canSubscribe =
-        billing !== undefined && account.ownedChannels.length > 0 && !account.subscribed
-      const canManage = billing !== undefined && account.subscribed
-      const channels: EntitlementsAnswer['channels'] = []
-      for (const { channelId, owner } of await heldChannelsOf(tx)) {
-        const { tier, purgeDate } = await entitlementOf(tx, channelId)
-        const picked = account.ownedChannels.some(
-          (each) => each.channelId === channelId && each.picked,
-        )
-        channels.push({
-          channelId,
-          tier,
-          owner,
-          picked,
-          purgeDate: purgeDate?.toISOString() ?? null,
-          canSubscribe: canSubscribe && owner && tier === 'free',
-          canManage: canManage && owner && tier === 'paid',
-        })
-      }
-      return {
-        paidTierOffered: billing !== undefined,
-        canSubscribe,
-        canManage,
-        blocks: account.blocks,
-        slotsInUse: account.slotsInUse,
-        channels,
-      }
-    })
+    const answer = await database.asUser(c.get('user').id, (tx) =>
+      entitlementsAnswerOf(tx, billing),
+    )
     return c.json(answer satisfies EntitlementsAnswer)
   })
 
@@ -153,4 +173,19 @@ export function billingRoute(
     if (!channelId) return refuse(c, 'not_connected')
     return openPortal(c, channelId)
   })
+
+  async function changePick(c: Context<SignedIn>, change: typeof pickProChannel) {
+    if (!billing) return c.json({ error: 'not_found' } satisfies ErrorAnswer, 404)
+    const channelId = channelIdOf(c)
+    if (!channelId) return refuse(c, 'not_connected')
+    const answer = await database.asUser(c.get('user').id, async (tx) => {
+      const changed = await change(tx, channelId)
+      return changed.ok ? entitlementsAnswerOf(tx, billing) : changed
+    })
+    if ('refusal' in answer) return refuse(c, answer.refusal)
+    return c.json(answer satisfies EntitlementsAnswer)
+  }
+
+  signedIn.put('/channels/:channelId/pro-pick', (c) => changePick(c, pickProChannel))
+  signedIn.delete('/channels/:channelId/pro-pick', (c) => changePick(c, unpickProChannel))
 }

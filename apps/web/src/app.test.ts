@@ -100,6 +100,7 @@ import {
   fakeGoogleUrl,
   fakePortalUrl,
   fakePrices,
+  fakePurgeDate,
   fakeVideo,
   installFakeApi,
   type RenderedApp,
@@ -136,10 +137,16 @@ import {
 import {
   channelTierTexts,
   currencySavedNotice,
+  noFreeSlotText,
+  pickChannelText,
   preferencesResetNotice,
   proHeading,
+  proPurgeTextOf,
+  slotsFullText,
   themeLabel,
   themeOptions,
+  unpickChannelText,
+  unpickWarning,
 } from './settings.ts'
 import { settingsName } from './settings-name.ts'
 import {
@@ -7784,6 +7791,152 @@ describe("the Settings screen's Pro section (creator-analytics#780, stillstats#2
       }
     },
   )
+
+  describe('the pick of each owned channel (stillstats#21)', () => {
+    const fullBlock = { ...subscribedToOneBlock, slotsInUse: 4 }
+    const fourPicked = ['c-4', 'c-5', 'c-6', 'c-7'].map((channelId) => ({
+      channelId,
+      tier: 'paid' as const,
+    }))
+
+    /** The lines under each channel on view, by the channel's name. */
+    const channelLinesIn = (container: HTMLElement) =>
+      [...container.querySelectorAll('.channel')].map((channel) =>
+        [...channel.querySelectorAll('p')].map((line) => line.textContent),
+      )
+
+    const pickRequests = (api: FakeApi) =>
+      api.requests
+        .filter(({ path }) => path.endsWith('/pro-pick'))
+        .map(({ method, path }) => `${method} ${path}`)
+
+    test("a click on a free channel's pick sends PUT to its route and pro_channel_selected with the block count, and the channel shows Pro", async () => {
+      const api = installFakeApi()
+      api.channels = [fakeChannel, anotherChannel]
+      api.entitlements = entitlementsOf(
+        subscribedToOneBlock,
+        { channelId: fakeChannel.id, tier: 'paid' },
+        { channelId: anotherChannel.id, tier: 'free' },
+      )
+      const { container } = await render('settings')
+      vi.mocked(track).mockClear()
+
+      await click(buttonNamed(container, pickChannelText))
+
+      expect(pickRequests(api)).toEqual([`PUT /api/channels/${anotherChannel.id}/pro-pick`])
+      expect(vi.mocked(track).mock.calls).toEqual([[{ name: 'pro_channel_selected', blocks: 1 }]])
+      expect(tierLinesIn(container)).toEqual([channelTierTexts.paid, channelTierTexts.paid])
+      expect(buttonsNamed(container, unpickChannelText)).toHaveLength(2)
+      expect(alertOf(container)).toBeNull()
+    })
+
+    test('a pick with every slot in use says the channel stays free, and a click shows why the API refused it and sends no event', async () => {
+      const api = installFakeApi()
+      api.channels = [fakeChannel]
+      api.entitlements = entitlementsOf(
+        fullBlock,
+        { channelId: fakeChannel.id, tier: 'free' },
+        ...fourPicked,
+      )
+      const { container } = await render('settings')
+      vi.mocked(track).mockClear()
+
+      const lines = channelLinesIn(container)
+      await click(buttonNamed(container, pickChannelText))
+
+      expect(lines).toEqual([[channelTierTexts.free, slotsFullText]])
+      expect(pickRequests(api)).toEqual([`PUT /api/channels/${fakeChannel.id}/pro-pick`])
+      expect(alertOf(container)).toBe(noFreeSlotText)
+      expect(vi.mocked(track).mock.calls).toEqual([])
+      expect(tierLinesIn(container)).toEqual([channelTierTexts.free])
+    })
+
+    test('an unpick asks first, sends DELETE, and the channel then shows Free and its purge date', async () => {
+      const asked: string[] = []
+      vi.stubGlobal('confirm', (message: string) => {
+        asked.push(message)
+        return true
+      })
+      const api = installFakeApi()
+      api.channels = [fakeChannel]
+      api.entitlements = entitlementsOf(subscribedToOneBlock, {
+        channelId: fakeChannel.id,
+        tier: 'paid',
+      })
+      const { container } = await render('settings')
+      vi.mocked(track).mockClear()
+
+      await click(buttonNamed(container, unpickChannelText))
+
+      expect(asked).toEqual([unpickWarning])
+      expect(pickRequests(api)).toEqual([`DELETE /api/channels/${fakeChannel.id}/pro-pick`])
+      expect(channelLinesIn(container)).toEqual([
+        [channelTierTexts.free, proPurgeTextOf(fakePurgeDate)],
+      ])
+      expect(buttonsNamed(container, pickChannelText)).toHaveLength(1)
+      expect(vi.mocked(track).mock.calls).toEqual([])
+    })
+
+    test('an unpick the creator cancels sends nothing', async () => {
+      vi.stubGlobal('confirm', () => false)
+      const api = installFakeApi()
+      api.channels = [fakeChannel]
+      api.entitlements = entitlementsOf(subscribedToOneBlock, {
+        channelId: fakeChannel.id,
+        tier: 'paid',
+      })
+      const { container } = await render('settings')
+
+      await click(buttonNamed(container, unpickChannelText))
+
+      expect(pickRequests(api)).toEqual([])
+      expect(tierLinesIn(container)).toEqual([channelTierTexts.paid])
+    })
+
+    test("a member's channel, and every channel of a user without a block, shows no pick control", async () => {
+      const api = installFakeApi()
+      api.channels = [fakeChannel, memberChannel]
+      api.entitlements = entitlementsOf(
+        subscribedToOneBlock,
+        { channelId: fakeChannel.id, tier: 'paid' },
+        { channelId: memberChannel.id, tier: 'free', owner: false },
+      )
+      const member = await render('settings')
+      const controls = (container: HTMLElement) =>
+        [...container.querySelectorAll('.channel')].map((channel) =>
+          [...channel.querySelectorAll('button')]
+            .map(({ textContent }) => textContent)
+            .filter((text) => text === pickChannelText || text === unpickChannelText),
+        )
+      const memberControls = controls(member.container)
+      member.unmount()
+      rendered = null
+
+      const unsubscribed = installFakeApi()
+      unsubscribed.channels = [fakeChannel]
+      unsubscribed.entitlements = entitlementsOf(
+        { canSubscribe: true },
+        { channelId: fakeChannel.id, tier: 'free', canSubscribe: true },
+      )
+      const { container } = await render('settings')
+
+      expect(memberControls).toEqual([[unpickChannelText], []])
+      expect(controls(container)).toEqual([[]])
+    })
+
+    test('a channel whose subscription ended shows Free and no line about a pick, since only subscribing again keeps its history', async () => {
+      const api = installFakeApi()
+      api.channels = [fakeChannel]
+      api.entitlements = entitlementsOf(
+        { canSubscribe: true },
+        { channelId: fakeChannel.id, tier: 'free', purgeDate: fakePurgeDate, canSubscribe: true },
+      )
+      const { container } = await render('settings')
+
+      expect(channelLinesIn(container)).toEqual([[channelTierTexts.free]])
+      expect(buttonsNamed(container, subscribeTexts.monthly)).toHaveLength(1)
+    })
+  })
 })
 
 describe("the sidebar's support item", () => {

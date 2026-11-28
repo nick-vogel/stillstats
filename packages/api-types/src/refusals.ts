@@ -10,6 +10,7 @@ export type Refusal =
   | 'not_owner'
   | 'already_subscribed'
   | 'not_subscribed'
+  | 'no_free_slot'
 
 export interface RefusalAnswer {
   refusal: Refusal
@@ -72,4 +73,5 @@ export type ConsentLandingRefusal =
       | 'not_owner'
       | 'already_subscribed'
       | 'not_subscribed'
+      | 'no_free_slot'
     >

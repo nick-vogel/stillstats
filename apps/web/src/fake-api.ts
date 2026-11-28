@@ -507,7 +507,10 @@ export interface FakeApi {
    * The entitlements answer: Pro not offered, no blocks, each channel the creator's own and free,
    * and nothing they may subscribe or manage, unless set, as with Pro not configured. The user's
    * Checkout, `POST /api/me/checkout`, answers `fakeCheckoutUrl`, and their Customer Portal,
-   * `POST /api/me/portal`, `fakePortalUrl`.
+   * `POST /api/me/portal`, `fakePortalUrl`. A pick, `PUT /api/channels/:channelId/pro-pick`, makes
+   * an owned channel paid and picked while a slot is free and answers 409 `no_free_slot` while
+   * none is; an unpick, `DELETE`, makes it free and unpicked with `fakePurgeDate`. Both answer the
+   * changed entitlements.
    */
   entitlements: EntitlementsAnswer
   /**
@@ -558,6 +561,35 @@ export const fakeCheckoutUrl = 'https://checkout.stripe.com/c/pay/cs_test_fake'
 
 /** Where the fake API's Customer Portal sends the creator. */
 export const fakePortalUrl = 'https://billing.stripe.com/p/session/test_fake'
+
+/** The purge date the fake API's unpick gives the channel it takes out of Pro. */
+export const fakePurgeDate = '2026-12-26T12:00:00.000Z'
+
+const proPickPattern = /^\/api\/channels\/([^/]+)\/pro-pick$/
+
+/** The pick routes' answer, or undefined for any other route. */
+function proPickAnswerOf(api: FakeApi, { method, path }: FakeRequest): Answer | undefined {
+  const channelId = proPickPattern.exec(path)?.[1]
+  if (!channelId || (method !== 'PUT' && method !== 'DELETE')) return undefined
+  const entitlements = api.entitlements
+  const channel = entitlements.channels.find((each) => each.channelId === channelId)
+  if (!channel) return { status: 404, body: { refusal: 'not_connected' } }
+  if (!channel.owner) return { status: 403, body: { refusal: 'not_owner' } }
+  const pick = method === 'PUT'
+  if (channel.picked === pick) return { status: 200, body: entitlements }
+  if (pick && entitlements.slotsInUse >= entitlements.blocks * 4) {
+    return { status: 409, body: { refusal: 'no_free_slot' } }
+  }
+  const changed = pick
+    ? { ...channel, tier: 'paid' as const, picked: true, purgeDate: null }
+    : { ...channel, tier: 'free' as const, picked: false, purgeDate: fakePurgeDate }
+  api.entitlements = {
+    ...entitlements,
+    slotsInUse: entitlements.slotsInUse + (pick ? 1 : -1),
+    channels: entitlements.channels.map((each) => (each === channel ? changed : each)),
+  }
+  return { status: 200, body: api.entitlements }
+}
 
 /** The Google page the fake API answers a sign-in or a connect with. */
 export const fakeGoogleUrl = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=fake'
@@ -610,6 +642,8 @@ function answerOf(api: FakeApi, { method, path, query, body }: FakeRequest): Ans
   if (route === 'GET /api/me/entitlements') return ok(api.entitlements)
   if (route === 'POST /api/me/checkout') return ok({ url: fakeCheckoutUrl })
   if (route === 'POST /api/me/portal') return ok({ url: fakePortalUrl })
+  const pickAnswer = proPickAnswerOf(api, { method, path, query, body })
+  if (pickAnswer) return pickAnswer
   if (route === 'PUT /api/me/preferences') {
     api.preferences = { ...api.preferences, ...(body as Preferences) }
     return ok(api.preferences)

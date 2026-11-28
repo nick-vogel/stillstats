@@ -7,6 +7,7 @@ import {
 import type { Option } from './ListSelect.tsx'
 import type { ProductEvent } from './landing.ts'
 import { loadingText } from './loading.ts'
+import { longDateOf } from './processing.ts'
 import { settingsName } from './settings-name.ts'
 
 // The heading is approved word for word by Nick on 2026-11-09 in creator-analytics#571, the rest
@@ -28,6 +29,30 @@ const slotsPerBlock = 4
 /** The Pro section's line on the slots: those the picked channels take, of all the blocks hold. */
 export function proSlotsTextOf(slotsInUse: number, blocks: number): string {
   return `${slotsInUse} of ${blocks * slotsPerBlock} slots in use`
+}
+
+// Drafted for stillstats#21, for Nick's word-for-word approval: the control under each channel
+// the user owns that picks it for a Pro slot or takes it out, the lines under a free one, the
+// question an unpick asks first, and the alert a pick with no free slot raises.
+export const pickChannelText = 'Pick for Pro'
+export const unpickChannelText = 'Take out of Pro'
+export const slotsFullText = 'Every slot is in use, so this channel stays Free.'
+export const unpickWarning =
+  'Take this channel out of Pro? It turns Free, and its stored history is deleted in 30 days unless you pick it for Pro again.'
+export const noFreeSlotText =
+  'Every slot is in use. Take another channel out of Pro first, then pick this one.'
+
+/** The line under a free channel with a purge date: the day its history is deleted on. */
+export function proPurgeTextOf(purgeDate: string, locale?: string): string {
+  return `Its stored history is deleted on ${longDateOf(purgeDate.slice(0, 10), locale)} unless you pick it for Pro again.`
+}
+
+/**
+ * The event a pick the API accepted sends: the user's blocks, and no channel, figure or account
+ * ID.
+ */
+export function proChannelSelectedEvent(blocks: number): ProductEvent {
+  return { name: 'pro_channel_selected', blocks }
 }
 
 export const settingsOpenedEvent: ProductEvent = { name: 'settings_opened' }
