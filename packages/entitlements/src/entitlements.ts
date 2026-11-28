@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import {
   accountCancellations,
+  type JobData,
+  jobDataOf,
   memberships,
   proEnds,
+  proGrants,
   proPicks,
   type Scoped,
   type subscriptionPlans,
@@ -184,11 +187,23 @@ export async function blockSubscriptionOf(tx: Scoped<'user'>): Promise<BlockSubs
   return { subscription: subscription.subscription, quantity: subscription.quantity }
 }
 
-/** What the scope user's Pro is: their blocks, the slots in use, and each owned channel's pick. */
-export interface ProAccount {
-  /** The blocks of the user's live paid subscription; 0 without one. */
+/** One Pro grant the scope user holds: blocks given without a purchase, and when it ends. */
+export interface OwnGrant {
   blocks: number
-  /** The picks that count inside the capacity, at most 4 for each block. */
+  /** When the grant ends; null for a grant with no end. */
+  endsAt: Date | null
+}
+
+/**
+ * What the scope user's Pro is: their paid blocks and grants, the slots in use, and each owned
+ * channel's pick.
+ */
+export interface ProAccount {
+  /** The blocks of the user's live paid subscription; 0 without one. A grant is not among them. */
+  blocks: number
+  /** The user's Pro grants, the oldest first, each 4 slots for each block beside the paid ones. */
+  grants: OwnGrant[]
+  /** The picks that count inside the capacity, at most 4 for each paid or granted block. */
   slotsInUse: number
   /** Whether the user holds a live subscription, which a second Checkout would bill twice. */
   subscribed: boolean
@@ -199,11 +214,17 @@ export interface ProAccount {
 /**
  * The scope user's Pro account, as pro_state counts it: a pick counts while the user owns its
  * channel, and the picks rank by when they were picked, then by connection, inside 4 slots for
- * each block of a live paid subscription.
+ * each block of a live paid subscription and each granted block.
  */
 export async function proAccountOf(tx: Scoped<'user'>): Promise<ProAccount> {
   const subscription = await ownSubscriptionOf(tx)
   const blocks = subscription && paidStatuses.has(subscription.status) ? subscription.quantity : 0
+  // The grants policy admits the scope user's own alone.
+  const grants = await tx.sql
+    .select({ blocks: proGrants.blocks, endsAt: proGrants.endsAt })
+    .from(proGrants)
+    .orderBy(asc(proGrants.createdAt), asc(proGrants.id))
+  const granted = grants.reduce((sum, grant) => sum + grant.blocks, 0)
   // Both policies admit the scope user's own rows: their memberships, and their own picks.
   const owned = await tx.sql
     .select({ channelId: memberships.channelId, pickedAt: proPicks.pickedAt })
@@ -217,7 +238,8 @@ export async function proAccountOf(tx: Scoped<'user'>): Promise<ProAccount> {
   const picks = owned.filter(({ pickedAt }) => pickedAt !== null).length
   return {
     blocks,
-    slotsInUse: Math.min(picks, blocks * slotsPerBlock),
+    grants,
+    slotsInUse: Math.min(picks, (blocks + granted) * slotsPerBlock),
     subscribed: subscription !== undefined && !endedStatuses.includes(subscription.status),
     ownedChannels: owned.map(({ channelId, pickedAt }) => ({
       channelId,
@@ -424,7 +446,7 @@ export async function recordSubscription(
  * for the channel neither blocks it nor is taken by it.
  */
 async function sendTurnedProDownloads(
-  tx: Scoped<'anonymous' | 'user'>,
+  tx: Scoped<'anonymous' | 'user' | 'admin'>,
   channelIds: string[],
 ): Promise<void> {
   for (const channelId of channelIds) {
@@ -434,4 +456,124 @@ async function sendTurnedProDownloads(
       { throttle: { key: channelId, seconds: subscribedSlotSeconds, purpose: 'subscribed' } },
     )
   }
+}
+
+/** A Pro grant as the admin screen lists it, with its user's email and blocks beside it. */
+export interface ProGrantRow {
+  id: string
+  email: string
+  blocks: number
+  /** When the grant ends; null for a grant with no end. */
+  endsAt: Date | null
+  createdAt: Date
+  /** The blocks of the user's live paid subscription; 0 without one. */
+  paidBlocks: number
+  /** The sum of every grant the user holds, this one included. */
+  grantedBlocks: number
+}
+
+/**
+ * Every Pro grant, newest first, through the pro_grants_list function (migration 0044), the admin
+ * scope's one read of the grants and their users' emails and paid blocks.
+ */
+export async function proGrantsOf(tx: Scoped<'admin'>): Promise<ProGrantRow[]> {
+  const result = await tx.sql.execute<{
+    id: string
+    email: string
+    blocks: number
+    ends_at: string | Date | null
+    created_at: string | Date
+    paid_blocks: number
+    granted_blocks: number
+  }>(sql`select * from pro_grants_list()`)
+  return result.rows.map((row) => ({
+    id: row.id,
+    email: row.email,
+    blocks: row.blocks,
+    endsAt: row.ends_at === null ? null : new Date(row.ends_at),
+    createdAt: new Date(row.created_at),
+    paidBlocks: row.paid_blocks,
+    grantedBlocks: row.granted_blocks,
+  }))
+}
+
+/** What a grant answers: its ID, or that no user holds the email. */
+export type GrantAnswer = { ok: true; grantId: string } | { ok: false; refusal: 'no_user' }
+
+/**
+ * The admin gives the user whose email is given `blocks` blocks of Pro, ending at `endsAt` or
+ * never, through the create_pro_grant function (migration 0044). The email is compared
+ * lower-cased. A grant is no subscription: it calls no Stripe and sends OpenPanel nothing. Its
+ * blocks fill the user's free slots with their unpicked owned channels in connection order, as a
+ * purchase does, and each channel that turns Pro has its history download sent now. A grant with
+ * an end sends its proGrantEnd job for that time, in the same transaction.
+ */
+export async function createProGrant(
+  tx: Scoped<'admin'>,
+  { email, blocks, endsAt }: { email: string; blocks: number; endsAt: Date | null },
+): Promise<GrantAnswer> {
+  const result = await tx.sql.execute<{
+    outcome: 'granted' | 'no_user'
+    grant_id: string | null
+    turned_pro: string[]
+  }>(
+    sql`select outcome, grant_id, turned_pro from create_pro_grant(${email}, ${blocks}::integer, ${endsAt?.toISOString() ?? null}::timestamptz)`,
+  )
+  const [answer] = result.rows
+  if (!answer?.outcome) throw new Error('create_pro_grant answered no outcome')
+  if (answer.outcome === 'no_user' || !answer.grant_id) return { ok: false, refusal: 'no_user' }
+  await sendTurnedProDownloads(tx, answer.turned_pro ?? [])
+  if (endsAt) await tx.enqueue('proGrantEnd', { grantId: answer.grant_id }, { startAfter: endsAt })
+  return { ok: true, grantId: answer.grant_id }
+}
+
+async function endGrant(
+  tx: Scoped<'admin' | 'system'>,
+  grantId: string,
+  purgeAfter: Date,
+): Promise<boolean> {
+  const result = await tx.sql.execute<{ outcome: 'ended' | 'no_grant' }>(
+    sql`select outcome from end_pro_grant(${grantId}::uuid, ${purgeAfter.toISOString()}::timestamptz)`,
+  )
+  const [answer] = result.rows
+  if (!answer?.outcome) throw new Error('end_pro_grant answered no outcome')
+  return answer.outcome === 'ended'
+}
+
+/**
+ * The admin removes the grant at once, through the end_pro_grant function (migration 0044): the
+ * user's capacity shrinks by its blocks, and the picks that fall out of it, the newest first,
+ * turn free with their purge date 30 days on. Answers whether a grant was removed; false for one
+ * already gone. Its proGrantEnd job, if any, later finds it gone and ends nothing.
+ */
+export async function removeProGrant(tx: Scoped<'admin'>, grantId: string): Promise<boolean> {
+  return endGrant(tx, grantId, purgeDateOf(tx.now))
+}
+
+/** The proGrantEnd job's data: the grant's uuid. */
+export function proGrantEndJobData(data: JobData): { grantId: string } {
+  return jobDataOf('proGrantEnd', data, 'grantId')
+}
+
+/**
+ * The proGrantEnd job, sent for a grant's end date: ends the grant as a removal does, with the
+ * purge date 30 days after the end date, so a late run moves no date. A grant already gone, or one
+ * with no end, ends nothing. A job that finds its grant's end still ahead of the clock sends itself
+ * again for that time and ends nothing.
+ */
+export async function endProGrant(
+  tx: Scoped<'system'>,
+  { grantId }: { grantId: string },
+): Promise<void> {
+  const result = await tx.sql.execute<{ ends: string | Date | null }>(
+    sql`select pro_grant_end_of(${grantId}::uuid) as ends`,
+  )
+  const ends = result.rows[0]?.ends
+  if (ends === null || ends === undefined) return
+  const endsAt = new Date(ends)
+  if (endsAt > tx.now) {
+    await tx.enqueue('proGrantEnd', { grantId }, { startAfter: endsAt })
+    return
+  }
+  await endGrant(tx, grantId, purgeDateOf(endsAt))
 }

@@ -30,7 +30,14 @@ export type ScreenChange =
 
 /** The budget screen a route shows, or null for a screen with no budget, the sponsor report included. */
 export function budgetScreenOf(route: Route): BudgetScreen | null {
-  if (route.settings || route.whatsNew || route.upgrade || route.feedback || route.adminFeedback) {
+  if (
+    route.settings ||
+    route.whatsNew ||
+    route.upgrade ||
+    route.feedback ||
+    route.adminFeedback ||
+    route.adminGrants
+  ) {
     return null
   }
   if (route.audience) return '/app/audience'

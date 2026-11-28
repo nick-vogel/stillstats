@@ -38,6 +38,7 @@ describe('the budget screen of a route', () => {
     expect(budgetScreenOf(at('upgrade'))).toBeNull()
     expect(budgetScreenOf(at('feedback'))).toBeNull()
     expect(budgetScreenOf(at('admin/feedback'))).toBeNull()
+    expect(budgetScreenOf(at('admin/grants'))).toBeNull()
   })
 })
 

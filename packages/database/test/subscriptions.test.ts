@@ -11,7 +11,7 @@ import {
 } from '../src/schema.ts'
 import type { Scoped, ScopeKind, WebDatabase, WorkerDatabase } from '../src/scopes.ts'
 import { test } from './harness.ts'
-import { recordUserSubscription, unpickChannel } from './pro.ts'
+import { grantBlocks, recordUserSubscription, unpickChannel } from './pro.ts'
 import { seedChannel, seedUser } from './seed.ts'
 
 interface Recorded {
@@ -906,6 +906,91 @@ describe('a block added while paid fills its new slots at once (stillstats#22)',
     expect({ outcome, turnedPro }).toEqual({ outcome: 'recorded', turnedPro: [] })
     expect(await web.asUser(ownerId, purgeOf(first))).toEqual(purgeAfter)
     expect(await proStates(web, ids)).toEqual([false, true, true, true])
+  })
+})
+
+describe('the granted slots come first in the capacity a subscription counts (stillstats#24)', () => {
+  /** The user's owned channels, connected in the order given, out of order of their ids. */
+  async function ownedChannels(web: WebDatabase, worker: WorkerDatabase, count: number) {
+    const ids: string[] = []
+    for (let n = count; n > 0; n--) {
+      ids.unshift(await ownedChannel(web, worker, ownerId, connected(n)))
+    }
+    return ids
+  }
+
+  const proStates = (web: WebDatabase, ids: string[]) =>
+    web.asUser(ownerId, async (scope) => {
+      const states: boolean[] = []
+      for (const id of ids) states.push((await proStateOf(id)(scope)) ?? false)
+      return states
+    })
+
+  const purges = (web: WebDatabase, ids: string[]) =>
+    web.asUser(ownerId, (scope) => Promise.all(ids.map((id) => purgeOf(id)(scope))))
+
+  const grant = (web: WebDatabase, blocks = 1) =>
+    grantBlocks(web, { email: `${ownerId}@example.com`, blocks })
+
+  test('a granted user who buys a block gets the next 4 owned channels picked, and only those turned Pro', async ({
+    web,
+    worker,
+    clock,
+  }) => {
+    clock.set(later(-1))
+    const ids = await ownedChannels(web, worker, 9)
+    await grant(web)
+
+    const { turnedPro } = await web.asAnonymous(recordTurn(ownerId, completed))
+
+    expect(turnedPro).toEqual(ids.slice(4, 8))
+    expect(await proStates(web, ids)).toEqual([...ids.slice(0, 8).map(() => true), false])
+  })
+
+  test('a granted user whose subscription ends keeps the granted 4 Pro, and the paid 4 get the purge date', async ({
+    web,
+    worker,
+    clock,
+  }) => {
+    clock.set(later(-1))
+    const ids = await ownedChannels(web, worker, 8)
+    await grant(web)
+    await web.asAnonymous(record(ownerId, completed))
+
+    await web.asAnonymous(record(ownerId, { ...ended, eventCreated: later(1) }))
+
+    expect(await proStates(web, ids)).toEqual([
+      ...ids.slice(0, 4).map(() => true),
+      false,
+      false,
+      false,
+      false,
+    ])
+    expect(await purges(web, ids)).toEqual([
+      null,
+      null,
+      null,
+      null,
+      ...ids.slice(4).map(() => purgeAfter),
+    ])
+  })
+
+  test('a raise of a granted user picks past the granted and the stored paid slots, and answers only those', async ({
+    web,
+    worker,
+    clock,
+  }) => {
+    clock.set(later(-1))
+    const ids = await ownedChannels(web, worker, 13)
+    await grant(web)
+    await web.asAnonymous(record(ownerId, completed))
+
+    const { turnedPro } = await web.asAnonymous(
+      recordTurn(ownerId, { ...created, status: 'active', quantity: 2, eventCreated: later(1) }),
+    )
+
+    expect(turnedPro).toEqual(ids.slice(8, 12))
+    expect(await proStates(web, ids)).toEqual([...ids.slice(0, 12).map(() => true), false])
   })
 })
 

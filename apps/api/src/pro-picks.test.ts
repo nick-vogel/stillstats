@@ -14,7 +14,7 @@ import {
   type WebDatabase,
   type WorkerDatabase,
 } from '@creator-analytics/database'
-import { test } from '@creator-analytics/database/testing'
+import { grantBlocks, test } from '@creator-analytics/database/testing'
 import { eq } from 'drizzle-orm'
 import { describe, expect } from 'vitest'
 import type { Browser } from '../test/browser.ts'
@@ -264,5 +264,41 @@ describe('seam 1: a newly connected channel fills a free slot by itself (stillst
     expect(unsubscribed).toEqual([free, free, free])
     expect(picksOf(answer, [...owned, fourth, fifth])).toEqual([paid, paid, paid, paid, free])
     expect(answer.slotsInUse).toBe(4)
+  })
+})
+
+describe('seam 1: a user with a Pro grant and no subscription picks into the granted slots (stillstats#24)', () => {
+  test('the grant fills 4 channels, the owner takes one out and picks the fifth, and a pick past the 4 is refused no_free_slot', async ({
+    web,
+    worker,
+    clock,
+  }) => {
+    clock.set(now)
+    const api = await startApi(web, { billing: testBilling })
+    const { browser, owned } = await pickerWithChannels(web, worker, api, 5)
+    await grantBlocks(web, { email: picker.email, blocks: 1 })
+    const [first = '', , , , fifth = ''] = owned
+
+    const refused = await pick(browser, fifth)
+    const unpicked = await unpick(browser, first)
+    const picked = await pick(browser, fifth)
+
+    expect(refused.status).toBe(409)
+    expect(await refused.json()).toEqual({ refusal: 'no_free_slot' } satisfies RefusalAnswer)
+    expect(unpicked.status).toBe(200)
+    expect(picked.status).toBe(200)
+    const answer = (await picked.json()) as EntitlementsAnswer
+    expect(answer).toMatchObject({
+      blocks: 0,
+      grants: [{ blocks: 1, endsAt: null }],
+      slotsInUse: 4,
+    })
+    expect(picksOf(answer, owned)).toEqual([
+      { tier: 'free', picked: false, purgeDate },
+      paid,
+      paid,
+      paid,
+      paid,
+    ])
   })
 })

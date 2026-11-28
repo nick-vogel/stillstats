@@ -8,6 +8,8 @@ import {
   type Route,
   routeAfterFailedSave,
   routeOf,
+  routeToAdminFeedback,
+  routeToAdminGrants,
   routeToAudience,
   routeToFeedback,
   routeToList,
@@ -1212,6 +1214,55 @@ describe('the admin feedback route (creator-analytics#583)', () => {
 
   test('the feedback form opened from it names the video list', () => {
     expect(addressOf(routeToFeedback(routeOf('admin/feedback', '?window=last90')))).toBe(
+      'feedback?window=last90',
+    )
+  })
+})
+
+describe('the admin grants route (stillstats#24)', () => {
+  test("the admin/grants path opens the Grants tab, with the list's route of its query", () => {
+    const route = routeOf('admin/grants', '?channel=c-2&window=last90&page=3')
+
+    expect(route).toStrictEqual({
+      ...defaultRoute,
+      window: 'last90',
+      page: 3,
+      channel: 'c-2',
+      adminGrants: true,
+    })
+    expect(addressOf(route)).toBe('admin/grants?channel=c-2&window=last90&page=3')
+  })
+
+  test('is read back as written', () => {
+    const route: Route = { ...defaultRoute, window: 'last7', adminGrants: true }
+    const [path = '', search = ''] = addressOf(route).split(/(?=\?)/)
+
+    expect(path).toBe('admin/grants')
+    expect(routeOf(path, search)).toStrictEqual(route)
+  })
+
+  test.each(['admin/grants/', 'admin/grant', 'grants'])('the path %o is no Grants tab', (path) => {
+    expect(routeOf(path, '').adminGrants).toBeUndefined()
+  })
+
+  test("the link back to the list keeps the list's route and leaves the Grants tab", () => {
+    const route = routeOf('admin/grants', '?window=last90&sort=views')
+
+    expect(addressOf(routeToList(route))).toBe('?window=last90&sort=views')
+  })
+
+  test("the tab strip's links move between the two admin screens, keeping the list's route", () => {
+    const feedback = routeOf('admin/feedback', '?window=last90')
+    const grants = routeOf('admin/grants', '?window=last90')
+
+    expect(addressOf(routeToAdminGrants(feedback))).toBe('admin/grants?window=last90')
+    expect(addressOf(routeToAdminFeedback(grants))).toBe('admin/feedback?window=last90')
+    expect(routeToAdminGrants(feedback).adminFeedback).toBeUndefined()
+    expect(routeToAdminFeedback(grants).adminGrants).toBeUndefined()
+  })
+
+  test('the feedback form opened from it names the video list', () => {
+    expect(addressOf(routeToFeedback(routeOf('admin/grants', '?window=last90')))).toBe(
       'feedback?window=last90',
     )
   })

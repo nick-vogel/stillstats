@@ -25,6 +25,7 @@ import {
   currencyChangedEvent,
   currencyLabel,
   currencyOptionsOf,
+  grantedBlocksTextOf,
   noChannelText,
   pickChannelText,
   proHeading,
@@ -46,6 +47,7 @@ import {
   manageSubscriptionText,
   type ProSection,
   subscribeTexts,
+  totalBlocksOf,
 } from './subscribe.ts'
 import {
   supportHeading,
@@ -60,7 +62,8 @@ import {
  * under each one the user owns whether it is Pro or Free while there is a Pro section, and while
  * the user holds a block its purge date while it has one, that it stays Free while every slot is
  * in use, and its pick or unpick control; the Pro
- * section, with the slots in use once the user holds a block, a subscribe action for each plan
+ * section, with the slots in use once the user holds a block, paid or granted, and under them a line
+ * for each grant, a subscribe action for each plan
  * while they may subscribe, "Add a block" while they may add one, and the Customer Portal's while
  * they may manage; the Support section
  * when the support answer has a link; and account: the currency revenue shows in, the theme, the
@@ -122,6 +125,7 @@ export function Settings({
   const { saved, save } = usePreferences()
   // Named in the browser's language.
   const currencyOptions = useMemo(() => currencyOptionsOf(), [])
+  const totalBlocks = pro ? totalBlocksOf(pro) : 0
 
   function changeCurrency(currency: RevenueCurrency) {
     if (currency === currencyOf(saved)) return
@@ -190,7 +194,7 @@ export function Settings({
                   )}
                   {owned && <p className="channel-tier">{channelTierTexts[owned.tier]}</p>}
                   {/* Without a block, only subscribing again keeps the history, not a pick. */}
-                  {pro && pro.blocks > 0 && owned?.tier === 'free' && owned.purgeDate && (
+                  {totalBlocks > 0 && owned?.tier === 'free' && owned.purgeDate && (
                     <p className="channel-pro-note">{proPurgeTextOf(owned.purgeDate)}</p>
                   )}
                   {owned?.slotsFull && <p className="channel-pro-note">{slotsFullText}</p>}
@@ -211,7 +215,11 @@ export function Settings({
       {pro && (
         <section className="settings-section">
           <h2>{proHeading}</h2>
-          {pro.blocks > 0 && <p>{proSlotsTextOf(pro.slotsInUse, pro.blocks)}</p>}
+          {totalBlocks > 0 && <p>{proSlotsTextOf(pro.slotsInUse, totalBlocks)}</p>}
+          {pro.grants.map((grant, place) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: a grant carries no ID here, and the list changes only as a whole, with a new answer.
+            <p key={place}>{grantedBlocksTextOf(grant.blocks, grant.endsAt)}</p>
+          ))}
           {(pro.canSubscribe || pro.canManage || pro.canAddBlock) && (
             <div className="app-actions">
               {pro.canSubscribe &&

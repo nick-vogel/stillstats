@@ -26,9 +26,28 @@ export const channelTierTexts: Record<Tier, string> = { paid: 'Pro', free: 'Free
 const slotsPerBlock = 4
 
 // Drafted for stillstats#20, for Nick's word-for-word approval.
-/** The Pro section's line on the slots: those the picked channels take, of all the blocks hold. */
-export function proSlotsTextOf(slotsInUse: number, blocks: number): string {
-  return `${slotsInUse} of ${blocks * slotsPerBlock} slots in use`
+/**
+ * The Pro section's line on the slots: those the picked channels take, of all the blocks hold,
+ * the paid ones and the granted ones (`totalBlocksOf`).
+ */
+export function proSlotsTextOf(slotsInUse: number, totalBlocks: number): string {
+  return `${slotsInUse} of ${totalBlocks * slotsPerBlock} slots in use`
+}
+
+// Drafted for stillstats#24, for Nick's word-for-word approval.
+/**
+ * The Pro section's line on one grant, under the slots: its blocks, and the day it ends on, in the
+ * locale as the purge date reads, while it has an end.
+ */
+export function grantedBlocksTextOf(
+  blocks: number,
+  endsAt: string | null,
+  locale?: string,
+): string {
+  const granted = `${blocks} ${blocks === 1 ? 'block' : 'blocks'} granted`
+  return endsAt === null
+    ? granted
+    : `${granted}, ends on ${longDateOf(endsAt.slice(0, 10), locale)}`
 }
 
 // Drafted for stillstats#21, for Nick's word-for-word approval: the control under each channel
@@ -48,8 +67,8 @@ export function proPurgeTextOf(purgeDate: string, locale?: string): string {
 }
 
 /**
- * The event a pick the API accepted sends: the user's blocks, and no channel, figure or account
- * ID.
+ * The event a pick the API accepted sends: the user's blocks, paid and granted, and no channel,
+ * figure or account ID.
  */
 export function proChannelSelectedEvent(blocks: number): ProductEvent {
   return { name: 'pro_channel_selected', blocks }

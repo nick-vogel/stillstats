@@ -138,6 +138,7 @@ import {
 import {
   channelTierTexts,
   currencySavedNotice,
+  grantedBlocksTextOf,
   noFreeSlotText,
   pickChannelText,
   preferencesResetNotice,
@@ -228,6 +229,7 @@ function entitlementsOf(
     canManage: false,
     canAddBlock: false,
     blocks: 0,
+    grants: [],
     slotsInUse: 0,
     ...user,
     channels: channels.map((channel) => ({
@@ -7945,6 +7947,78 @@ describe("the Settings screen's Pro section (creator-analytics#780, stillstats#2
       expect(channelLinesIn(container)).toEqual([[channelTierTexts.free]])
       expect(buttonsNamed(container, subscribeTexts.monthly)).toHaveLength(1)
     })
+  })
+})
+
+describe("a Pro grant in the Settings screen's Pro section (stillstats#24)", () => {
+  const grantEnd = '2026-12-01T00:00:00.000Z'
+
+  /** The lines of the Pro section, found by its heading. */
+  const proLinesIn = (container: HTMLElement) =>
+    [
+      ...([...container.querySelectorAll('section')]
+        .find((section) => section.querySelector('h2')?.textContent === proHeading)
+        ?.querySelectorAll('p') ?? []),
+    ].map((line) => line.textContent)
+
+  test('a subscribed user with grants sees the slots of the paid and granted blocks, then one line for each grant', async () => {
+    const api = installFakeApi()
+    api.entitlements = entitlementsOf(
+      {
+        ...subscribedToOneBlock,
+        grants: [
+          { blocks: 1, endsAt: grantEnd },
+          { blocks: 2, endsAt: null },
+        ],
+      },
+      { channelId: fakeChannel.id, tier: 'paid', canManage: true },
+    )
+    const { container } = await render('settings')
+
+    expect(proLinesIn(container)).toEqual([
+      '1 of 16 slots in use',
+      grantedBlocksTextOf(1, grantEnd),
+      '2 blocks granted',
+    ])
+    expect(grantedBlocksTextOf(1, grantEnd, 'en-GB')).toBe(
+      '1 block granted, ends on 1 December 2026',
+    )
+  })
+
+  test('a user with a grant and no subscription sees its slots and line, picks a channel into it, and the pick sends pro_channel_selected with the granted blocks', async () => {
+    const api = installFakeApi()
+    api.channels = [fakeChannel]
+    api.entitlements = entitlementsOf(
+      { canSubscribe: true, grants: [{ blocks: 1, endsAt: null }] },
+      { channelId: fakeChannel.id, tier: 'free', canSubscribe: true },
+    )
+    const { container } = await render('settings')
+    vi.mocked(track).mockClear()
+
+    expect(proLinesIn(container)).toEqual(['0 of 4 slots in use', '1 block granted'])
+
+    await click(buttonNamed(container, pickChannelText))
+
+    expect(alertOf(container)).toBeNull()
+    expect(vi.mocked(track).mock.calls).toEqual([[{ name: 'pro_channel_selected', blocks: 1 }]])
+    expect(proLinesIn(container)).toEqual(['1 of 4 slots in use', '1 block granted'])
+    expect(buttonsNamed(container, unpickChannelText)).toHaveLength(1)
+  })
+
+  test("a channel taken out of a grant's slot shows its purge date, as one taken out of a paid slot does", async () => {
+    const api = installFakeApi()
+    api.channels = [fakeChannel]
+    api.entitlements = entitlementsOf(
+      { grants: [{ blocks: 1, endsAt: grantEnd }], slotsInUse: 1 },
+      { channelId: fakeChannel.id, tier: 'paid' },
+    )
+    const { container } = await render('settings')
+
+    await click(buttonNamed(container, unpickChannelText))
+
+    expect(
+      [...container.querySelectorAll('.channel .channel-pro-note')].map((line) => line.textContent),
+    ).toEqual([proPurgeTextOf(fakePurgeDate)])
   })
 })
 

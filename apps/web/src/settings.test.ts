@@ -13,6 +13,7 @@ import {
   consentGivenTextOf,
   currencyChangedEvent,
   currencyOptionsOf,
+  grantedBlocksTextOf,
   proChannelSelectedEvent,
   proPurgeTextOf,
   proSlotsTextOf,
@@ -26,6 +27,7 @@ import {
   blockAddedTextOf,
   blocksChangedText,
   proSectionOf,
+  totalBlocksOf,
 } from './subscribe.ts'
 
 describe('the event the Settings screen sends', () => {
@@ -146,6 +148,7 @@ describe("each owned channel's pick control in the Pro section (stillstats#21)",
       canManage: true,
       canAddBlock: true,
       blocks: 1,
+      grants: [],
       slotsInUse: 1,
       ...user,
       channels: channels.map((channel) => ({
@@ -229,6 +232,7 @@ describe('the Pro section carries whether the user may add a block (stillstats#2
       canManage: true,
       canAddBlock,
       blocks: 1,
+      grants: [],
       slotsInUse: 1,
       channels: [],
     })
@@ -267,6 +271,118 @@ describe('the strings of an add of a block (stillstats#22)', () => {
       addBlockQuestionOf(preview, 'en-US'),
       blockAddedTextOf(2),
       blocksChangedText,
+    ]
+    expect(strings.filter((text) => text.includes('\u2014'))).toEqual([])
+  })
+})
+
+describe('a Pro grant in the Pro section (stillstats#24)', () => {
+  /** A user with no subscription who holds the grants given, each channel their own. */
+  function grantedAnswerOf(
+    grants: EntitlementsAnswer['grants'],
+    slotsInUse: number,
+    ...channels: Pick<ChannelEntitlement, 'channelId' | 'tier'>[]
+  ): EntitlementsAnswer {
+    return {
+      paidTierOffered: true,
+      canSubscribe: true,
+      canManage: false,
+      canAddBlock: false,
+      blocks: 0,
+      grants,
+      slotsInUse,
+      channels: channels.map((channel) => ({
+        owner: true,
+        picked: channel.tier === 'paid',
+        purgeDate: null,
+        canSubscribe: channel.tier === 'free',
+        canManage: false,
+        ...channel,
+      })),
+    }
+  }
+
+  test('the blocks the user holds are the paid ones and every granted one', () => {
+    expect(totalBlocksOf({ blocks: 0, grants: [] })).toBe(0)
+    expect(totalBlocksOf({ blocks: 1, grants: [] })).toBe(1)
+    expect(
+      totalBlocksOf({
+        blocks: 1,
+        grants: [
+          { blocks: 2, endsAt: null },
+          { blocks: 1, endsAt: '2026-12-01T00:00:00.000Z' },
+        ],
+      }),
+    ).toBe(4)
+  })
+
+  test('a grant alone gives each owned channel its control, and the slots of the grant', () => {
+    const grants = [{ blocks: 1, endsAt: '2026-12-01T00:00:00.000Z' }]
+    const section = proSectionOf(
+      grantedAnswerOf(
+        grants,
+        1,
+        { channelId: 'c-1', tier: 'paid' },
+        { channelId: 'c-2', tier: 'free' },
+      ),
+    )
+
+    expect(section?.grants).toEqual(grants)
+    expect(section?.channels.get('c-1')).toMatchObject({ control: 'unpick', slotsFull: false })
+    expect(section?.channels.get('c-2')).toMatchObject({ control: 'pick', slotsFull: false })
+    expect(proSlotsTextOf(1, totalBlocksOf({ blocks: 0, grants }))).toBe('1 of 4 slots in use')
+  })
+
+  test("a grant's slots are full at 4 for each of its blocks", () => {
+    const full = Array.from({ length: 4 }, (_, n) => ({
+      channelId: `c-${n + 1}`,
+      tier: 'paid' as const,
+    }))
+    const section = proSectionOf(
+      grantedAnswerOf([{ blocks: 1, endsAt: null }], 4, ...full, {
+        channelId: 'c-5',
+        tier: 'free',
+      }),
+    )
+
+    expect(section?.channels.get('c-5')).toMatchObject({ control: 'pick', slotsFull: true })
+  })
+
+  test('a granted block beside a paid one adds its 4 slots', () => {
+    const full = Array.from({ length: 4 }, (_, n) => ({
+      channelId: `c-${n + 1}`,
+      tier: 'paid' as const,
+    }))
+    const section = proSectionOf({
+      ...grantedAnswerOf([{ blocks: 1, endsAt: null }], 4, ...full, {
+        channelId: 'c-5',
+        tier: 'free',
+      }),
+      canSubscribe: false,
+      canManage: true,
+      blocks: 1,
+    })
+
+    expect(section?.channels.get('c-5')).toMatchObject({ control: 'pick', slotsFull: false })
+  })
+
+  test('the granted line names the blocks, and the day the grant ends on, in the locale', () => {
+    expect(grantedBlocksTextOf(1, '2026-12-01T00:00:00.000Z', 'en-GB')).toBe(
+      '1 block granted, ends on 1 December 2026',
+    )
+    expect(grantedBlocksTextOf(1, '2026-12-01T00:00:00.000Z', 'en-US')).toBe(
+      '1 block granted, ends on December 1, 2026',
+    )
+  })
+
+  test('the granted line of a grant with no end names only the blocks', () => {
+    expect(grantedBlocksTextOf(2, null)).toBe('2 blocks granted')
+  })
+
+  test('no string of it carries an em-dash', () => {
+    const strings = [
+      grantedBlocksTextOf(1, '2026-12-01T00:00:00.000Z'),
+      grantedBlocksTextOf(3, null),
     ]
     expect(strings.filter((text) => text.includes('\u2014'))).toEqual([])
   })

@@ -47,6 +47,8 @@ export type ErrorCode =
   | 'invalid_blocks'
   | 'invalid_figure'
   | 'revenue_figure'
+  | 'invalid_grant'
+  | 'unknown_email'
 
 export interface ErrorAnswer {
   error: ErrorCode

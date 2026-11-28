@@ -43,6 +43,13 @@ export interface ChannelEntitlement {
   canManage: boolean
 }
 
+/** One Pro grant the user holds, as Settings shows it. */
+export interface EntitlementGrant {
+  blocks: number
+  /** When the grant ends, ISO 8601; null for a grant with no end. */
+  endsAt: string | null
+}
+
 /**
  * GET /api/me/entitlements: the user's Pro, and one entry for each channel the user holds. PUT and
  * DELETE /api/channels/:channelId/pro-pick, the owner's pick and unpick of a channel for one of
@@ -66,7 +73,13 @@ export interface EntitlementsAnswer {
   canAddBlock: boolean
   /** The blocks of the user's live paid subscription, each 4 channel slots; 0 without one. */
   blocks: number
-  /** The slots their picked channels take, at most 4 for each block. */
+  /**
+   * The Pro grants the user holds, the oldest first: blocks given without a purchase, each 4
+   * channel slots beside the paid ones, and when each ends, ISO 8601, or null for no end
+   * (stillstats#24). A grant is no subscription, so `blocks` and `canAddBlock` leave it out.
+   */
+  grants: EntitlementGrant[]
+  /** The slots their picked channels take, at most 4 for each paid or granted block. */
   slotsInUse: number
   channels: ChannelEntitlement[]
 }

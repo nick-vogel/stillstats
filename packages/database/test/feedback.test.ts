@@ -23,6 +23,7 @@ import {
 import type { Scoped, ScopeKind, WebDatabase } from '../src/scopes.ts'
 import { readFeedbackMessages } from './feedback-rows.ts'
 import { test } from './harness.ts'
+import { grantBlocks } from './pro.ts'
 import { seedChannel, seedUser } from './seed.ts'
 
 function messageOf(userId: string, createdAt: Date) {
@@ -460,6 +461,10 @@ describe('the admin scope (creator-analytics#583)', () => {
       })
     })
     await sendMessage(web, userId)
+    // A grant to a user with no channel, so it turns none of the seeded channel's Pro again.
+    const grantee = 'feedback-grantee'
+    await seedUser(web, grantee)
+    await grantBlocks(web, { email: `${grantee}@example.com`, blocks: 1 })
     // A channel's subscription payments are the release before blocks' rows, which nothing writes
     // any more (stillstats#20).
     const tables = (await web.asAnonymous(publicTables)).filter(
@@ -468,6 +473,7 @@ describe('the admin scope (creator-analytics#583)', () => {
     const counts = (scope: Scoped<ScopeKind>) => rowCountsOf(scope, tables)
     const seen = [
       await web.asUser(userId, counts),
+      await web.asUser(grantee, counts),
       await web.asAnonymous(counts),
       await worker.forChannel(channelId, counts),
       await worker.asSystem(counts),

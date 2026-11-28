@@ -20,6 +20,7 @@ const free: EntitlementsAnswer = {
   canManage: false,
   canAddBlock: false,
   blocks: 0,
+  grants: [],
   slotsInUse: 0,
   channels: [ownedFree],
 }
@@ -31,6 +32,7 @@ const subscribed: EntitlementsAnswer = {
   canManage: true,
   canAddBlock: true,
   blocks: 1,
+  grants: [],
   slotsInUse: 1,
   channels: [{ ...ownedFree, tier: 'paid', picked: true, canSubscribe: false, canManage: true }],
 }

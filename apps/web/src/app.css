@@ -434,6 +434,107 @@
   gap: 0.75rem;
 }
 
+/* The tab strip over both admin screens (stillstats#24): plain links in a row, the one on view in
+   ink with the accent under it, the other soft. */
+.admin-tabs {
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-tabs a {
+  padding-bottom: 0.5rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+
+.admin-tabs a:hover {
+  color: var(--ink);
+}
+
+.admin-tabs a[aria-current="page"] {
+  box-shadow: inset 0 -2px 0 var(--accent);
+  color: var(--ink);
+}
+
+/* The Grants tab: the reading width, as the feedback tab keeps it; the form's fields in a row that
+   wraps, each a label above its native field in the visual system's ink, line and field radius,
+   then one grant to a block, each field a label above its value, as a feedback message reads. */
+.admin-grants {
+  display: grid;
+  gap: 1.5rem;
+  max-width: min(100%, var(--reading-width));
+}
+
+.admin-grants-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+}
+
+.admin-grants-field {
+  display: grid;
+  flex: 1 1 10rem;
+  gap: 0.35rem;
+}
+
+.admin-grants-field:first-child {
+  flex-basis: 16rem;
+}
+
+.admin-grants-field label {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.admin-grants-field input {
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
+  background: transparent;
+  color: var(--ink);
+  font: 400 1rem / 1.5 var(--font-body);
+}
+
+.admin-grants-list {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-grants-grant {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
+}
+
+.admin-grants-grant dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem 1.5rem;
+  margin: 0;
+}
+
+.admin-grants-grant dt {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.admin-grants-grant dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-grants-grant .button {
+  justify-self: start;
+}
+
 /* Centered beside the avatar, as the header's other items are (Nick, browser walk, F2.36). Its
    size and line height of 1 make it 1.375rem tall, which .app-signed-in's top space counts on. */
 .app-header .wordmark {

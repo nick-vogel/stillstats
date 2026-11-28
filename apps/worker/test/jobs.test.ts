@@ -22,7 +22,13 @@ import {
   subscribeOwner,
   test,
 } from '@creator-analytics/database/testing'
-import { purgeDateOf, requestAccountCancellation } from '@creator-analytics/entitlements'
+import {
+  createProGrant,
+  entitlementOf,
+  purgeDateOf,
+  removeProGrant,
+  requestAccountCancellation,
+} from '@creator-analytics/entitlements'
 import { startFakeStripe } from '@creator-analytics/fake-stripe'
 import { type Reporter, recordingReporter } from '@creator-analytics/reporter'
 import {
@@ -304,6 +310,88 @@ describe('seam 2: the job worker', () => {
       ),
     )
     expect(held).toEqual([[], [{ videoId: 'fixture' }]])
+  })
+
+  test('a grant reaching its end date: the proGrantEnd job takes the newest picks out in the system scope, and the history purge deletes their history 30 days on (stillstats#24)', async ({
+    web,
+    worker,
+    clock,
+    findJobs,
+  }) => {
+    const day = (n: number) => new Date(Date.UTC(2026, 11, 1 + n, 12))
+    const ownerId = 'grant-end-owner'
+    clock.set(day(0))
+    const ids: string[] = []
+    for (let n = 0; n < 6; n++) ids.push(await seedChannel(web, worker, ownerId))
+    // The seeds' fill picked the first 4, and the subscription covers them.
+    await subscribeOwner(web, worker, ids[0] ?? '')
+    clock.advance(60_000)
+    const granted = await web.asAdmin('grant-end-admin', (scope) =>
+      createProGrant(scope, { email: `${ownerId}@example.com`, blocks: 1, endsAt: day(10) }),
+    )
+    expect(granted).toEqual({ ok: true, grantId: expect.any(String) })
+    const tiers = () =>
+      Promise.all(ids.map((id) => worker.forChannel(id, (scope) => entitlementOf(scope, id))))
+    expect((await tiers()).map(({ tier }) => tier)).toEqual(ids.map(() => 'paid'))
+    const handlers = handlersWith()
+
+    clock.set(day(10))
+    const [job] = await findJobs('proGrantEnd')
+    expect(job?.startAfter).toEqual(day(10))
+    await handlers.proGrantEnd(worker, job?.data ?? {})
+    const ended = await tiers()
+    await handlers.proGrantEnd(worker, job?.data ?? {})
+
+    const paid = { tier: 'paid', purgeDate: null }
+    const left = { tier: 'free', purgeDate: day(40) }
+    expect(ended).toEqual([paid, paid, paid, paid, left, left])
+    expect(await tiers()).toEqual(ended)
+
+    clock.set(day(41))
+    await handlers.historyPurgeRoster(worker, {})
+    for (const purge of await findJobs('historyPurge')) {
+      await handlers.historyPurge(worker, purge.data)
+    }
+    const held = await Promise.all(
+      ids.map((channelId) =>
+        worker.forChannel(channelId, (scope) =>
+          scope.sql.select({ videoId: reachHistory.videoId }).from(reachHistory),
+        ),
+      ),
+    )
+    const kept = [{ videoId: 'fixture' }]
+    expect(held).toEqual([kept, kept, kept, kept, [], []])
+  })
+
+  test("a removed grant's proGrantEnd job, run at its end date, ends nothing and moves no purge date (stillstats#24)", async ({
+    web,
+    worker,
+    clock,
+    findJobs,
+  }) => {
+    const day = (n: number) => new Date(Date.UTC(2026, 11, 1 + n, 12))
+    const ownerId = 'grant-removed-owner'
+    clock.set(day(0))
+    const channelId = await seedChannel(web, worker, ownerId)
+    clock.advance(60_000)
+    const granted = await web.asAdmin('grant-end-admin', (scope) =>
+      createProGrant(scope, { email: `${ownerId}@example.com`, blocks: 1, endsAt: day(10) }),
+    )
+    clock.set(day(2))
+    if (!granted.ok) throw new Error('The grant was not made')
+    const removed = await web.asAdmin('grant-end-admin', (scope) =>
+      removeProGrant(scope, granted.grantId),
+    )
+    expect(removed).toBe(true)
+
+    clock.set(day(10))
+    const handlers = handlersWith()
+    for (const job of await findJobs('proGrantEnd')) await handlers.proGrantEnd(worker, job.data)
+
+    expect(await worker.forChannel(channelId, (scope) => entitlementOf(scope, channelId))).toEqual({
+      tier: 'free',
+      purgeDate: day(32),
+    })
   })
 
   // pg-boss retries a job whose work callback rejects. This observes the rejection, not the retry:

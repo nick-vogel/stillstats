@@ -4,6 +4,12 @@ export {
   type AdminFeedbackMessage,
   adminFeedbackPageSize,
 } from './admin-feedback.ts'
+export {
+  type AdminGrant,
+  type AdminGrantRequest,
+  type AdminGrantsAnswer,
+  adminGrantMaxBlocks,
+} from './admin-grants.ts'
 export type {
   AgeGroup,
   AudienceAnswer,
@@ -26,6 +32,7 @@ export {
   type ChannelEntitlement,
   type CheckoutRequest,
   type CheckoutStartAnswer,
+  type EntitlementGrant,
   type EntitlementsAnswer,
   type PortalStartAnswer,
   type Tier,
