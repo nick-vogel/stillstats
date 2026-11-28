@@ -1,7 +1,8 @@
 // Limits: the Customer Portal opens on the fake Stripe server, which checks none of Stripe's rules,
 // so these tests show what the API asks Stripe for, not that Stripe opens it for a Managed Payments
-// subscription, nor what its default configuration lets the user change (stillstats#22 sets it). Nick's walk of Pro
-// on production (creator-analytics#791) covers both.
+// subscription, nor that the configuration it sends keeps the quantity fixed in Stripe's own page:
+// the spike (stillstats#18) showed that in the sandbox, and Nick's walk of Pro on production
+// (stillstats#26) covers it there.
 import type {
   EntitlementsAnswer,
   PortalStartAnswer,
@@ -87,7 +88,11 @@ describe('seam 1: a subscribed user opens their Customer Portal', () => {
     const { url } = (await response.json()) as PortalStartAnswer
     expect(url).toMatch(new RegExp(`^${stripe.origin}/p/session/`))
     expect(stripe.portalSessions.map((body) => Object.fromEntries(body))).toEqual([
-      { customer: 'cus_test_portal', return_url: `${api.origin}/app/settings` },
+      {
+        customer: 'cus_test_portal',
+        return_url: `${api.origin}/app/settings`,
+        configuration: expect.stringMatching(/^bpc_/),
+      },
     ])
   })
 
@@ -166,7 +171,11 @@ describe("seam 1: the owner opens the channel's Customer Portal", () => {
 
     expect(response.status).toBe(200)
     expect(fakeStripeOf(api).portalSessions.map((body) => Object.fromEntries(body))).toEqual([
-      { customer: 'cus_test_portal', return_url: `${api.origin}/app/settings` },
+      {
+        customer: 'cus_test_portal',
+        return_url: `${api.origin}/app/settings`,
+        configuration: expect.stringMatching(/^bpc_/),
+      },
     ])
   })
 
@@ -237,3 +246,99 @@ describe('seam 1: whether the web app offers the Customer Portal', () => {
     })
   })
 })
+
+describe("seam 1: the Customer Portal opens on Stillstats' own configuration (stillstats#22)", () => {
+  // What the configuration sends Stripe, as stripe-node encodes it, beside the metadata a creation
+  // adds: the card, the invoices and a cancellation at period end on; a plan switch of price
+  // alone, charged at once from now; and the quantity off in both places the spike found (#18).
+  const features = {
+    'features[payment_method_update][enabled]': 'true',
+    'features[invoice_history][enabled]': 'true',
+    'features[subscription_cancel][enabled]': 'true',
+    'features[subscription_cancel][mode]': 'at_period_end',
+    'features[subscription_update][enabled]': 'true',
+    'features[subscription_update][default_allowed_updates][0]': 'price',
+    'features[subscription_update][products][0][product]': 'prod_fake_stillstats',
+    'features[subscription_update][products][0][prices][0]': testBilling.prices.monthly,
+    'features[subscription_update][products][0][prices][1]': testBilling.prices.annual,
+    'features[subscription_update][products][0][adjustable_quantity][enabled]': 'false',
+    'features[subscription_update][proration_behavior]': 'always_invoice',
+    'features[subscription_update][billing_cycle_anchor]': 'now',
+  }
+
+  function configurationsOf(stripe: FakeStripe) {
+    return stripe.portalConfigurations.map(({ configuration, params }) => ({
+      configuration,
+      params: Object.fromEntries(params),
+    }))
+  }
+
+  test('the first open creates the configuration, with the quantity off and the plan switch charged at once, and the session names it', async ({
+    web,
+  }) => {
+    const api = await startApi(web, { billing: testBilling })
+    const { browser } = await paidChannel(api)
+    const stripe = fakeStripeOf(api)
+
+    const response = await openPortal(browser)
+
+    expect(response.status).toBe(200)
+    expect(configurationsOf(stripe)).toEqual([
+      { configuration: null, params: { ...features, 'metadata[stillstats_portal]': 'true' } },
+    ])
+    const [created] = (await listConfigurations(stripe)).data
+    expect(stripe.portalSessions.map((body) => body.get('configuration'))).toEqual([created?.id])
+  })
+
+  test('a second open reuses the configuration and sends it nothing again', async ({ web }) => {
+    const api = await startApi(web, { billing: testBilling })
+    const { browser } = await paidChannel(api)
+    const stripe = fakeStripeOf(api)
+
+    await openPortal(browser)
+    await openPortal(browser)
+
+    expect(stripe.portalConfigurations).toHaveLength(1)
+    const [first, second] = stripe.portalSessions.map((body) => body.get('configuration'))
+    expect(second).toBe(first)
+  })
+
+  test('a process that finds the marked configuration updates it rather than creating another, and passes over one without the mark', async ({
+    web,
+  }) => {
+    const api = await startApi(web, { billing: testBilling })
+    const { browser } = await paidChannel(api)
+    const stripe = fakeStripeOf(api)
+    stripe.addPortalConfiguration({ metadata: {} })
+    const marked = stripe.addPortalConfiguration({ metadata: { stillstats_portal: 'true' } })
+
+    const response = await openPortal(browser)
+
+    expect(response.status).toBe(200)
+    expect(configurationsOf(stripe)).toEqual([{ configuration: marked, params: features }])
+    expect(stripe.portalSessions.map((body) => body.get('configuration'))).toEqual([marked])
+  })
+
+  test('a failed configuration call answers 500 and opens no session, and the next open tries again', async ({
+    web,
+  }) => {
+    const api = await startApi(web, { billing: testBilling })
+    const { browser } = await paidChannel(api)
+    const stripe = fakeStripeOf(api)
+    stripe.failPortalConfigurations(500)
+
+    const failed = await openPortal(browser)
+    stripe.failPortalConfigurations(null)
+    const opened = await openPortal(browser)
+
+    expect([failed.status, opened.status]).toEqual([500, 200])
+    expect(stripe.portalSessions).toHaveLength(1)
+    expect(stripe.portalConfigurations).toHaveLength(1)
+  })
+})
+
+/** The fake's configurations, read as the API reads them. */
+async function listConfigurations(stripe: FakeStripe) {
+  const response = await fetch(`${stripe.origin}/v1/billing_portal/configurations`)
+  return (await response.json()) as { data: { id: string }[] }
+}

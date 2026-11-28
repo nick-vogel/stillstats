@@ -33,6 +33,9 @@ const refusalStatus: Record<Refusal, ContentfulStatusCode> = {
   // A pick of a channel needs a free slot of a live paid subscription: swapping one in takes
   // another out first.
   no_free_slot: 409,
+  // An add of a block names the count the user previewed; a quantity Stripe already holds at
+  // another count, from a second click or a stale tab, buys no block nobody saw the price of.
+  blocks_changed: 409,
 }
 
 export function refuse(c: Context, refusal: Refusal): Response {

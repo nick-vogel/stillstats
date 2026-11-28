@@ -19,6 +19,9 @@ export type {
 } from './audience.ts'
 export {
   type BillingPlan,
+  type BlockAddAnswer,
+  type BlockAddRequest,
+  type BlockPreviewAnswer,
   billingPlans,
   type ChannelEntitlement,
   type CheckoutRequest,

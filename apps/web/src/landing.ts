@@ -71,6 +71,8 @@ export type ProductEvent =
   | { name: 'customer_portal_opened' }
   /** A pick of a Pro channel the API accepted: the user's blocks, and no channel or figure. */
   | { name: 'pro_channel_selected'; blocks: number }
+  /** A block of Pro the API added: the user's blocks after it, and no channel, user or amount. */
+  | { name: 'block_added'; blocks: number }
   | { name: 'upgrade_screen_viewed' }
   | { name: 'upgrade_link_clicked'; source: Exclude<UpgradeLinkSource, 'homepage'> }
   | { name: 'upgrade_prompt_dismissed' }

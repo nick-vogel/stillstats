@@ -9,6 +9,7 @@ import {
   type AudienceRetentionPoint,
   type AudienceWindow,
   adminFeedbackPageSize,
+  type BlockPreviewAnswer,
   type ChannelSummaryAnswer,
   type City,
   type ClientSettingsAnswer,
@@ -510,7 +511,10 @@ export interface FakeApi {
    * `POST /api/me/portal`, `fakePortalUrl`. A pick, `PUT /api/channels/:channelId/pro-pick`, makes
    * an owned channel paid and picked while a slot is free and answers 409 `no_free_slot` while
    * none is; an unpick, `DELETE`, makes it free and unpicked with `fakePurgeDate`. Both answer the
-   * changed entitlements.
+   * changed entitlements. The block preview, `GET /api/me/block-preview`, answers
+   * `fakeBlockPreviewOf` one block more while `canAddBlock`, and 409 `not_subscribed` otherwise;
+   * an add, `POST /api/me/blocks`, of one block more raises `blocks` and answers it, and of any
+   * other count answers 409 `blocks_changed`.
    */
   entitlements: EntitlementsAnswer
   /**
@@ -561,6 +565,35 @@ export const fakeCheckoutUrl = 'https://checkout.stripe.com/c/pay/cs_test_fake'
 
 /** Where the fake API's Customer Portal sends the creator. */
 export const fakePortalUrl = 'https://billing.stripe.com/p/session/test_fake'
+
+/**
+ * What the fake API's block preview answers for the count after the add: $7 a month, and $3.50
+ * for the rest of the period, on the invoice of 2026-12-17.
+ */
+export function fakeBlockPreviewOf(blocks: number): BlockPreviewAnswer {
+  return {
+    blocks,
+    plan: 'monthly',
+    price: { amount: 700, currency: 'usd' },
+    prorated: { amount: 350, currency: 'usd' },
+    periodEnd: '2026-12-17T12:00:00.000Z',
+  }
+}
+
+/** The block routes' answer, or undefined for any other route. */
+function blockAnswerOf(api: FakeApi, { method, path, body }: FakeRequest): Answer | undefined {
+  const route = `${method} ${path}`
+  if (route !== 'GET /api/me/block-preview' && route !== 'POST /api/me/blocks') return undefined
+  const entitlements = api.entitlements
+  if (!entitlements.canAddBlock) return { status: 409, body: { refusal: 'not_subscribed' } }
+  const next = entitlements.blocks + 1
+  if (method === 'GET') return { status: 200, body: fakeBlockPreviewOf(next) }
+  if ((body as { blocks?: unknown } | null)?.blocks !== next) {
+    return { status: 409, body: { refusal: 'blocks_changed' } }
+  }
+  api.entitlements = { ...entitlements, blocks: next }
+  return { status: 200, body: { blocks: next } }
+}
 
 /** The purge date the fake API's unpick gives the channel it takes out of Pro. */
 export const fakePurgeDate = '2026-12-26T12:00:00.000Z'
@@ -644,6 +677,8 @@ function answerOf(api: FakeApi, { method, path, query, body }: FakeRequest): Ans
   if (route === 'POST /api/me/portal') return ok({ url: fakePortalUrl })
   const pickAnswer = proPickAnswerOf(api, { method, path, query, body })
   if (pickAnswer) return pickAnswer
+  const blockAnswer = blockAnswerOf(api, { method, path, query, body })
+  if (blockAnswer) return blockAnswer
   if (route === 'PUT /api/me/preferences') {
     api.preferences = { ...api.preferences, ...(body as Preferences) }
     return ok(api.preferences)
@@ -796,6 +831,7 @@ export function installFakeApi(preferences: Preferences = {}): FakeApi {
       paidTierOffered: false,
       canSubscribe: false,
       canManage: false,
+      canAddBlock: false,
       blocks: 0,
       slotsInUse: 0,
       channels: [

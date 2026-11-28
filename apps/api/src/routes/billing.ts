@@ -1,4 +1,6 @@
 import {
+  type BlockAddAnswer,
+  type BlockPreviewAnswer,
   billingPlans,
   type CheckoutStartAnswer,
   type EntitlementsAnswer,
@@ -7,23 +9,34 @@ import {
 } from '@creator-analytics/api-types'
 import type { Scoped } from '@creator-analytics/database'
 import {
+  blockSubscriptionOf,
   entitlementOf,
   heldChannelsOf,
   pickProChannel,
   portalCustomerOf,
   proAccountOf,
+  recordSubscription,
   stripeCustomerOf,
   unpickProChannel,
 } from '@creator-analytics/entitlements'
 import type { Context, Hono } from 'hono'
 import type { ApiDependencies } from '../app.ts'
 import { channelIdOf, refuse, type SignedIn } from '../signed-in.ts'
+import { subscriptionSnapshotOf } from '../stripe-events.ts'
 
 /** The plan a Checkout request names, or undefined for a body that names none. */
 async function requestedPlan(request: Request) {
   const body: unknown = await request.json().catch(() => null)
   const plan = typeof body === 'object' && body !== null && 'plan' in body ? body.plan : undefined
   return billingPlans.find((each) => each === plan)
+}
+
+/** The block count an add names, or undefined for a body with no positive integer `blocks`. */
+async function requestedBlocks(request: Request) {
+  const body: unknown = await request.json().catch(() => null)
+  const blocks =
+    typeof body === 'object' && body !== null && 'blocks' in body ? body.blocks : undefined
+  return typeof blocks === 'number' && Number.isInteger(blocks) && blocks >= 1 ? blocks : undefined
 }
 
 type Checked<T> =
@@ -73,6 +86,7 @@ async function entitlementsAnswerOf(
   const canSubscribe =
     billing !== undefined && account.ownedChannels.length > 0 && !account.subscribed
   const canManage = billing !== undefined && account.subscribed
+  const canAddBlock = billing !== undefined && (await blockSubscriptionOf(tx)) !== null
   const channels: EntitlementsAnswer['channels'] = []
   for (const { channelId, owner } of await heldChannelsOf(tx)) {
     const { tier, purgeDate } = await entitlementOf(tx, channelId)
@@ -91,6 +105,7 @@ async function entitlementsAnswerOf(
     paidTierOffered: billing !== undefined,
     canSubscribe,
     canManage,
+    canAddBlock,
     blocks: account.blocks,
     slotsInUse: account.slotsInUse,
     channels,
@@ -110,6 +125,14 @@ async function entitlementsAnswerOf(
  * POST /api/channels/:channelId/checkout and /portal: the routes of the release before blocks,
  * kept for a tab opened before the deploy. Each checks the user holds and owns the channel, as it
  * did, then does what the user's route does.
+ * GET /api/me/block-preview: what one more block costs, read from Stripe: the subscription's own
+ * price, and the prorated charge for the rest of the paid period, on the next invoice.
+ * POST /api/me/blocks `{ blocks }`: raises the user's subscription to the block count the preview
+ * answered, with its proration on the next invoice, and records Stripe's answer at once, so the
+ * new slots fill and count before it answers `{ blocks }`. 409 `blocks_changed` for a count other
+ * than one more than Stripe holds. Both are only for the user's own live paid subscription: a
+ * member of a paid channel holds none, and a user without one is refused 409 `not_subscribed`
+ * and subscribes through Checkout instead (stillstats#22).
  * PUT /api/channels/:channelId/pro-pick: the owner picks the channel for one of their Pro slots;
  * 409 `no_free_slot` without a free slot of a live paid subscription, so a swap takes another
  * channel out first.
@@ -185,6 +208,45 @@ export function billingRoute(
     if ('refusal' in answer) return refuse(c, answer.refusal)
     return c.json(answer satisfies EntitlementsAnswer)
   }
+
+  signedIn.get('/me/block-preview', async (c) => {
+    if (!billing) return c.json({ error: 'not_found' } satisfies ErrorAnswer, 404)
+    const block = await database.asUser(c.get('user').id, blockSubscriptionOf)
+    if (!block) return refuse(c, 'not_subscribed')
+    // Outside the transaction, as the Checkout's.
+    const preview = await billing.previewBlock({ subscriptionId: block.subscription })
+    return c.json({
+      blocks: preview.blocks,
+      plan: preview.plan,
+      price: preview.price,
+      prorated: preview.prorated,
+      periodEnd: preview.periodEnd.toISOString(),
+    } satisfies BlockPreviewAnswer)
+  })
+
+  signedIn.post('/me/blocks', async (c) => {
+    if (!billing) return c.json({ error: 'not_found' } satisfies ErrorAnswer, 404)
+    const blocks = await requestedBlocks(c.req.raw)
+    if (blocks === undefined) return c.json({ error: 'invalid_blocks' } satisfies ErrorAnswer, 400)
+    const block = await database.asUser(c.get('user').id, blockSubscriptionOf)
+    if (!block) return refuse(c, 'not_subscribed')
+    // Outside the transaction, as the Checkout's.
+    const added = await billing.addBlock({ subscriptionId: block.subscription, blocks })
+    if (added.kind === 'blocks_changed') return refuse(c, 'blocks_changed')
+    // Stripe's answer, recorded now through the webhook's own write and its own reading of the
+    // subscription, so the raise, the fill of the new slots and each newly Pro channel's history
+    // download land before the answer. Stamped at the API's clock floored to the whole second,
+    // as Stripe stamps its events: the raise's own event then reads as no older and changes
+    // nothing, and an earlier one at the old quantity reads as older and takes nothing back.
+    const recorded = await database.asAnonymous(async (tx) => {
+      const at = new Date(Math.floor(tx.now.getTime() / 1000) * 1000)
+      const fields = subscriptionSnapshotOf(added.subscription, at)
+      if (!fields) throw new Error(`Stripe's answer to the add of a block is not a Stillstats one`)
+      await recordSubscription(tx, fields)
+      return fields
+    })
+    return c.json({ blocks: recorded.quantity ?? blocks } satisfies BlockAddAnswer)
+  })
 
   signedIn.put('/channels/:channelId/pro-pick', (c) => changePick(c, pickProChannel))
   signedIn.delete('/channels/:channelId/pro-pick', (c) => changePick(c, unpickProChannel))

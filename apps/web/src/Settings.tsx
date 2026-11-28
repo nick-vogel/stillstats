@@ -41,7 +41,12 @@ import {
   themeOptions,
   unpickChannelText,
 } from './settings.ts'
-import { manageSubscriptionText, type ProSection, subscribeTexts } from './subscribe.ts'
+import {
+  addBlockText,
+  manageSubscriptionText,
+  type ProSection,
+  subscribeTexts,
+} from './subscribe.ts'
 import {
   supportHeading,
   supportLinkText,
@@ -56,7 +61,8 @@ import {
  * the user holds a block its purge date while it has one, that it stays Free while every slot is
  * in use, and its pick or unpick control; the Pro
  * section, with the slots in use once the user holds a block, a subscribe action for each plan
- * while they may subscribe and the Customer Portal's while they may manage; the Support section
+ * while they may subscribe, "Add a block" while they may add one, and the Customer Portal's while
+ * they may manage; the Support section
  * when the support answer has a link; and account: the currency revenue shows in, the theme, the
  * RPM switch, connect, reset of the preferences, sign-out and delete. While the channels
  * are read, their place holds a placeholder, until the read fails. A change of currency saves the
@@ -76,6 +82,7 @@ export function Settings({
   onGiveRevenueConsent,
   onSubscribe,
   onManage,
+  onAddBlock,
   onPick,
   onUnpick,
   onConnect,
@@ -98,6 +105,8 @@ export function Settings({
   onGiveRevenueConsent: (channelId: string) => void
   onSubscribe: (plan: BillingPlan) => void
   onManage: () => void
+  /** Adds a block to the user's subscription, once the user confirms its price. */
+  onAddBlock: () => void
   /** Picks the channel for one of the user's Pro slots. */
   onPick: (channelId: string) => void
   /** Takes the channel out of its Pro slot, once the user confirms. */
@@ -203,7 +212,7 @@ export function Settings({
         <section className="settings-section">
           <h2>{proHeading}</h2>
           {pro.blocks > 0 && <p>{proSlotsTextOf(pro.slotsInUse, pro.blocks)}</p>}
-          {(pro.canSubscribe || pro.canManage) && (
+          {(pro.canSubscribe || pro.canManage || pro.canAddBlock) && (
             <div className="app-actions">
               {pro.canSubscribe &&
                 billingPlans.map((plan) => (
@@ -216,6 +225,11 @@ export function Settings({
                     {subscribeTexts[plan]}
                   </button>
                 ))}
+              {pro.canAddBlock && (
+                <button className="button" type="button" onClick={onAddBlock}>
+                  {addBlockText}
+                </button>
+              )}
               {pro.canManage && (
                 <button className="button" type="button" onClick={onManage}>
                   {manageSubscriptionText}

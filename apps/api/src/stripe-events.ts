@@ -2,7 +2,7 @@ import { billingPlans } from '@creator-analytics/api-types'
 import { isInternalId } from '@creator-analytics/database'
 import { type Plan, purgeDateOf, type SubscriptionFields } from '@creator-analytics/entitlements'
 import Stripe from 'stripe'
-import { channelMetadataKey, userMetadataKey } from './billing.ts'
+import { channelMetadataKey, planOfPrice, userMetadataKey } from './billing.ts'
 
 export type ReadStripeEvent = { ok: true; event: Stripe.Event } | { ok: false }
 
@@ -121,24 +121,9 @@ function dateOf(seconds: number): Date {
   return new Date(seconds * 1000)
 }
 
-/**
- * The plan of each billing interval Stillstats sells: a price billed every month is the monthly
- * plan, and every year the annual one, whatever its price ID (ADR 0022).
- */
-const planOfInterval: Partial<Record<Stripe.Price.Recurring.Interval, Plan>> = {
-  month: 'monthly',
-  year: 'annual',
-}
-
-/**
- * The plan a subscription item's price bills at, from its `recurring.interval`, or null for an
- * interval Stillstats sells no plan at: a day, a week, or more than one month or year between
- * billings (docs.stripe.com/api/prices/object).
- */
+/** The plan a subscription item's price bills at, or null for one Stillstats sells no plan at. */
 function planOf(item: Stripe.SubscriptionItem): Plan | null {
-  const recurring = item.price.recurring
-  if (recurring?.interval_count !== 1) return null
-  return planOfInterval[recurring.interval] ?? null
+  return planOfPrice(item.price)
 }
 
 type SubscriptionRead =
@@ -187,6 +172,22 @@ function subscriptionFieldsOf(
       purgeAfter,
     },
   }
+}
+
+/**
+ * What Stripe's answer to a Stillstats update of the subscription says of it, read as the webhook
+ * reads its `customer.subscription.updated`, stamped `at`, for the API to record at once: a raise
+ * of its blocks is then usable before the API answers, and the webhook's later event of the same
+ * change records nothing new. Null for a subscription no Stillstats Checkout made, or one with no
+ * item.
+ */
+export function subscriptionSnapshotOf(
+  subscription: Stripe.Subscription,
+  at: Date,
+): SubscriptionFields | null {
+  const read = subscriptionFieldsOf(subscription, null)
+  if (read.kind !== 'fields') return null
+  return { ...read.fields, eventCreated: at }
 }
 
 /**

@@ -19,7 +19,14 @@ import {
   rpmSourcesToggledEvent,
   settingsOpenedEvent,
 } from './settings.ts'
-import { proSectionOf } from './subscribe.ts'
+import {
+  addBlockQuestionOf,
+  addBlockText,
+  blockAddedEvent,
+  blockAddedTextOf,
+  blocksChangedText,
+  proSectionOf,
+} from './subscribe.ts'
 
 describe('the event the Settings screen sends', () => {
   test('is settings_opened, with no other value', () => {
@@ -137,6 +144,7 @@ describe("each owned channel's pick control in the Pro section (stillstats#21)",
       paidTierOffered: true,
       canSubscribe: false,
       canManage: true,
+      canAddBlock: true,
       blocks: 1,
       slotsInUse: 1,
       ...user,
@@ -210,5 +218,56 @@ describe('the purge date line under a channel taken out of Pro (stillstats#21)',
     expect(proPurgeTextOf('2026-12-26T12:00:00.000Z', 'en-US')).toBe(
       'Its stored history is deleted on December 26, 2026 unless you pick it for Pro again.',
     )
+  })
+})
+
+describe('the Pro section carries whether the user may add a block (stillstats#22)', () => {
+  test.for([true, false])('canAddBlock %s from the answer', (canAddBlock) => {
+    const section = proSectionOf({
+      paidTierOffered: true,
+      canSubscribe: false,
+      canManage: true,
+      canAddBlock,
+      blocks: 1,
+      slotsInUse: 1,
+      channels: [],
+    })
+
+    expect(section?.canAddBlock).toBe(canAddBlock)
+  })
+})
+
+describe('the strings of an add of a block (stillstats#22)', () => {
+  const preview = {
+    blocks: 2,
+    plan: 'monthly',
+    price: { amount: 700, currency: 'usd' },
+    prorated: { amount: 350, currency: 'usd' },
+    periodEnd: '2026-12-17T12:00:00.000Z',
+  } as const
+
+  test("the question names the preview's price, its period, the next invoice's day and the prorated charge", () => {
+    expect(addBlockQuestionOf(preview, 'en-US')).toBe(
+      'Add a block of 4 more Pro slots for $7 a month? Your next invoice, on December 17, 2026, also charges $3.50 for the rest of this month.',
+    )
+    expect(addBlockQuestionOf({ ...preview, plan: 'annual' }, 'en-US')).toContain(' a year?')
+  })
+
+  test('the toast names the slots the blocks now hold', () => {
+    expect(blockAddedTextOf(2)).toBe('Block added. You now have 8 Pro slots.')
+  })
+
+  test('the event is block_added with the block count, and no channel, user or amount', () => {
+    expect(blockAddedEvent(3)).toEqual({ name: 'block_added', blocks: 3 })
+  })
+
+  test('no string of it carries an em-dash', () => {
+    const strings = [
+      addBlockText,
+      addBlockQuestionOf(preview, 'en-US'),
+      blockAddedTextOf(2),
+      blocksChangedText,
+    ]
+    expect(strings.filter((text) => text.includes('\u2014'))).toEqual([])
   })
 })

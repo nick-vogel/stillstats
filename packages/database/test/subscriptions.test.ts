@@ -11,7 +11,7 @@ import {
 } from '../src/schema.ts'
 import type { Scoped, ScopeKind, WebDatabase, WorkerDatabase } from '../src/scopes.ts'
 import { test } from './harness.ts'
-import { recordUserSubscription } from './pro.ts'
+import { recordUserSubscription, unpickChannel } from './pro.ts'
 import { seedChannel, seedUser } from './seed.ts'
 
 interface Recorded {
@@ -763,6 +763,133 @@ describe("a block of Pro covers 4 of the user's channels (stillstats#20)", () =>
 
     expect(await proStates(web, ids.slice(1))).toEqual([true, true, true, false])
     expect(await worker.forChannel(first, proStateOf(first))).toBe(false)
+  })
+})
+
+describe('a block added while paid fills its new slots at once (stillstats#22)', () => {
+  /** The user's owned channels, connected in the order given, out of order of their ids. */
+  async function ownedChannels(web: WebDatabase, worker: WorkerDatabase, count: number) {
+    const ids: string[] = []
+    for (let n = count; n > 0; n--) {
+      ids.unshift(await ownedChannel(web, worker, ownerId, connected(n)))
+    }
+    return ids
+  }
+
+  const proStates = (web: WebDatabase, ids: string[]) =>
+    web.asUser(ownerId, async (scope) => {
+      const states: boolean[] = []
+      for (const id of ids) states.push((await proStateOf(id)(scope)) ?? false)
+      return states
+    })
+
+  const raise = (quantity: number, minutes: number) =>
+    recordTurn(ownerId, { ...created, status: 'active', quantity, eventCreated: later(minutes) })
+
+  test('a raise from 1 block to 2 picks the fifth and sixth channels in connection order and answers only them', async ({
+    web,
+    worker,
+  }) => {
+    const ids = await ownedChannels(web, worker, 6)
+    await web.asAnonymous(record(ownerId, completed))
+
+    const { outcome, turnedPro } = await web.asAnonymous(raise(2, 1))
+
+    expect(outcome).toBe('recorded')
+    expect(turnedPro).toEqual(ids.slice(4))
+    expect(await proStates(web, ids)).toEqual(ids.map(() => true))
+  })
+
+  test('a raise for an owner whose every channel is already picked answers nothing', async ({
+    web,
+    worker,
+  }) => {
+    const ids = await ownedChannels(web, worker, 3)
+    await web.asAnonymous(record(ownerId, completed))
+
+    const { outcome, turnedPro } = await web.asAnonymous(raise(2, 1))
+
+    expect({ outcome, turnedPro }).toEqual({ outcome: 'recorded', turnedPro: [] })
+    expect(await web.asUser(ownerId, readSubscriptions)).toMatchObject([{ quantity: 2 }])
+    expect(await proStates(web, ids)).toEqual([true, true, true])
+  })
+
+  test('an older event carrying a higher quantity raises nothing and picks nothing', async ({
+    web,
+    worker,
+  }) => {
+    const ids = await ownedChannels(web, worker, 5)
+    await web.asAnonymous(record(ownerId, { ...completed, eventCreated: later(2) }))
+
+    const { outcome, turnedPro } = await web.asAnonymous(raise(2, 1))
+
+    expect(turnedPro).toEqual([])
+    expect(outcome).toBe('recorded')
+    expect(await web.asUser(ownerId, readSubscriptions)).toMatchObject([{ quantity: 1 }])
+    expect(await proStates(web, ids)).toEqual([true, true, true, true, false])
+  })
+
+  test('a channel the user holds without owning it is never picked on a raise', async ({
+    web,
+    worker,
+  }) => {
+    const ids = await ownedChannels(web, worker, 5)
+    const held = await memberChannel(web, worker, ownerId)
+    await web.asAnonymous(record(ownerId, completed))
+
+    const { turnedPro } = await web.asAnonymous(raise(2, 1))
+
+    expect(turnedPro).toEqual(ids.slice(4))
+    expect(await proStates(web, [held])).toEqual([false])
+    expect(
+      await worker.forChannel(held, (scope) =>
+        scope.sql.select({ userId: proPicks.userId }).from(proPicks),
+      ),
+    ).toEqual([])
+  })
+
+  test('a channel taken out of its block is picked again by the raise, and keeps its history', async ({
+    web,
+    worker,
+  }) => {
+    const ids = await ownedChannels(web, worker, 4)
+    const [first = ''] = ids
+    await web.asAnonymous(record(ownerId, completed))
+    await web.asUser(ownerId, (scope) => unpickChannel(scope, first, purgeAfter))
+
+    const { turnedPro } = await web.asAnonymous(raise(2, 1))
+
+    expect(turnedPro).toEqual([first])
+    expect(await web.asUser(ownerId, purgeOf(first))).toBeNull()
+    expect(await proStates(web, ids)).toEqual([true, true, true, true])
+  })
+
+  test('picks a cut left outside the capacity count again on a raise, and the raise picks nothing more', async ({
+    web,
+    worker,
+  }) => {
+    const ids = await ownedChannels(web, worker, 9)
+    await web.asAnonymous(record(ownerId, { ...completed, quantity: 2 }))
+    const cut = await web.asAnonymous(raise(1, 1))
+
+    const { turnedPro } = await web.asAnonymous(raise(2, 2))
+
+    expect(cut.turnedPro).toEqual([])
+    expect(turnedPro).toEqual(ids.slice(4, 8))
+    expect(await proStates(web, ids)).toEqual([...ids.slice(0, 8).map(() => true), false])
+  })
+
+  test('a repeated delivery of the raise answers unchanged and nothing turned Pro', async ({
+    web,
+    worker,
+  }) => {
+    await ownedChannels(web, worker, 6)
+    await web.asAnonymous(record(ownerId, completed))
+    await web.asAnonymous(raise(2, 1))
+
+    const { outcome, turnedPro } = await web.asAnonymous(raise(2, 1))
+
+    expect({ outcome, turnedPro }).toEqual({ outcome: 'unchanged', turnedPro: [] })
   })
 })
 

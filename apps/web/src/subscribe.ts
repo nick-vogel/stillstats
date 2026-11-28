@@ -1,5 +1,15 @@
-import type { BillingPlan, EntitlementsAnswer, Tier } from '@creator-analytics/api-types'
+import type {
+  BillingPlan,
+  BlockPreviewAnswer,
+  EntitlementsAnswer,
+  Tier,
+} from '@creator-analytics/api-types'
 import type { ProductEvent } from './landing.ts'
+import { longDateOf } from './processing.ts'
+import { moneyOf } from './upgrade.ts'
+
+/** The slots each block of Pro holds, as `slotsPerBlock` in `@creator-analytics/entitlements`. */
+const slotsPerBlock = 4
 
 // Drafted for creator-analytics#780; the two subscribe labels are approved word for word in
 // creator-analytics#913. Change them only with Nick. No price: a price shows only where it is read
@@ -25,6 +35,43 @@ export const manageSubscriptionText = 'Manage subscription' // approved by Nick 
  */
 export const portalOpenedEvent: ProductEvent = { name: 'customer_portal_opened' }
 
+// Drafted for stillstats#22, for Nick's word-for-word approval: the action that adds a block, the
+// question it asks first with the price and the prorated charge read from Stripe, the toast once
+// the block is added, and the alert of a refused add. No price is written here: each comes from
+// the preview the API read from Stripe.
+/** The action that adds one block of Pro to the user's subscription. */
+export const addBlockText = 'Add a block'
+
+const periodNames: Record<BillingPlan, string> = { monthly: 'month', annual: 'year' }
+
+/**
+ * The question an add asks before it charges: the new block's price for each period, and the
+ * prorated charge for the rest of this one, which the next invoice carries.
+ */
+export function addBlockQuestionOf(preview: BlockPreviewAnswer, locale?: string): string {
+  const price = moneyOf(preview.price.amount, preview.price.currency, locale)
+  const prorated = moneyOf(preview.prorated.amount, preview.prorated.currency, locale)
+  const next = longDateOf(preview.periodEnd.slice(0, 10), locale)
+  return `Add a block of 4 more Pro slots for ${price} a ${periodNames[preview.plan]}? Your next invoice, on ${next}, also charges ${prorated} for the rest of this ${periodNames[preview.plan]}.`
+}
+
+/** The toast once the block is added: the slots the user's blocks now hold. */
+export function blockAddedTextOf(blocks: number): string {
+  return `Block added. You now have ${blocks * slotsPerBlock} Pro slots.`
+}
+
+/** The alert of an add the API refused because the blocks changed since the preview. */
+export const blocksChangedText =
+  'Your blocks changed since that price was shown. Add a block again to see the new price.'
+
+/**
+ * The event an add the API accepted sends: the user's blocks after it, and no channel, user or
+ * amount.
+ */
+export function blockAddedEvent(blocks: number): ProductEvent {
+  return { name: 'block_added', blocks }
+}
+
 /** The control under an owned channel that picks it for a Pro slot, or takes it out of its one. */
 export type PickControl = 'pick' | 'unpick'
 
@@ -48,15 +95,14 @@ export interface ProSection {
   canSubscribe: boolean
   /** Whether the user may open their Customer Portal, so the section shows "Manage subscription". */
   canManage: boolean
+  /** Whether the user may add a block to their live paid subscription, "Add a block". */
+  canAddBlock: boolean
   /** The blocks the user holds, 4 slots each: the section says the slots in use once there is one. */
   blocks: number
   slotsInUse: number
   /** Each channel the user owns, by ID. */
   channels: ReadonlyMap<string, ProChannel>
 }
-
-/** The slots each block of Pro holds, as `slotsPerBlock` in `@creator-analytics/entitlements`. */
-const slotsPerBlock = 4
 
 /**
  * The Settings screen's Pro section: null before the answer lands, with Pro not offered, so Settings
@@ -67,7 +113,7 @@ const slotsPerBlock = 4
  */
 export function proSectionOf(answer: EntitlementsAnswer | null): ProSection | null {
   if (!answer?.paidTierOffered) return null
-  const { canSubscribe, canManage, blocks, slotsInUse } = answer
+  const { canSubscribe, canManage, canAddBlock, blocks, slotsInUse } = answer
   if (!canSubscribe && !canManage && blocks === 0) return null
   const slotsFull = blocks > 0 && slotsInUse >= blocks * slotsPerBlock
   const channels = new Map(
@@ -85,5 +131,5 @@ export function proSectionOf(answer: EntitlementsAnswer | null): ProSection | nu
         return [channelId, channel]
       }),
   )
-  return { canSubscribe, canManage, blocks, slotsInUse, channels }
+  return { canSubscribe, canManage, canAddBlock, blocks, slotsInUse, channels }
 }

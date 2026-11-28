@@ -346,3 +346,222 @@ describe('a seeded subscription in the fake Stripe server', () => {
     expect(stripe.refunds).toEqual([])
   })
 })
+
+describe('a block added to a seeded subscription in the fake Stripe server (stillstats#22)', () => {
+  async function seededWithItem() {
+    const { stripe, client } = await started()
+    stripe.addPrice({ id: 'price_test_block', unitAmount: 900, product: 'prod_test_block' })
+    stripe.addSubscription({
+      id: 'sub_fake',
+      customer: 'cus_fake',
+      periodStart,
+      periodEnd,
+      amountPaid: 900,
+      itemId: 'si_fake',
+      price: 'price_test_block',
+      metadata: { stillstats_user_id: 'fake-stripe-block-user' },
+    })
+    return { stripe, client }
+  }
+
+  test('reads back with its metadata, and one item with its ID, price, quantity and period end', async () => {
+    const { client } = await seededWithItem()
+
+    const subscription = await client.subscriptions.retrieve('sub_fake')
+
+    expect(subscription.metadata).toEqual({ stillstats_user_id: 'fake-stripe-block-user' })
+    expect(subscription.items.data).toMatchObject([
+      {
+        id: 'si_fake',
+        quantity: 1,
+        current_period_end: periodEnd.getTime() / 1000,
+        price: {
+          id: 'price_test_block',
+          unit_amount: 900,
+          currency: 'usd',
+          product: 'prod_test_block',
+          recurring: { interval: 'month', interval_count: 1 },
+        },
+      },
+    ])
+  })
+
+  test('an update applies the quantity to the item it names, records its parameters and idempotency key, and answers the subscription', async () => {
+    const { stripe, client } = await seededWithItem()
+
+    const updated = await client.subscriptions.update(
+      'sub_fake',
+      { items: [{ id: 'si_fake', quantity: 2 }], proration_behavior: 'create_prorations' },
+      { idempotencyKey: 'add-block-1' },
+    )
+
+    expect(updated.items.data.map(({ quantity }) => quantity)).toEqual([2])
+    expect(
+      (await client.subscriptions.retrieve('sub_fake')).items.data.map(({ quantity }) => quantity),
+    ).toEqual([2])
+    expect(
+      stripe.subscriptionUpdates.map(({ subscription, params, idempotencyKey }) => [
+        subscription,
+        Object.fromEntries(params),
+        idempotencyKey,
+      ]),
+    ).toEqual([
+      [
+        'sub_fake',
+        {
+          'items[0][id]': 'si_fake',
+          'items[0][quantity]': '2',
+          proration_behavior: 'create_prorations',
+        },
+        'add-block-1',
+      ],
+    ])
+  })
+
+  test('an update that names another item is refused and changes nothing', async () => {
+    const { client } = await seededWithItem()
+
+    const updating = client.subscriptions.update('sub_fake', {
+      items: [{ id: 'si_other', quantity: 2 }],
+    })
+
+    await expect(updating).rejects.toMatchObject({ statusCode: 400 })
+    expect(
+      (await client.subscriptions.retrieve('sub_fake')).items.data.map(({ quantity }) => quantity),
+    ).toEqual([1])
+  })
+
+  test('failed updates answer their status and change nothing, until they end', async () => {
+    const { stripe, client } = await seededWithItem()
+    stripe.failUpdates(402)
+
+    const updating = client.subscriptions.update('sub_fake', {
+      items: [{ id: 'si_fake', quantity: 2 }],
+    })
+
+    await expect(updating).rejects.toMatchObject({ statusCode: 402 })
+    expect(stripe.subscriptionUpdates).toEqual([])
+    stripe.failUpdates(null)
+    await client.subscriptions.update('sub_fake', { items: [{ id: 'si_fake', quantity: 2 }] })
+    expect(stripe.subscriptionUpdates).toHaveLength(1)
+  })
+
+  test('a preview answers the seeded proration as a proration line and the next period at the new quantity, and records the body', async () => {
+    const { stripe, client } = await seededWithItem()
+    stripe.setProration('sub_fake', 450)
+
+    const preview = await client.invoices.createPreview({
+      subscription: 'sub_fake',
+      subscription_details: {
+        items: [{ id: 'si_fake', quantity: 2 }],
+        proration_behavior: 'create_prorations',
+      },
+    })
+
+    expect(
+      preview.lines.data.map((line) => ({
+        amount: line.amount,
+        proration: line.parent?.subscription_item_details?.proration,
+      })),
+    ).toEqual([
+      { amount: 450, proration: true },
+      { amount: 1800, proration: false },
+    ])
+    expect(preview.currency).toBe('usd')
+    expect(stripe.invoicePreviews.map((body) => Object.fromEntries(body))).toEqual([
+      {
+        subscription: 'sub_fake',
+        'subscription_details[items][0][id]': 'si_fake',
+        'subscription_details[items][0][quantity]': '2',
+        'subscription_details[proration_behavior]': 'create_prorations',
+      },
+    ])
+  })
+
+  test('a preview of a subscription it does not hold answers 404', async () => {
+    const { client } = await started()
+
+    await expect(
+      client.invoices.createPreview({ subscription: 'sub_missing' }),
+    ).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
+describe('Customer Portal configurations in the fake Stripe server (stillstats#22)', () => {
+  test('a configuration created is listed with its metadata, updated in place, and each body recorded', async () => {
+    const { stripe, client } = await started()
+
+    const created = await client.billingPortal.configurations.create({
+      features: { invoice_history: { enabled: true } },
+      metadata: { stillstats: 'portal' },
+    })
+    const listed = await client.billingPortal.configurations.list({ active: true })
+    const updated = await client.billingPortal.configurations.update(created.id, {
+      features: { invoice_history: { enabled: false } },
+    })
+
+    expect(created).toMatchObject({
+      object: 'billing_portal.configuration',
+      active: true,
+      is_default: false,
+      metadata: { stillstats: 'portal' },
+    })
+    expect(listed.data.map(({ id, metadata }) => ({ id, metadata }))).toEqual([
+      { id: created.id, metadata: { stillstats: 'portal' } },
+    ])
+    expect(updated.id).toBe(created.id)
+    expect(
+      stripe.portalConfigurations.map(({ configuration, params }) => [
+        configuration,
+        Object.fromEntries(params),
+      ]),
+    ).toEqual([
+      [
+        null,
+        {
+          'features[invoice_history][enabled]': 'true',
+          'metadata[stillstats]': 'portal',
+        },
+      ],
+      [created.id, { 'features[invoice_history][enabled]': 'false' }],
+    ])
+  })
+
+  test('a seeded configuration is listed, an inactive one only without the active filter', async () => {
+    const { stripe, client } = await started()
+    const active = stripe.addPortalConfiguration({ metadata: { stillstats: 'portal' } })
+    const inactive = stripe.addPortalConfiguration({ metadata: {}, active: false })
+
+    const listedActive = await client.billingPortal.configurations.list({ active: true })
+    const listedAll = await client.billingPortal.configurations.list()
+
+    expect(listedActive.data.map(({ id }) => id)).toEqual([active])
+    expect(listedAll.data.map(({ id }) => id)).toEqual([active, inactive])
+  })
+
+  test('a Portal session records the configuration it names', async () => {
+    const { stripe, client } = await started()
+
+    await client.billingPortal.sessions.create({
+      customer: 'cus_test_portal',
+      configuration: 'bpc_test',
+    })
+
+    expect(stripe.portalSessions.map((body) => body.get('configuration'))).toEqual(['bpc_test'])
+  })
+
+  test('failed configuration calls answer their status and record nothing, until they end', async () => {
+    const { stripe, client } = await started()
+    stripe.failPortalConfigurations(500)
+
+    await expect(client.billingPortal.configurations.list()).rejects.toMatchObject({
+      statusCode: 500,
+    })
+    await expect(
+      client.billingPortal.configurations.create({ features: {} }),
+    ).rejects.toMatchObject({ statusCode: 500 })
+    expect(stripe.portalConfigurations).toEqual([])
+    stripe.failPortalConfigurations(null)
+    expect((await client.billingPortal.configurations.list()).data).toEqual([])
+  })
+})
