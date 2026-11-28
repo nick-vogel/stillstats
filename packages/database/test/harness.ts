@@ -24,7 +24,15 @@ import type {} from './database-urls.ts'
 export { channelRowCounts } from './channel-rows.ts'
 export { readFeedbackMessages } from './feedback-rows.ts'
 export { fixtureNotes } from './fixtures.ts'
-export { ownerOf, type RecordedEvent, recordUserSubscription, subscribeOwner } from './pro.ts'
+export {
+  ownerOf,
+  type PickAnswer,
+  pickChannel,
+  type RecordedEvent,
+  recordUserSubscription,
+  subscribeOwner,
+  unpickChannel,
+} from './pro.ts'
 export { seedChannel, seedUser } from './seed.ts'
 
 export const databaseUrls = () => inject('databaseUrls')

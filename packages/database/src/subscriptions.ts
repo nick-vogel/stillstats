@@ -1,4 +1,4 @@
-import { type SQLWrapper, sql } from 'drizzle-orm'
+import { type SQL, type SQLWrapper, sql } from 'drizzle-orm'
 import {
   check,
   index,
@@ -14,8 +14,10 @@ import {
   inScope,
   isScopeChannel,
   isScopeUser,
+  proPickRole,
   proStateRole,
   userChannelIds,
+  userOwnedChannelIds,
   webPolicy,
   workerScopePolicy,
 } from './access.ts'
@@ -47,6 +49,20 @@ function proStatePolicy(table: string) {
     for: 'select',
     to: proStateRole,
     using: sql`(${inScope('user')} or ${inScope('channel')})`,
+  })
+}
+
+/**
+ * Admits to `app_pro_pick` in a user scope the rows the condition names, for the command given.
+ * Only pick_pro_channel and unpick_pro_channel run as `app_pro_pick` (migration 0042).
+ */
+function proPickPolicy(table: string, command: 'select' | 'update' | 'all', condition: SQL) {
+  const admitted = inScope('user', condition)
+  return pgPolicy(`${table}_pro_pick_${command}`, {
+    for: command,
+    to: proPickRole,
+    using: admitted,
+    ...(command === 'select' ? {} : { withCheck: admitted }),
   })
 }
 
@@ -87,6 +103,10 @@ export const userSubscriptions = pgTable(
     webPolicy('user_subscriptions', 'select', isScopeUser(t.userId)),
     billingPolicy('user_subscriptions'),
     proStatePolicy('user_subscriptions'),
+    // The pick and the unpick lock the user's own row, which FOR UPDATE takes through an update
+    // policy; neither updates it.
+    proPickPolicy('user_subscriptions', 'select', isScopeUser(t.userId)),
+    proPickPolicy('user_subscriptions', 'update', isScopeUser(t.userId)),
   ],
 )
 
@@ -95,9 +115,11 @@ export const userSubscriptions = pgTable(
  * channel is Pro while its pick counts, its user still holding the channel's owner membership,
  * and ranks inside its user's capacity, 4 slots for each live paid block, by `pickedAt` and then
  * the order the channels were connected (pro_state, migration 0041). A disconnect ends the
- * membership at once, so the slot frees before the deletion cascades the pick away. Only the
- * webhook's fill, through record_user_subscription, writes it in this release; the channel's
- * members and the picking user read it, and the channel scope reads its own channel's.
+ * membership at once, so the slot frees before the deletion cascades the pick away. Two paths
+ * write it: the webhook's fill, through record_user_subscription, and the owner's own pick and
+ * unpick, through pick_pro_channel and unpick_pro_channel (migration 0042), which run as
+ * `app_pro_pick` in the user scope. The channel's members and the picking user read it, and the
+ * channel scope reads its own channel's.
  */
 export const proPicks = pgTable(
   'pro_picks',
@@ -120,6 +142,13 @@ export const proPicks = pgTable(
     workerScopePolicy('pro_picks', 'channel', 'select', isScopeChannel(t.channelId)),
     billingPolicy('pro_picks'),
     proStatePolicy('pro_picks'),
+    // The user's own picks, and an earlier owner's pick of a channel the user owns now, which a
+    // pick takes over as the fill does.
+    proPickPolicy(
+      'pro_picks',
+      'all',
+      sql`(${isScopeUser(t.userId)} or ${t.channelId} in ${userOwnedChannelIds})`,
+    ),
   ],
 )
 
@@ -182,12 +211,14 @@ export const subscriptions = channelOwned(
 /**
  * When a channel stopped being Pro and when its stored history is deleted, at most one row per
  * channel (#787, stillstats#19). The channel owns it, not its subscription, so each channel a
- * subscription covers can end Pro at its own time. Stripe's webhook writes it only through the
+ * subscription covers can end Pro at its own time. Stripe's webhook writes it through the
  * record_user_subscription function (migration 0041), as `app_billing` in the anonymous scope: an
  * end event sets the purge date 30 days after the end on every pick inside the user's capacity,
  * and a turn to paid deletes the row of every pick inside it, so a return before the date keeps
- * the history. The history purge's channel scope clears the purge date once it has deleted the
- * channel's history (#789), and keeps the end.
+ * the history. The owner's unpick of a Pro channel, through unpick_pro_channel (migration 0042),
+ * sets its purge date 30 days on, and a pick that turns it Pro again deletes the row. The history
+ * purge's channel scope clears the purge date once it has deleted the channel's history (#789),
+ * and keeps the end.
  */
 export const proEnds = channelOwned(
   'pro_ends',
@@ -198,7 +229,10 @@ export const proEnds = channelOwned(
   },
   {
     onePerChannel: true,
-    extraConfig: () => [billingPolicy('pro_ends')],
+    extraConfig: (t) => [
+      billingPolicy('pro_ends'),
+      proPickPolicy('pro_ends', 'all', sql`${t.channelId} in ${userOwnedChannelIds}`),
+    ],
   },
 )
 

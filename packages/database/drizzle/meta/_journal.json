@@ -295,6 +295,13 @@
       "when": 1795823778301,
       "tag": "0041_user_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1795828799294,
+      "tag": "0042_pro_picks_by_owner",
+      "breakpoints": true
     }
   ]
 }

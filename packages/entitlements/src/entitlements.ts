@@ -207,6 +207,85 @@ export async function proAccountOf(tx: Scoped<'user'>): Promise<ProAccount> {
   }
 }
 
+/** Why the owner's pick of a channel was refused; an unpick is never `no_free_slot`. */
+export type PickRefusal = 'not_connected' | 'not_owner' | 'no_free_slot'
+
+/** What a pick or an unpick answers: whether it changed the picks, or why it was refused. */
+export type PickAnswer<TRefusal extends PickRefusal = PickRefusal> =
+  | { ok: true; changed: boolean }
+  | { ok: false; refusal: TRefusal }
+
+type PickOutcome = 'picked' | 'unpicked' | 'unchanged' | PickRefusal
+
+/**
+ * The scope user picks the channel for one of their Pro slots, through the pick_pro_channel
+ * function (migration 0042): only its owner may, and only into a free slot of a live paid
+ * subscription, so swapping a channel in takes another out first. A pick that turns the channel
+ * Pro clears its purge date, so a pick before it keeps the history, and sends its history
+ * download now; after the purge, the download starts again from the reports YouTube still holds,
+ * as a return does. A channel already picked answers unchanged.
+ */
+export async function pickProChannel(tx: Scoped<'user'>, channelId: string): Promise<PickAnswer> {
+  const result = await tx.sql.execute<{ outcome: PickOutcome; turned_pro: string[] }>(
+    sql`select outcome, turned_pro from pick_pro_channel(${channelId}::uuid)`,
+  )
+  return pickAnswerOf(tx, result.rows[0], 'pick_pro_channel')
+}
+
+/**
+ * The scope user unpicks the channel, through the unpick_pro_channel function (migration 0042),
+ * which frees its slot. A channel that was Pro turns free and gets its purge date 30 days on, so
+ * its history is deleted then unless it is picked again; one already free keeps the date it holds.
+ * The freed slot fills with nothing. A pick beyond the capacity that ranks inside it once this one
+ * leaves turns Pro, and its history download is sent, as a pick's is.
+ */
+export async function unpickProChannel(
+  tx: Scoped<'user'>,
+  channelId: string,
+): Promise<PickAnswer<'not_connected' | 'not_owner'>> {
+  const result = await tx.sql.execute<{ outcome: PickOutcome; turned_pro: string[] }>(
+    sql`select outcome, turned_pro from unpick_pro_channel(${channelId}::uuid, ${purgeDateOf(tx.now).toISOString()}::timestamptz)`,
+  )
+  const answer = await pickAnswerOf(tx, result.rows[0], 'unpick_pro_channel')
+  if (!answer.ok && answer.refusal === 'no_free_slot') {
+    throw new Error('unpick_pro_channel answered no_free_slot')
+  }
+  return answer as PickAnswer<'not_connected' | 'not_owner'>
+}
+
+/**
+ * Fills a free slot of the scope user with the channel they just connected, so a new channel is
+ * Pro while a slot is free, and stays free when every slot is in use, or without a live paid
+ * subscription, so the bill never grows without the creator's action. Answers whether it picked
+ * the channel. The claim already sent the channel's history download.
+ */
+export async function fillFreeSlot(tx: Scoped<'user'>, channelId: string): Promise<boolean> {
+  const result = await tx.sql.execute<{ outcome: PickOutcome; turned_pro: string[] }>(
+    sql`select outcome, turned_pro from pick_pro_channel(${channelId}::uuid)`,
+  )
+  const [answer] = result.rows
+  if (!answer?.outcome) throw new Error('pick_pro_channel answered no outcome')
+  return answer.outcome === 'picked'
+}
+
+async function pickAnswerOf(
+  tx: Scoped<'user'>,
+  answer: { outcome: PickOutcome; turned_pro: string[] } | undefined,
+  name: string,
+): Promise<PickAnswer> {
+  if (!answer?.outcome) throw new Error(`${name} answered no outcome`)
+  await sendTurnedProDownloads(tx, answer.turned_pro ?? [])
+  switch (answer.outcome) {
+    case 'picked':
+    case 'unpicked':
+      return { ok: true, changed: true }
+    case 'unchanged':
+      return { ok: true, changed: false }
+    default:
+      return { ok: false, refusal: answer.outcome }
+  }
+}
+
 const hourMs = 60 * 60 * 1000
 
 // Well inside a day, so a cancellation Stripe keeps refusing is reported while the user can still
@@ -315,12 +394,25 @@ export async function recordSubscription(
   )
   const [answer] = result.rows
   if (!answer?.outcome) throw new Error('record_user_subscription answered no outcome')
-  for (const channelId of answer.turned_pro ?? []) {
+  await sendTurnedProDownloads(tx, answer.turned_pro ?? [])
+  return answer.outcome
+}
+
+/**
+ * Sends the ensureReportingJob job of each channel that turned Pro, in the caller's transaction,
+ * so its history downloads now and not at the next daily roster run (#1034), throttled to one per
+ * channel in each `subscribedSlotSeconds` slot under its own purpose, so the roster's daily slot
+ * for the channel neither blocks it nor is taken by it.
+ */
+async function sendTurnedProDownloads(
+  tx: Scoped<'anonymous' | 'user'>,
+  channelIds: string[],
+): Promise<void> {
+  for (const channelId of channelIds) {
     await tx.enqueue(
       'ensureReportingJob',
       { channelId },
       { throttle: { key: channelId, seconds: subscribedSlotSeconds, purpose: 'subscribed' } },
     )
   }
-  return answer.outcome
 }

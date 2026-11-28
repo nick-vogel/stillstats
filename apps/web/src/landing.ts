@@ -69,6 +69,8 @@ export type ProductEvent =
   | { name: 'feedback_sent'; type: FeedbackType }
   | { name: 'checkout_started'; plan: BillingPlan }
   | { name: 'customer_portal_opened' }
+  /** A pick of a Pro channel the API accepted: the user's blocks, and no channel or figure. */
+  | { name: 'pro_channel_selected'; blocks: number }
   | { name: 'upgrade_screen_viewed' }
   | { name: 'upgrade_link_clicked'; source: Exclude<UpgradeLinkSource, 'homepage'> }
   | { name: 'upgrade_prompt_dismissed' }

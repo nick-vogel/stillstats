@@ -27,6 +27,12 @@ export const billingRole = pgRole('app_billing')
 // subscription and other picks, which neither a member's user scope nor a channel scope may read.
 export const proStateRole = pgRole('app_pro_state')
 
+// Owns the pick_pro_channel and unpick_pro_channel functions and nothing else, and no login role is
+// a member of it. A pick is checked against the user's free slots under a lock on their
+// subscription row, which the user scope reads and may not lock as app_web, and it writes the
+// user's picks and their owned channels' pro_ends rows, which the user scope writes none of itself.
+export const proPickRole = pgRole('app_pro_pick')
+
 export type SettingName = 'app.scope' | 'app.user_id' | 'app.channel_id' | 'app.now'
 
 // A setting never set reads as null, but one set by an earlier transaction on the same connection
@@ -45,6 +51,9 @@ export function isScopeUser(userId: SQLWrapper): SQL {
 }
 
 export const userChannelIds = sql`(select m.channel_id from memberships m where m.user_id = ${setting('app.user_id')})`
+
+/** The channels the scope's user owns, as their memberships admit them. */
+export const userOwnedChannelIds = sql`(select m.channel_id from memberships m where m.user_id = ${setting('app.user_id')} and m.role = 'owner')`
 
 export function inScope(scope: ScopeKind, condition?: SQL): SQL {
   const scoped = sql`${setting('app.scope')} = '${sql.raw(scope)}'`

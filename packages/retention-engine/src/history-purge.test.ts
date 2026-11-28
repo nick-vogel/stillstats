@@ -12,14 +12,21 @@ import {
   retentionCurves,
   type Scoped,
   subscriptions,
+  type WebDatabase,
   type WorkerDatabase,
 } from '@creator-analytics/database'
 import {
   test as databaseTest,
   seedChannel,
   subscribeOwner,
+  type TestClock,
 } from '@creator-analytics/database/testing'
-import { purgeDateOf } from '@creator-analytics/entitlements'
+import {
+  entitlementOf,
+  pickProChannel,
+  purgeDateOf,
+  unpickProChannel,
+} from '@creator-analytics/entitlements'
 import { eq } from 'drizzle-orm'
 import { describe, expect } from 'vitest'
 import { enqueueHistoryPurges, historyPurgeJobData, purgeEndedHistory } from './history-purge.ts'
@@ -221,5 +228,79 @@ describe('seam 2: the history purge', () => {
     await worker.asSystem(enqueueHistoryPurges)
 
     expect((await findJobs('historyPurge')).map((job) => job.data)).toEqual([{ channelId }])
+  })
+})
+
+describe('seam 2: the history purge of a channel its owner took out of their block (stillstats#21)', () => {
+  const owner = 'purge-picker'
+
+  /** A Pro channel of the owner's, its history stored, taken out of the block at `endedAt`. */
+  async function unpickedChannel(web: WebDatabase, worker: WorkerDatabase, clock: TestClock) {
+    clock.set(endedAt)
+    const channelId = await seedChannel(web, worker, owner)
+    await subscribeOwner(web, worker, channelId)
+    const unpicked = await web.asUser(owner, (scope) => unpickProChannel(scope, channelId))
+    expect(unpicked).toEqual({ ok: true, changed: true })
+    return channelId
+  }
+
+  const historyOf = (worker: WorkerDatabase, channelId: string) =>
+    worker.forChannel(channelId, async (scope) => (await stored(scope, channelId)).history)
+
+  test('on day 29 after the unpick the channel keeps its history, and on day 31 the purge deletes it', async ({
+    web,
+    worker,
+    clock,
+  }) => {
+    const channelId = await unpickedChannel(web, worker, clock)
+
+    clock.set(dayAfterEnd(29))
+    await purge(worker, channelId)
+    const kept = await historyOf(worker, channelId)
+    clock.set(dayAfterEnd(31))
+    await purge(worker, channelId)
+
+    expect(kept).toEqual([{ videoId: 'fixture', day: '2026-11-01' }])
+    expect(await historyOf(worker, channelId)).toEqual([])
+  })
+
+  test('picked again before its purge date, the channel reads paid and day 31 purges nothing', async ({
+    web,
+    worker,
+    clock,
+  }) => {
+    const channelId = await unpickedChannel(web, worker, clock)
+
+    clock.set(dayAfterEnd(20))
+    const picked = await web.asUser(owner, (scope) => pickProChannel(scope, channelId))
+    clock.set(dayAfterEnd(31))
+    await purge(worker, channelId)
+
+    expect(picked).toEqual({ ok: true, changed: true })
+    expect(await web.asUser(owner, (scope) => entitlementOf(scope, channelId))).toEqual({
+      tier: 'paid',
+      purgeDate: null,
+    })
+    expect(await historyOf(worker, channelId)).toEqual([{ videoId: 'fixture', day: '2026-11-01' }])
+  })
+
+  test('picked again after its purge, the channel reads paid with no purge date and no stored history', async ({
+    web,
+    worker,
+    clock,
+  }) => {
+    const channelId = await unpickedChannel(web, worker, clock)
+    clock.set(dayAfterEnd(31))
+    await purge(worker, channelId)
+
+    clock.set(dayAfterEnd(40))
+    await web.asUser(owner, (scope) => pickProChannel(scope, channelId))
+    await purge(worker, channelId)
+
+    expect(await web.asUser(owner, (scope) => entitlementOf(scope, channelId))).toEqual({
+      tier: 'paid',
+      purgeDate: null,
+    })
+    expect(await historyOf(worker, channelId)).toEqual([])
   })
 })

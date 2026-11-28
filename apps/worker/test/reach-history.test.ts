@@ -17,7 +17,7 @@ import {
   type WorkerDatabase,
 } from '@creator-analytics/database'
 import { type FindJobs, subscribeOwner, type TestClock } from '@creator-analytics/database/testing'
-import { purgeDateOf } from '@creator-analytics/entitlements'
+import { pickProChannel, purgeDateOf, unpickProChannel } from '@creator-analytics/entitlements'
 import type { FakeGoogle, FakeReachRow } from '@creator-analytics/fake-google'
 import { asc, sql } from 'drizzle-orm'
 import { describe, expect } from 'vitest'
@@ -281,6 +281,49 @@ describe('seam 2: the daily download of a paid channel reach history', () => {
     expect(google.reportDownloads.slice(beforeEnded)).toEqual(gap)
     expect(await storedDays(worker, channelId)).toEqual(
       Array.from({ length: 22 }, (_, i) => dateOf(i - 3)),
+    )
+  })
+
+  test('a channel its owner picks again after its purge downloads every report YouTube still holds at once (stillstats#21)', async ({
+    web,
+    worker,
+    clock,
+    google,
+    keys,
+    handlers,
+    findJobs,
+  }) => {
+    const dayMs = 24 * 60 * 60 * 1000
+    const day0 = new Date('2026-10-20T12:00:00.000Z')
+    const dayAt = (n: number) => new Date(day0.getTime() + n * dayMs)
+    const dateOf = (n: number) => dayAt(n).toISOString().slice(0, 10)
+    const addReport = (n: number) =>
+      addDay(google, 'UC-reach-repick', dateOf(n), `${dateOf(n + 1)}T10:00:00Z`)
+    const userId = 'reach-repick'
+
+    clock.set(day0)
+    google.setNow(day0)
+    const channelId = await connectedChannel(web, google, keys, userId, 'UC-reach-repick')
+    await subscribe(web, worker, channelId)
+    for (const n of [-3, -2, -1]) addReport(n)
+    await handlers.ensureReportingJob(worker, { channelId })
+    // The owner takes the channel out of their block on day 0, and its 30 days run out.
+    await web.asUser(userId, (tx) => unpickProChannel(tx, channelId))
+    for (let n = 0; n < 39; n++) addReport(n)
+    clock.set(dayAt(31))
+    await handlers.historyPurge(worker, { channelId })
+    const purged = await storedDays(worker, channelId)
+
+    clock.set(dayAt(40))
+    google.setNow(dayAt(40))
+    const picked = await web.asUser(userId, (tx) => pickProChannel(tx, channelId))
+    const ran = await runQueuedJobs({ findJobs, clock, google, handlers, worker })
+
+    expect(purged).toEqual([])
+    expect(picked).toEqual({ ok: true, changed: true })
+    expect(ran.map((job) => job.data)).toEqual([{ channelId }])
+    expect(await storedDays(worker, channelId)).toEqual(
+      Array.from({ length: 42 }, (_, i) => dateOf(i - 3)),
     )
   })
 

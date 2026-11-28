@@ -3,6 +3,7 @@ export {
   claimRole,
   feedbackCountRole,
   migrationRole,
+  proPickRole,
   proStateRole,
   rosterRole,
   webRole,

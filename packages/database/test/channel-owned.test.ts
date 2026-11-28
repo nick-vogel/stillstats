@@ -62,7 +62,7 @@ describe('tables with a channel id', () => {
     expect(rows.filter((row) => !row.forced).map((row) => row.table)).toEqual([])
   })
 
-  test('every one has policies for the web and worker roles, only memberships for the claim role, only the connection roster tables for the roster role, only subscriptions, subscription payments, pro ends, pro picks and memberships for the billing role, and only pro picks and memberships for the pro state role', async ({
+  test('every one has policies for the web and worker roles, only memberships for the claim role, only the connection roster tables for the roster role, only subscriptions, subscription payments, pro ends, pro picks and memberships for the billing role, only pro picks and memberships for the pro state role, and only pro ends, pro picks and memberships for the pro pick role', async ({
     pool,
   }) => {
     const rows = await channelTables(pool)
@@ -72,8 +72,11 @@ describe('tables with a channel id', () => {
     )
 
     const expected = (table: string) => {
-      if (table === 'memberships') return 'app_billing,app_claim,app_pro_state,app_web,app_worker'
-      if (table === 'pro_picks') return 'app_billing,app_pro_state,app_web,app_worker'
+      if (table === 'memberships') {
+        return 'app_billing,app_claim,app_pro_pick,app_pro_state,app_web,app_worker'
+      }
+      if (table === 'pro_picks') return 'app_billing,app_pro_pick,app_pro_state,app_web,app_worker'
+      if (table === 'pro_ends') return 'app_billing,app_pro_pick,app_web,app_worker'
       if (billingTables.includes(table)) return 'app_billing,app_web,app_worker'
       if (['connections', 'connection_identifiers'].includes(table)) {
         return 'app_roster,app_web,app_worker'

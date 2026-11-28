@@ -26,7 +26,9 @@ import {
   currencyLabel,
   currencyOptionsOf,
   noChannelText,
+  pickChannelText,
   proHeading,
+  proPurgeTextOf,
   proSlotsTextOf,
   resetPreferencesButton,
   rpmSourcesHint,
@@ -34,8 +36,10 @@ import {
   rpmSourcesToggledEvent,
   settingsHeading,
   settingsOpenedEvent,
+  slotsFullText,
   themeLabel,
   themeOptions,
+  unpickChannelText,
 } from './settings.ts'
 import { manageSubscriptionText, type ProSection, subscribeTexts } from './subscribe.ts'
 import {
@@ -48,7 +52,9 @@ import {
 
 /**
  * The creator's channels, each by its name on YouTube, with disconnect and revenue consent, and
- * under each one the user owns whether it is Pro or Free while there is a Pro section; the Pro
+ * under each one the user owns whether it is Pro or Free while there is a Pro section, with its
+ * purge date while it has one, that it stays Free while every slot is in use, and its pick or
+ * unpick control while the user holds a block; the Pro
  * section, with the slots in use once the user holds a block, a subscribe action for each plan
  * while they may subscribe and the Customer Portal's while they may manage; the Support section
  * when the support answer has a link; and account: the currency revenue shows in, the theme, the
@@ -70,6 +76,8 @@ export function Settings({
   onGiveRevenueConsent,
   onSubscribe,
   onManage,
+  onPick,
+  onUnpick,
   onConnect,
   onResetPreferences,
   onSignOut,
@@ -90,6 +98,10 @@ export function Settings({
   onGiveRevenueConsent: (channelId: string) => void
   onSubscribe: (plan: BillingPlan) => void
   onManage: () => void
+  /** Picks the channel for one of the user's Pro slots. */
+  onPick: (channelId: string) => void
+  /** Takes the channel out of its Pro slot, once the user confirms. */
+  onUnpick: (channelId: string) => void
   onConnect: () => void
   onResetPreferences: () => void
   onSignOut: () => void
@@ -146,7 +158,7 @@ export function Settings({
         ) : (
           <ul className="channels">
             {channels.map((channel) => {
-              const tier = pro?.tiers.get(channel.id)
+              const owned = pro?.channels.get(channel.id)
               return (
                 <li className="channel" key={channel.id}>
                   <div className="channel-head">
@@ -167,7 +179,19 @@ export function Settings({
                       Give revenue consent
                     </QuietButton>
                   )}
-                  {tier && <p className="channel-tier">{channelTierTexts[tier]}</p>}
+                  {owned && <p className="channel-tier">{channelTierTexts[owned.tier]}</p>}
+                  {owned?.tier === 'free' && owned.purgeDate && (
+                    <p className="channel-pro-note">{proPurgeTextOf(owned.purgeDate)}</p>
+                  )}
+                  {owned?.slotsFull && <p className="channel-pro-note">{slotsFullText}</p>}
+                  {owned?.control === 'pick' && (
+                    <QuietButton onClick={() => onPick(channel.id)}>{pickChannelText}</QuietButton>
+                  )}
+                  {owned?.control === 'unpick' && (
+                    <QuietButton onClick={() => onUnpick(channel.id)}>
+                      {unpickChannelText}
+                    </QuietButton>
+                  )}
                 </li>
               )
             })}

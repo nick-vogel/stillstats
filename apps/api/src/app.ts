@@ -13,7 +13,7 @@ import type {
   MeAnswer,
 } from '@creator-analytics/api-types'
 import type { WebDatabase } from '@creator-analytics/database'
-import { requestAccountCancellation } from '@creator-analytics/entitlements'
+import { fillFreeSlot, requestAccountCancellation } from '@creator-analytics/entitlements'
 import type { EventRelay } from '@creator-analytics/event-relay'
 import type { Logger, Reporter } from '@creator-analytics/reporter'
 import {
@@ -397,7 +397,9 @@ export function createApi({
   })
   // The three calls share one transaction, so the channel, its owner membership and its
   // connection appear together or not at all, and a revenue consent changes the connection only
-  // when the grant reads the channel it began for.
+  // when the grant reads the channel it began for. A channel the claim created fills a free Pro
+  // slot of its owner in the same transaction, and stays free when every slot is in use, so the
+  // bill never grows without the creator's action; the claim already sent its history download.
   signedIn.get(connectCallbackRoute, async (c) => {
     const landing = await database.asUser(c.get('user').id, async (tx) => {
       const consent = await vault.completeConsent(tx, c.req.query())
@@ -423,6 +425,7 @@ export function createApi({
           : refusedLanding(intent, given.refusal)
       }
       const claimed = await accounts.claimChannel(tx, identified.grant)
+      if (claimed.ok && claimed.created) await fillFreeSlot(tx, claimed.channelId)
       return claimed.ok
         ? connectedLanding(intent.landing, claimed.channelId)
         : refusedLanding(intent, claimed.refusal)

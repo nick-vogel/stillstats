@@ -25,6 +25,23 @@ export const manageSubscriptionText = 'Manage subscription' // approved by Nick 
  */
 export const portalOpenedEvent: ProductEvent = { name: 'customer_portal_opened' }
 
+/** The control under an owned channel that picks it for a Pro slot, or takes it out of its one. */
+export type PickControl = 'pick' | 'unpick'
+
+/** What the Settings screen shows under a channel the user owns. */
+export interface ProChannel {
+  /** Whether it is Pro, which the line under the channel says. */
+  tier: Tier
+  /** Whether the user picked it for one of their slots. */
+  picked: boolean
+  /** The day its stored history is deleted on, ISO 8601, while it is ahead; else null. */
+  purgeDate: string | null
+  /** Its pick or unpick control, or null for a user without a block, who has no slot to fill. */
+  control: PickControl | null
+  /** Whether it stays free because every slot is in use, which the screen says under it. */
+  slotsFull: boolean
+}
+
 /** What the Settings screen shows of the user's Pro, from the entitlements answer. */
 export interface ProSection {
   /** Whether the user may start a Checkout, so the section shows a subscribe action for each plan. */
@@ -34,21 +51,39 @@ export interface ProSection {
   /** The blocks the user holds, 4 slots each: the section says the slots in use once there is one. */
   blocks: number
   slotsInUse: number
-  /** The tier of each channel the user owns, by ID, which the line under the channel says. */
-  tiers: ReadonlyMap<string, Tier>
+  /** Each channel the user owns, by ID. */
+  channels: ReadonlyMap<string, ProChannel>
 }
+
+/** The slots each block of Pro holds, as `slotsPerBlock` in `@creator-analytics/entitlements`. */
+const slotsPerBlock = 4
 
 /**
  * The Settings screen's Pro section: null before the answer lands, with Pro not offered, so Settings
  * draws as it did before Pro, and for a user with nothing in it, who may neither subscribe nor
- * manage and holds no block, such as a member who owns none of their channels.
+ * manage and holds no block, such as a member who owns none of their channels. While the user
+ * holds a block, each owned channel gets its control: unpick for a picked one, pick for any other,
+ * which the API refuses while every slot is in use.
  */
 export function proSectionOf(answer: EntitlementsAnswer | null): ProSection | null {
   if (!answer?.paidTierOffered) return null
   const { canSubscribe, canManage, blocks, slotsInUse } = answer
   if (!canSubscribe && !canManage && blocks === 0) return null
-  const tiers = new Map(
-    answer.channels.filter(({ owner }) => owner).map(({ channelId, tier }) => [channelId, tier]),
+  const slotsFull = blocks > 0 && slotsInUse >= blocks * slotsPerBlock
+  const channels = new Map(
+    answer.channels
+      .filter(({ owner }) => owner)
+      .map(({ channelId, tier, picked, purgeDate }) => {
+        const control: PickControl | null = blocks === 0 ? null : picked ? 'unpick' : 'pick'
+        const channel = {
+          tier,
+          picked,
+          purgeDate,
+          control,
+          slotsFull: slotsFull && tier === 'free' && !picked,
+        }
+        return [channelId, channel]
+      }),
   )
-  return { canSubscribe, canManage, blocks, slotsInUse, tiers }
+  return { canSubscribe, canManage, blocks, slotsInUse, channels }
 }

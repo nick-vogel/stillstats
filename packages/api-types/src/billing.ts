@@ -41,7 +41,11 @@ export interface ChannelEntitlement {
   canManage: boolean
 }
 
-/** GET /api/me/entitlements: the user's Pro, and one entry for each channel the user holds. */
+/**
+ * GET /api/me/entitlements: the user's Pro, and one entry for each channel the user holds. PUT and
+ * DELETE /api/channels/:channelId/pro-pick, the owner's pick and unpick of a channel for one of
+ * their Pro slots, answer it too, after the change.
+ */
 export interface EntitlementsAnswer {
   /** Whether Pro's settings are set, so any channel could buy it. */
   paidTierOffered: boolean

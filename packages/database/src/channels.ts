@@ -14,6 +14,7 @@ import {
   claimPolicy,
   inScope,
   isScopeUser,
+  proPickRole,
   proStateRole,
   userChannelIds,
   webPolicy,
@@ -77,6 +78,13 @@ export const memberships = pgTable(
       for: 'select',
       to: proStateRole,
       using: sql`(${inScope('user')} or ${inScope('channel')})`,
+    }),
+    // Only pick_pro_channel and unpick_pro_channel run as app_pro_pick: a pick or an unpick
+    // checks the scope user holds and owns the channel.
+    pgPolicy('memberships_pro_pick', {
+      for: 'select',
+      to: proPickRole,
+      using: inScope('user', isScopeUser(t.userId)),
     }),
   ],
 )

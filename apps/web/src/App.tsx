@@ -14,6 +14,7 @@ import type {
   Preferences,
   PreferencesAnswer,
   PreferencesUpdate,
+  RefusalAnswer,
   SupportAnswer,
   Theme,
 } from '@creator-analytics/api-types'
@@ -59,6 +60,7 @@ import {
   writeQueue,
 } from './preferences.ts'
 import { RetentionComparison } from './RetentionComparison.tsx'
+import { refusalMessageOf } from './refusals.ts'
 import {
   addressOf,
   revertAddressAfterFailedSave,
@@ -73,8 +75,11 @@ import { SponsorReport } from './SponsorReport.tsx'
 import {
   currencySavedNotice,
   noChannelText,
+  noFreeSlotText,
   preferencesResetNotice,
+  proChannelSelectedEvent,
   resetPreferencesWarning,
+  unpickWarning,
 } from './settings.ts'
 import { checkoutStartedEvent, portalOpenedEvent, proSectionOf } from './subscribe.ts'
 import {
@@ -190,6 +195,23 @@ async function openPortal(): Promise<void> {
   track(portalOpenedEvent)
   window.location.assign(url)
 }
+
+/**
+ * Picks the channel for one of the user's Pro slots, or with DELETE takes it out, and answers the
+ * changed entitlements, or the refusal of a pick with no free slot, which the alert explains.
+ */
+async function changeProPick(
+  channelId: string,
+  method: 'PUT' | 'DELETE',
+): Promise<EntitlementsAnswer | RefusalAnswer> {
+  const response = await fetch(`/api/channels/${channelId}/pro-pick`, { method })
+  if (response.status === 409) return (await response.json()) as RefusalAnswer
+  assertAnswered(response)
+  return (await response.json()) as EntitlementsAnswer
+}
+
+/** What `Alert.from` names a failed pick or unpick of the channel by. */
+const proPickAlertOf = (channelId: string) => `pro-pick:${channelId}`
 
 async function savePreferences(change: PreferencesUpdate): Promise<void> {
   const response = await fetch('/api/me/preferences', {
@@ -532,6 +554,31 @@ export function App({
     clearAlertFrom(disconnectAlertOf(channelId))
   }
 
+  /**
+   * Picks the channel, and redraws Settings from the answer. An accepted pick sends
+   * `pro_channel_selected` with the user's blocks; a refused one shows why in the alert.
+   */
+  async function pickChannel(channelId: string) {
+    const showError = alertOnFailure(proPickAlertOf(channelId))
+    const answer = await changeProPick(channelId, 'PUT')
+    if ('refusal' in answer) {
+      showError(refusalMessageOf(answer, 'Pro', { no_free_slot: noFreeSlotText }))
+      return
+    }
+    clearAlertFrom(proPickAlertOf(channelId))
+    setEntitlements(answer)
+    track(proChannelSelectedEvent(answer.blocks))
+  }
+
+  /** Takes the channel out of Pro once the user confirms, and redraws Settings from the answer. */
+  async function unpickChannel(channelId: string) {
+    if (!window.confirm(unpickWarning)) return
+    const answer = await changeProPick(channelId, 'DELETE')
+    if ('refusal' in answer) throw new Error(`The API refused the unpick: ${answer.refusal}`)
+    clearAlertFrom(proPickAlertOf(channelId))
+    setEntitlements(answer)
+  }
+
   async function deleteYourself() {
     track({ name: 'delete_user_clicked' })
     if (!window.confirm(deleteUserWarning)) return
@@ -770,6 +817,12 @@ export function App({
                       onGiveRevenueConsent={giveRevenueConsent}
                       onSubscribe={(plan) => start(() => startCheckout(plan))}
                       onManage={() => start(openPortal)}
+                      onPick={(channelId) =>
+                        start(() => pickChannel(channelId), proPickAlertOf(channelId))
+                      }
+                      onUnpick={(channelId) =>
+                        start(() => unpickChannel(channelId), proPickAlertOf(channelId))
+                      }
                       onConnect={() => openConsentScreen({ consent: 'connection' })}
                       onResetPreferences={() => start(resetPreferences, resetAlert)}
                       onSignOut={() => start(signOut)}
