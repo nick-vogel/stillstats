@@ -1,3 +1,4 @@
+import type { FakeStripe } from '@creator-analytics/fake-stripe'
 import Stripe from 'stripe'
 import type { BillingSettings } from '../src/billing.ts'
 import type { StartedApi } from './start-api.ts'
@@ -411,4 +412,49 @@ export function deliverStripeEvent(
   })
   if (signature !== null) headers.set('stripe-signature', signature)
   return fetch(new URL('/api/stripe/events', api.origin), { method: 'POST', headers, body })
+}
+
+export interface SeededSubscriptionFields {
+  /** The user its metadata names, as Stillstats Checkout writes it. */
+  userId: string
+  subscription?: string
+  customer?: string
+  /**
+   * The ID of its one item's price, which the fake must hold (`addPrice`): the test API's monthly
+   * price unless given.
+   */
+  price?: string
+  /** Its one item's quantity, the number of blocks: 1 unless given. */
+  quantity?: number
+  /** The end of the item's paid period, the one the subscription events carry unless given. */
+  periodEnd?: Date
+}
+
+/**
+ * Seeds the fake Stripe server with the subscription a delivered Checkout event recorded, as
+ * Stripe holds it: the same ID, customer and user metadata, one item at its price and quantity,
+ * and the paid period the subscription events carry, so a block's preview and add read it.
+ */
+export function seedStripeSubscription(
+  stripe: FakeStripe,
+  {
+    userId,
+    subscription = 'sub_test_stillstats',
+    customer = 'cus_test_stillstats',
+    price = testBilling.prices.monthly,
+    quantity = 1,
+    periodEnd = new Date('2026-12-17T12:00:00.000Z'),
+  }: SeededSubscriptionFields,
+): void {
+  stripe.addSubscription({
+    id: subscription,
+    customer,
+    periodStart: new Date(periodEnd.getTime() - 30 * 24 * 60 * 60 * 1000),
+    periodEnd,
+    amountPaid: 700,
+    metadata: { stillstats_user_id: userId },
+    itemId: `si_${subscription}`,
+    price,
+    quantity,
+  })
 }

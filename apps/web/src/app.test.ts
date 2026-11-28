@@ -93,6 +93,7 @@ import { formatFilterOptions, formatLabel } from './controls-bar.ts'
 import { customRangeText, prefillOf } from './custom-range.ts'
 import {
   type FakeApi,
+  fakeBlockPreviewOf,
   fakeBounds,
   fakeChannel,
   fakeCheckoutUrl,
@@ -160,7 +161,14 @@ import {
   videosLinkText,
   whatsNewLinkText,
 } from './sidebar.ts'
-import { manageSubscriptionText, subscribeTexts } from './subscribe.ts'
+import {
+  addBlockQuestionOf,
+  addBlockText,
+  blockAddedTextOf,
+  blocksChangedText,
+  manageSubscriptionText,
+  subscribeTexts,
+} from './subscribe.ts'
 import {
   hideSupportLabel,
   hideSupportText,
@@ -218,6 +226,7 @@ function entitlementsOf(
     paidTierOffered: true,
     canSubscribe: false,
     canManage: false,
+    canAddBlock: false,
     blocks: 0,
     slotsInUse: 0,
     ...user,
@@ -7936,6 +7945,100 @@ describe("the Settings screen's Pro section (creator-analytics#780, stillstats#2
       expect(channelLinesIn(container)).toEqual([[channelTierTexts.free]])
       expect(buttonsNamed(container, subscribeTexts.monthly)).toHaveLength(1)
     })
+  })
+})
+
+describe('"Add a block" in the Pro section (stillstats#22)', () => {
+  const canAdd = { ...subscribedToOneBlock, canAddBlock: true }
+
+  const blockRequests = (api: FakeApi) =>
+    api.requests
+      .filter(({ path }) => path === '/api/me/block-preview' || path === '/api/me/blocks')
+      .map(({ method, path, body }) => ({ method, path, body }))
+
+  const slotLinesIn = (container: HTMLElement) =>
+    [...container.querySelectorAll('section')]
+      .find((section) => section.querySelector('h2')?.textContent === proHeading)
+      ?.querySelector('p')?.textContent
+
+  function subscribedOwner() {
+    const api = installFakeApi()
+    api.channels = [fakeChannel]
+    api.entitlements = entitlementsOf(canAdd, { channelId: fakeChannel.id, tier: 'paid' })
+    return api
+  }
+
+  test('a subscribed owner sees "Add a block", and a user without a live paid subscription sees the subscribe buttons instead', async () => {
+    subscribedOwner()
+    const owner = await render('settings')
+    const ownerButtons = buttonsNamed(owner.container, addBlockText).length
+    owner.unmount()
+    rendered = null
+
+    const unsubscribed = installFakeApi()
+    unsubscribed.entitlements = entitlementsOf(
+      { canSubscribe: true },
+      { channelId: fakeChannel.id, tier: 'free', canSubscribe: true },
+    )
+    const { container } = await render('settings')
+
+    expect(ownerButtons).toBe(1)
+    expect(buttonsNamed(container, addBlockText)).toEqual([])
+    expect(buttonsNamed(container, subscribeTexts.monthly)).toHaveLength(1)
+  })
+
+  test("a click asks first with the preview's price and charge, posts the previewed count, sends block_added with it, and the slots line reads the new capacity", async () => {
+    const asked: string[] = []
+    vi.stubGlobal('confirm', (message: string) => {
+      asked.push(message)
+      return true
+    })
+    const api = subscribedOwner()
+    const { container } = await render('settings')
+    vi.mocked(track).mockClear()
+
+    await click(buttonNamed(container, addBlockText))
+    await settle()
+
+    expect(asked).toEqual([addBlockQuestionOf(fakeBlockPreviewOf(2))])
+    expect(blockRequests(api)).toEqual([
+      { method: 'GET', path: '/api/me/block-preview', body: undefined },
+      { method: 'POST', path: '/api/me/blocks', body: { blocks: 2 } },
+    ])
+    expect(vi.mocked(track).mock.calls).toEqual([[{ name: 'block_added', blocks: 2 }]])
+    expect(slotLinesIn(container)).toBe('1 of 8 slots in use')
+    expect(toastText()).toBe(blockAddedTextOf(2))
+    expect(alertOf(container)).toBeNull()
+  })
+
+  test('a cancelled confirm posts nothing and sends nothing', async () => {
+    vi.stubGlobal('confirm', () => false)
+    const api = subscribedOwner()
+    const { container } = await render('settings')
+    vi.mocked(track).mockClear()
+
+    await click(buttonNamed(container, addBlockText))
+
+    expect(blockRequests(api).map(({ method }) => method)).toEqual(['GET'])
+    expect(vi.mocked(track).mock.calls).toEqual([])
+    expect(slotLinesIn(container)).toBe('1 of 4 slots in use')
+  })
+
+  test('a blocks_changed refusal shows why in the alert, sends nothing, and redraws the blocks', async () => {
+    vi.stubGlobal('confirm', () => true)
+    const api = subscribedOwner()
+    const { container } = await render('settings')
+    api.failNext('POST /api/me/blocks', { status: 409, body: { refusal: 'blocks_changed' } })
+    vi.mocked(track).mockClear()
+
+    await click(buttonNamed(container, addBlockText))
+    await settle()
+
+    expect(alertOf(container)).toBe(blocksChangedText)
+    expect(vi.mocked(track).mock.calls).toEqual([])
+    expect(
+      api.requests.filter(({ path }) => path === '/api/me/entitlements').length,
+    ).toBeGreaterThan(1)
   })
 })
 

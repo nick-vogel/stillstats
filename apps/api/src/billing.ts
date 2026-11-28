@@ -68,10 +68,29 @@ export interface Billing {
     customerId: string | null
   }): Promise<string>
   /**
-   * Opens a Customer Portal session for the user's Stripe customer, in which they change the card
-   * or cancel at period end, and answers its URL on Stripe.
+   * Opens a Customer Portal session for the user's Stripe customer, on Stillstats' own Portal
+   * configuration, in which they change the card, read their invoices, switch between the monthly
+   * and the annual plan, or cancel at period end, and never change the number of blocks; answers
+   * its URL on Stripe. The configuration is made or brought up to date once for the process, and a
+   * failure to do so throws, with no session on the account's default configuration.
    */
   openPortal(portal: { customerId: string }): Promise<string>
+  /**
+   * What one more block of the subscription costs, read from Stripe: the price of its item, which
+   * it keeps on a rise (ADR 0022), and the preview of its next invoice at one block more, whose
+   * proration lines are the charge for the rest of the paid period.
+   */
+  previewBlock(block: { subscriptionId: string }): Promise<BlockPreview>
+  /**
+   * Raises the subscription's quantity to `blocks`, its proration on the next invoice and no
+   * invoice now, under an idempotency key that names this add, and answers Stripe's subscription.
+   * A `blocks` other than one more than Stripe holds answers `blocks_changed` and updates nothing,
+   * so a second click or a stale tab never buys a block nobody previewed.
+   */
+  addBlock(block: {
+    subscriptionId: string
+    blocks: number
+  }): Promise<{ kind: 'added'; subscription: Stripe.Subscription } | { kind: 'blocks_changed' }>
   /**
    * The amount and currency of the two prices Checkout sells, read from Stripe once for the
    * process and kept. Calls that arrive together share one read. It never rejects: a read that
@@ -95,6 +114,39 @@ export const userMetadataKey = 'stillstats_user_id'
  */
 export const channelMetadataKey = 'stillstats_channel_id'
 
+/**
+ * The metadata that marks Stillstats' own Customer Portal configuration among the account's, so a
+ * process that starts finds and updates it rather than creating another (stillstats#22).
+ */
+export const portalMetadataKey = 'stillstats_portal'
+
+/** What one more block costs, as `Billing.previewBlock` reads it from Stripe. */
+export interface BlockPreview {
+  /** The number of blocks after the add. */
+  blocks: number
+  /** The plan the item's price bills at. */
+  plan: Plan
+  /** The item's own price of one block for each period. */
+  price: PlanPrice
+  /** The sum of the preview's proration lines of this add, on the next invoice. */
+  prorated: PlanPrice
+  /** The end of the current paid period. */
+  periodEnd: Date
+}
+
+/**
+ * The plan a price bills at, from its `recurring.interval`: a price billed every month is the
+ * monthly plan, and every year the annual one, whatever its ID (ADR 0022). Null for an interval
+ * Stillstats sells no plan at: a day, a week, or more than one month or year between billings
+ * (docs.stripe.com/api/prices/object).
+ */
+export function planOfPrice(price: Stripe.Price): Plan | null {
+  if (price.recurring?.interval_count !== 1) return null
+  if (price.recurring.interval === 'month') return 'monthly'
+  if (price.recurring.interval === 'year') return 'annual'
+  return null
+}
+
 // Long enough for Stripe on a normal day, short enough that a hanging Stripe never holds the
 // upgrade answer near Cloudflare's 100-second limit. The read is not retried, since the next view
 // of the screen reads again once the failure window ends.
@@ -115,7 +167,10 @@ export function createBilling({
   /** The API's own origin, which Stripe's page returns to. */
   baseURL: string
   stripeApi?: StripeApi
-  /** The clock a failed price read's window runs on. Unset, system time. */
+  /**
+   * The clock a failed price read's window and a block preview's proration date run on. Unset,
+   * system time.
+   */
   now?: () => Date
   /** The deadline of one price read, in milliseconds. Unset, 3 seconds. */
   priceTimeoutMs?: number
@@ -147,6 +202,86 @@ export function createBilling({
   }
   let prices: Promise<Record<Plan, PlanPrice> | null> | null = null
   let failedAt: number | null = null
+  let portalConfiguration: Promise<string> | null = null
+
+  /**
+   * The subscription's one item as Stripe holds it: its ID, its quantity, its own price and plan,
+   * and the end of its paid period, on the item since API version 2025-03-31.basil
+   * (docs.stripe.com/api/subscription_items/object, read 2026-11-27).
+   */
+  async function blockOf(subscriptionId: string) {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+    const [item] = subscription.items.data
+    if (!item) throw new Error(`Stripe's subscription ${subscriptionId} carries no item`)
+    const { price } = item
+    if (price.unit_amount === null) {
+      throw new Error(`The price of subscription ${subscriptionId} has no unit_amount`)
+    }
+    const plan = planOfPrice(price)
+    if (plan === null) {
+      throw new Error(
+        `The price of subscription ${subscriptionId} bills neither monthly nor yearly`,
+      )
+    }
+    return {
+      itemId: item.id,
+      quantity: item.quantity ?? 1,
+      plan,
+      price: { amount: price.unit_amount, currency: price.currency },
+      periodEnd: new Date(item.current_period_end * 1000),
+    }
+  }
+
+  /**
+   * Stillstats' own Customer Portal configuration, made through the API since the dashboard cannot
+   * set `billing_cycle_anchor` (#18): the active one whose metadata carries the marker, updated to
+   * these settings, or a new one. Answers its ID.
+   */
+  async function ensurePortalConfiguration(): Promise<string> {
+    const [monthly, annual] = await Promise.all([
+      stripe.prices.retrieve(settings.prices.monthly),
+      stripe.prices.retrieve(settings.prices.annual),
+    ])
+    const productOf = (price: Stripe.Price) =>
+      typeof price.product === 'string' ? price.product : price.product.id
+    const product = productOf(monthly)
+    if (productOf(annual) !== product) {
+      throw new Error("Stripe's monthly and annual prices are not of one product")
+    }
+    // docs.stripe.com/api/customer_portal/configurations/create and /update, read 2026-11-27,
+    // with stripe-node 23.1.0's types at 2026-10-28.endive, and the #18 spike (comments 3 and 4):
+    //   - The card, the invoices and a cancellation at period end stay the owner's.
+    //   - A plan switch is a change of price alone: `default_allowed_updates` leaves out
+    //     `quantity`, and the product's `adjustable_quantity` is off, without which the product
+    //     still lets the quantity change. The number of blocks changes only in Stillstats.
+    //   - `always_invoice` with `billing_cycle_anchor=now` is the one pair that charged a monthly
+    //     to annual switch at once and for a full year.
+    const features = {
+      payment_method_update: { enabled: true },
+      invoice_history: { enabled: true },
+      subscription_cancel: { enabled: true, mode: 'at_period_end' },
+      subscription_update: {
+        enabled: true,
+        default_allowed_updates: ['price'],
+        products: [
+          {
+            product,
+            prices: [settings.prices.monthly, settings.prices.annual],
+            adjustable_quantity: { enabled: false },
+          },
+        ],
+        proration_behavior: 'always_invoice',
+        billing_cycle_anchor: 'now',
+      },
+    } satisfies Stripe.BillingPortal.ConfigurationCreateParams.Features
+    const metadata = { [portalMetadataKey]: 'true' }
+    const listed = await stripe.billingPortal.configurations.list({ active: true, limit: 100 })
+    const own = listed.data.find((each) => each.metadata?.[portalMetadataKey] === 'true')
+    const configuration = own
+      ? await stripe.billingPortal.configurations.update(own.id, { features })
+      : await stripe.billingPortal.configurations.create({ features, metadata })
+    return configuration.id
+  }
 
   return {
     settings,
@@ -174,16 +309,79 @@ export function createBilling({
       return session.url
     },
     async openPortal({ customerId }) {
-      // docs.stripe.com/api/customer_portal/sessions/create, checked 2026-11-17. No
-      // `configuration`: the session takes the account's default one, set in the dashboard, which
-      // says what the owner may change. Under Managed Payments the Portal is where the card
-      // changes, since the API may not update a subscription's payment method.
+      // docs.stripe.com/api/customer_portal/sessions/create, checked 2026-11-17, and `configuration`
+      // 2026-11-27: the session opens on Stillstats' own configuration, never the account's
+      // default, whose quantity control the dashboard cannot be trusted to keep off. Under
+      // Managed Payments the Portal is where the card changes, since the API may not update a
+      // subscription's payment method.
+      portalConfiguration ??= ensurePortalConfiguration().catch((error: unknown) => {
+        portalConfiguration = null
+        throw error
+      })
+      const configuration = await portalConfiguration
       const session = await stripe.billingPortal.sessions.create({
         customer: customerId,
         return_url: settingsPage,
+        configuration,
       })
       if (!session.url) throw new Error('Stripe answered a Customer Portal session with no URL')
       return session.url
+    },
+    async previewBlock({ subscriptionId }) {
+      const block = await blockOf(subscriptionId)
+      const blocks = block.quantity + 1
+      // docs.stripe.com/api/invoices/create_preview, read 2026-11-27, and the #18 spike: the
+      // preview of the next invoice with the item at one block more and `create_prorations`
+      // carries the proration lines the raise would make, which Stripe names as the lines whose
+      // `parent.subscription_item_details.proration` is true. `GET /v1/invoices/upcoming` is gone
+      // at 2026-10-28.endive. The preview also shows every pending invoice item, an earlier add's
+      // proration in this period among them, so only the lines whose period starts at the
+      // preview's own `proration_date` are this add's (docs.stripe.com/billing/subscriptions/
+      // prorations, "Preview a proration", read 2026-11-27).
+      const prorationDate = Math.floor(now().getTime() / 1000)
+      const preview = await stripe.invoices.createPreview({
+        subscription: subscriptionId,
+        subscription_details: {
+          items: [{ id: block.itemId, quantity: blocks }],
+          proration_behavior: 'create_prorations',
+          proration_date: prorationDate,
+        },
+      })
+      const prorated = preview.lines.data
+        .filter(
+          (line) =>
+            line.parent?.subscription_item_details?.proration === true &&
+            line.period.start === prorationDate,
+        )
+        .reduce((sum, line) => sum + line.amount, 0)
+      return {
+        blocks,
+        plan: block.plan,
+        price: block.price,
+        prorated: { amount: prorated, currency: preview.currency },
+        periodEnd: block.periodEnd,
+      }
+    },
+    async addBlock({ subscriptionId, blocks }) {
+      const block = await blockOf(subscriptionId)
+      if (blocks !== block.quantity + 1) return { kind: 'blocks_changed' }
+      // docs.stripe.com/api/subscriptions/update, read 2026-11-27, and the #18 spike: the item's
+      // quantity with `create_prorations` makes no invoice and puts the proration on the next one.
+      // Managed Payments allowed an immediate charge in the sandbox; no charge now is Stillstats'
+      // choice for a block. Inside one paid period the quantity rises only through Stillstats, so
+      // the subscription, the period's end and the count name one add, and a retry of it, a
+      // network retry of stripe-node's included, is answered from Stripe's first.
+      const subscription = await stripe.subscriptions.update(
+        subscriptionId,
+        {
+          items: [{ id: block.itemId, quantity: blocks }],
+          proration_behavior: 'create_prorations',
+        },
+        {
+          idempotencyKey: `add-block-${subscriptionId}-${block.periodEnd.getTime() / 1000}-${blocks}`,
+        },
+      )
+      return { kind: 'added', subscription }
     },
     readPrices(report) {
       if (failedAt !== null && now().getTime() - failedAt < priceFailureMs) {

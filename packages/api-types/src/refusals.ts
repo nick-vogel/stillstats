@@ -11,6 +11,7 @@ export type Refusal =
   | 'already_subscribed'
   | 'not_subscribed'
   | 'no_free_slot'
+  | 'blocks_changed'
 
 export interface RefusalAnswer {
   refusal: Refusal
@@ -43,6 +44,7 @@ export type ErrorCode =
   | 'invalid_app_version'
   | 'invalid_reply_address'
   | 'invalid_plan'
+  | 'invalid_blocks'
   | 'invalid_figure'
   | 'revenue_figure'
 
@@ -74,4 +76,5 @@ export type ConsentLandingRefusal =
       | 'already_subscribed'
       | 'not_subscribed'
       | 'no_free_slot'
+      | 'blocks_changed'
     >

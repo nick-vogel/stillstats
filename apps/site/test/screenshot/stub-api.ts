@@ -1058,6 +1058,7 @@ export async function startStubApi(
         paidTierOffered,
         canSubscribe: paidTierOffered,
         canManage: false,
+        canAddBlock: false,
         blocks: 0,
         slotsInUse: 0,
         channels: listed.map(({ id }) => ({

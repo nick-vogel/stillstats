@@ -1,6 +1,8 @@
 import highlights from 'virtual:highlights'
 import type {
   BillingPlan,
+  BlockAddAnswer,
+  BlockPreviewAnswer,
   ChannelsAnswer,
   CheckoutStartAnswer,
   ClientSettingsAnswer,
@@ -81,7 +83,15 @@ import {
   resetPreferencesWarning,
   unpickWarning,
 } from './settings.ts'
-import { checkoutStartedEvent, portalOpenedEvent, proSectionOf } from './subscribe.ts'
+import {
+  addBlockQuestionOf,
+  blockAddedEvent,
+  blockAddedTextOf,
+  blocksChangedText,
+  checkoutStartedEvent,
+  portalOpenedEvent,
+  proSectionOf,
+} from './subscribe.ts'
 import {
   sidebarSupportLinkOf,
   supportOpenedEvent,
@@ -195,6 +205,28 @@ async function openPortal(): Promise<void> {
   track(portalOpenedEvent)
   window.location.assign(url)
 }
+
+/**
+ * What one more block costs, read from Stripe by the API, or the refusal of a user with no live
+ * paid subscription.
+ */
+async function readBlockPreview(): Promise<BlockPreviewAnswer | RefusalAnswer> {
+  const response = await fetch('/api/me/block-preview')
+  if (response.status === 409) return (await response.json()) as RefusalAnswer
+  assertAnswered(response)
+  return (await response.json()) as BlockPreviewAnswer
+}
+
+/** Adds the block the preview priced, by the count it answered, or answers the API's refusal. */
+async function postBlock(blocks: number): Promise<BlockAddAnswer | RefusalAnswer> {
+  const response = await fetch('/api/me/blocks', { ...jsonPost, body: JSON.stringify({ blocks }) })
+  if (response.status === 409) return (await response.json()) as RefusalAnswer
+  assertAnswered(response)
+  return (await response.json()) as BlockAddAnswer
+}
+
+/** What `Alert.from` names a failed add of a block by. */
+const addBlockAlert = 'add-block'
 
 /**
  * Picks the channel for one of the user's Pro slots, or with DELETE takes it out, and answers the
@@ -579,6 +611,32 @@ export function App({
     setEntitlements(answer)
   }
 
+  /**
+   * Adds a block once the user confirms the price and the prorated charge Stripe gave, then
+   * redraws Settings with the new slots, raises a toast and sends `block_added` with the blocks
+   * after it. A cancel, or a refusal, which the alert explains, sends nothing.
+   */
+  async function addBlock() {
+    const showError = alertOnFailure(addBlockAlert)
+    const refusalTexts = { blocks_changed: blocksChangedText }
+    const preview = await readBlockPreview()
+    if ('refusal' in preview) {
+      showError(refusalMessageOf(preview, 'Pro', refusalTexts))
+      return
+    }
+    if (!window.confirm(addBlockQuestionOf(preview))) return
+    const added = await postBlock(preview.blocks)
+    if ('refusal' in added) {
+      showError(refusalMessageOf(added, 'Pro', refusalTexts))
+      setEntitlements(await readEntitlements())
+      return
+    }
+    clearAlertFrom(addBlockAlert)
+    track(blockAddedEvent(added.blocks))
+    setEntitlements(await readEntitlements())
+    showSuccess(blockAddedTextOf(added.blocks))
+  }
+
   async function deleteYourself() {
     track({ name: 'delete_user_clicked' })
     if (!window.confirm(deleteUserWarning)) return
@@ -817,6 +875,7 @@ export function App({
                       onGiveRevenueConsent={giveRevenueConsent}
                       onSubscribe={(plan) => start(() => startCheckout(plan))}
                       onManage={() => start(openPortal)}
+                      onAddBlock={() => start(addBlock, addBlockAlert)}
                       onPick={(channelId) =>
                         start(() => pickChannel(channelId), proPickAlertOf(channelId))
                       }

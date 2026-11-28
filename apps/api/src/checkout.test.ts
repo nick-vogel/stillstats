@@ -294,6 +294,7 @@ describe("seam 1: what the web app reads of the user's Pro and each channel", ()
       paidTierOffered: true,
       canSubscribe: true,
       canManage: false,
+      canAddBlock: false,
       ...freeAnswer,
       channels: [{ ...free, owner: true, picked: false, canSubscribe: true }],
     })
@@ -301,12 +302,13 @@ describe("seam 1: what the web app reads of the user's Pro and each channel", ()
       paidTierOffered: true,
       canSubscribe: false,
       canManage: false,
+      canAddBlock: false,
       ...freeAnswer,
       channels: [{ ...free, owner: false, picked: false, canSubscribe: false }],
     })
   })
 
-  test('a paid channel reads as paid and picked, the user may not subscribe again and may manage, with one block and one slot in use', async ({
+  test('a paid channel reads as paid and picked, the user may not subscribe again and may manage and add a block, with one block and one slot in use', async ({
     web,
   }) => {
     const api = await startApi(web, { billing: testBilling })
@@ -317,6 +319,7 @@ describe("seam 1: what the web app reads of the user's Pro and each channel", ()
       paidTierOffered: true,
       canSubscribe: false,
       canManage: true,
+      canAddBlock: true,
       blocks: 1,
       slotsInUse: 1,
       channels: [
@@ -349,6 +352,7 @@ describe("seam 1: what the web app reads of the user's Pro and each channel", ()
       paidTierOffered: true,
       canSubscribe: true,
       canManage: false,
+      canAddBlock: false,
       ...freeAnswer,
       channels: [
         {
@@ -372,6 +376,7 @@ describe("seam 1: what the web app reads of the user's Pro and each channel", ()
       paidTierOffered: false,
       canSubscribe: false,
       canManage: false,
+      canAddBlock: false,
       ...freeAnswer,
       channels: [
         {

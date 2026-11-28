@@ -1,3 +1,5 @@
+import type { PlanPrice } from './upgrade.ts'
+
 /** Pro's two plans: $7 a month and $70 a year (ADR 0022). */
 export const billingPlans = ['monthly', 'annual'] as const
 export type BillingPlan = (typeof billingPlans)[number]
@@ -56,9 +58,43 @@ export interface EntitlementsAnswer {
   canSubscribe: boolean
   /** Whether the user may open the Customer Portal: Pro is offered and they hold a live subscription. */
   canManage: boolean
+  /**
+   * Whether the user may add a block from Settings: Pro is offered and they hold a live paid
+   * subscription of their own, `active` or `past_due`. A user without one subscribes through
+   * Checkout instead (`canSubscribe`).
+   */
+  canAddBlock: boolean
   /** The blocks of the user's live paid subscription, each 4 channel slots; 0 without one. */
   blocks: number
   /** The slots their picked channels take, at most 4 for each block. */
   slotsInUse: number
   channels: ChannelEntitlement[]
+}
+
+/**
+ * GET /api/me/block-preview: what one more block costs, read from Stripe before the confirm. The
+ * price is the subscription's own (ADR 0022 keeps it on a rise), and the prorated charge for the
+ * rest of the paid period goes on the next invoice, with no charge now.
+ */
+export interface BlockPreviewAnswer {
+  /** The number of blocks after the add, the count the confirm sends back. */
+  blocks: number
+  /** The plan the price bills at, which says its period. */
+  plan: BillingPlan
+  /** The price of one block for each period. */
+  price: PlanPrice
+  /** The prorated charge for the new block's rest of the current period, on the next invoice. */
+  prorated: PlanPrice
+  /** The end of the current paid period, ISO 8601, when the next invoice comes. */
+  periodEnd: string
+}
+
+/** POST /api/me/blocks: the block count the preview answered, which the add raises the quantity to. */
+export interface BlockAddRequest {
+  blocks: number
+}
+
+/** POST /api/me/blocks: the user's blocks after the add, usable at once. */
+export interface BlockAddAnswer {
+  blocks: number
 }

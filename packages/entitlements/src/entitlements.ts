@@ -165,6 +165,25 @@ export async function portalCustomerOf(tx: Scoped<'user'>): Promise<string | nul
   return subscription.customer
 }
 
+/** The scope user's own subscription a block is added to, and its blocks as Stillstats holds them. */
+export interface BlockSubscription {
+  /** Stripe's subscription ID. */
+  subscription: string
+  /** The number of blocks the stored row holds. */
+  quantity: number
+}
+
+/**
+ * The scope user's own subscription while it is paid, `active` or `past_due`, which a block is
+ * added to; else null, and a user without one subscribes through Checkout. The user scope's
+ * policy admits the user's own row alone, so a member of a paid channel holds none.
+ */
+export async function blockSubscriptionOf(tx: Scoped<'user'>): Promise<BlockSubscription | null> {
+  const subscription = await ownSubscriptionOf(tx)
+  if (!subscription || !paidStatuses.has(subscription.status)) return null
+  return { subscription: subscription.subscription, quantity: subscription.quantity }
+}
+
 /** What the scope user's Pro is: their blocks, the slots in use, and each owned channel's pick. */
 export interface ProAccount {
   /** The blocks of the user's live paid subscription; 0 without one. */

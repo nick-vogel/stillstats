@@ -92,6 +92,7 @@ function settingsOf(channels: ListedChannel[] | null, channelsFailed = false) {
       onGiveRevenueConsent: noop,
       onSubscribe: noop,
       onManage: noop,
+      onAddBlock: noop,
       onPick: noop,
       onUnpick: noop,
       onConnect: noop,
