@@ -10,7 +10,7 @@ Google's own pages set every field below. Each was read on 2026-11-23:
 - [The YouTube API Services Developer Policies](https://developers.google.com/youtube/terms/developer-policies), marked "Last updated 2026-11-06 UTC".
 - [Additional policies for derived metrics and data storage](https://developers.google.com/youtube/terms/derived-metrics-policy), marked "Last updated 2026-09-14 UTC".
 
-A field this document can't answer yet carries a gap marker, `[GAP #<issue>]`, with the issue that fills it: #972 for the quota figure and its justification, #975 for the screencast and the screenshots, and #976 for the details only I can give at submission. `grep -n 'GAP #97' docs/audit-application.md` lists every one.
+A field this document can't answer yet carries a gap marker, `[GAP #<issue>]`, with the issue that fills it: #975 for the screencast and the screenshots, and #976 for the details only I can give at submission. `grep -n 'GAP #97' docs/audit-application.md` lists every one.
 
 ## Section 1: Request Type
 
@@ -105,7 +105,7 @@ One Cloud project, `creator-analytics-510701`, the project OAuth verification ap
 | Google Cloud Project Number | [GAP #976] The number of `creator-analytics-510701`, from the Cloud Console "Welcome" card |
 | Use Case Category (or Categories) | Analytics & Reporting, and nothing else |
 | Does this API Client require users to sign in with their Google Account (OAuth 2.0)? | Yes |
-| Expected API Usage Volume | [GAP #972] The band for the measured requests a day |
+| Expected API Usage Volume | 10,000 to 100,000 requests per day (the measurement is in creator-analytics#972) |
 
 ### The derived-metrics opt-in
 
@@ -158,10 +158,22 @@ The set was checked on 2026-11-23 with `grep -rnoE "api\.[a-zA-Z.]+\(" packages/
 | Field | Answer |
 |---|---|
 | What is the total quota you are requesting for Project #1? | Above Default quota |
-| Total Per Day Quota | [GAP #972] The measured cost per channel per day, times 250 channels, rounded up |
-| Detailed Justification | [GAP #972] The cost per channel, the 250-channel target and the total as three lines, the target stated as a 12-month plan, and the 10% reserve the gateway keeps |
+| Total Per Day Quota | 15000 |
+| Detailed Justification | The text below |
 | youtube.search.list, Total Per Day Quota and Detailed Justification | Left empty |
 | youtube.videos.insert, Total Per Day Quota and Detailed Justification | Left empty |
+
+Detailed Justification:
+
+```
+Stillstats reads a creator's own channel through the YouTube Data API, the YouTube Analytics API and the YouTube Reporting API, after the creator connects the channel with OAuth. It never calls search.list or videos.insert.
+
+Cost per channel per day: 54 Data API units. That's the busiest day per channel from November 14 to 27, 2026 (12.85 units), plus the daily read of a channel's uploads for Stillstats Pro, for a channel with 1,000 videos (41 units).
+Target: 250 connected channels over the next 12 months.
+Total: 54 units x 250 channels = 13,500 units a day, which is 90% of 15,000.
+
+Stillstats' gateway counts every call against the daily quota and keeps the last 10% of it back for data deletion and urgent reads, so routine reads stop before the project reaches Google's limit. 15,000 units leaves the 13,500 for routine reads and 1,500 in reserve.
+```
 
 ## Section 6: Additional Evidence and Documentation Requirements
 
