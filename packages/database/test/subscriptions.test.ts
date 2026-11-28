@@ -891,6 +891,22 @@ describe('a block added while paid fills its new slots at once (stillstats#22)',
 
     expect({ outcome, turnedPro }).toEqual({ outcome: 'unchanged', turnedPro: [] })
   })
+
+  test('a later paid event at the same quantity, as a renewal sends, picks nothing again: a channel taken out stays out and keeps its purge date', async ({
+    web,
+    worker,
+  }) => {
+    const ids = await ownedChannels(web, worker, 4)
+    const [first = ''] = ids
+    await web.asAnonymous(record(ownerId, completed))
+    await web.asUser(ownerId, (scope) => unpickChannel(scope, first, purgeAfter))
+
+    const { outcome, turnedPro } = await web.asAnonymous(raise(1, 1))
+
+    expect({ outcome, turnedPro }).toEqual({ outcome: 'recorded', turnedPro: [] })
+    expect(await web.asUser(ownerId, purgeOf(first))).toEqual(purgeAfter)
+    expect(await proStates(web, ids)).toEqual([false, true, true, true])
+  })
 })
 
 describe('pro_state answers only for a channel the scope admits', () => {
