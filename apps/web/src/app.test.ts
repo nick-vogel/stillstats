@@ -8085,6 +8085,25 @@ describe('"Add a block" in the Pro section (stillstats#22)', () => {
     expect(alertOf(container)).toBeNull()
   })
 
+  test('an add by a user who also holds a grant toasts the slots of the paid and granted blocks, and sends block_added with the paid ones', async () => {
+    vi.stubGlobal('confirm', () => true)
+    const api = installFakeApi()
+    api.channels = [fakeChannel]
+    api.entitlements = entitlementsOf(
+      { ...canAdd, grants: [{ blocks: 2, endsAt: null }] },
+      { channelId: fakeChannel.id, tier: 'paid' },
+    )
+    const { container } = await render('settings')
+    vi.mocked(track).mockClear()
+
+    await click(buttonNamed(container, addBlockText))
+    await settle()
+
+    expect(vi.mocked(track).mock.calls).toEqual([[{ name: 'block_added', blocks: 2 }]])
+    expect(slotLinesIn(container)).toBe('1 of 16 slots in use')
+    expect(toastText()).toBe('Block added. You now have 16 Pro slots.')
+  })
+
   test('a cancelled confirm posts nothing and sends nothing', async () => {
     vi.stubGlobal('confirm', () => false)
     const api = subscribedOwner()

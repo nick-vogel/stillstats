@@ -636,8 +636,10 @@ export function App({
     }
     clearAlertFrom(addBlockAlert)
     track(blockAddedEvent(added.blocks))
-    setEntitlements(await readEntitlements())
-    showSuccess(blockAddedTextOf(added.blocks))
+    const answer = await readEntitlements()
+    setEntitlements(answer)
+    // The toast says the slots the user now holds, a grant's included; the event, the paid blocks.
+    showSuccess(blockAddedTextOf(totalBlocksOf(answer)))
   }
 
   async function deleteYourself() {

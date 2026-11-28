@@ -56,7 +56,7 @@ export function addBlockQuestionOf(preview: BlockPreviewAnswer, locale?: string)
   return `Add a block of 4 more Pro slots for ${price} a ${periodNames[preview.plan]}? Your next invoice, on ${next}, also charges ${prorated} for the rest of this ${periodNames[preview.plan]}.`
 }
 
-/** The toast once the block is added: the slots the user's blocks now hold. */
+/** The toast once the block is added: the slots the user's paid and granted blocks now hold. */
 export function blockAddedTextOf(blocks: number): string {
   return `Block added. You now have ${blocks * slotsPerBlock} Pro slots.`
 }
