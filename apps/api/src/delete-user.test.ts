@@ -4,6 +4,7 @@
 // deletion job's handler in the test's transaction; it cannot prove that pg-boss fetches the
 // committed job, which the delivery pipeline's smoke run (#20) covers.
 import {
+  accountCancellations,
   deletionLog,
   deletionRequests,
   preferences,
@@ -17,7 +18,13 @@ import {
   sponsorReportFigureChoices,
   subscriptions,
 } from '@creator-analytics/database'
-import { channelRowCounts, fixtureNotes, test } from '@creator-analytics/database/testing'
+import {
+  channelRowCounts,
+  fixtureNotes,
+  recordUserSubscription,
+  subscribeOwner,
+  test,
+} from '@creator-analytics/database/testing'
 import { recordingReporter } from '@creator-analytics/reporter'
 import { createRetention, deletionJobData } from '@creator-analytics/retention-engine'
 import { describe, expect } from 'vitest'
@@ -115,6 +122,53 @@ describe('seam 1: user deletion', () => {
     expect(api.google.revokedTokens).toEqual([])
   })
 
+  test("a paid user's deletion pends the cancellation of their subscription, and sends its cancellation now and its alarm at 12 hours", async ({
+    web,
+    worker,
+    clock,
+    findJobs,
+  }) => {
+    clock.set(new Date('2026-11-27T12:00:00.000Z'))
+    const api = await startApi(web)
+    const browser = await signIn(api, creator)
+    api.google.pickChannel('UC-delete-user-paid')
+    const channelId = await connectedChannel(browser)
+    await subscribeOwner(web, worker, channelId)
+
+    await deleteUser(browser)
+
+    const pending = await worker.asSystem((tx) =>
+      tx.sql
+        .select({
+          id: accountCancellations.id,
+          subscription: accountCancellations.stripeSubscriptionId,
+        })
+        .from(accountCancellations),
+    )
+    expect(pending).toEqual([{ id: expect.any(String), subscription: `sub_${channelId}` }])
+    const cancellationId = pending[0]?.id
+    const sent = async (name: 'cancelAccountSubscription' | 'accountCancellationAlarm') =>
+      (await findJobs(name)).map((job) => ({ data: job.data, startAfter: job.startAfter }))
+    expect(await sent('cancelAccountSubscription')).toEqual([
+      { data: { cancellationId }, startAfter: clock.now() },
+    ])
+    expect(await sent('accountCancellationAlarm')).toEqual([
+      { data: { cancellationId }, startAfter: new Date('2026-11-28T00:00:00.000Z') },
+    ])
+  })
+
+  test("a free user's deletion pends no cancellation", async ({ web, worker, findJobs }) => {
+    const api = await startApi(web)
+    const browser = await signIn(api, creator)
+    api.google.pickChannel('UC-delete-user-free')
+    await connectedChannel(browser)
+
+    await deleteUser(browser)
+
+    expect(await worker.asSystem((tx) => tx.sql.select().from(accountCancellations))).toEqual([])
+    expect(await findJobs('cancelAccountSubscription')).toEqual([])
+  })
+
   test('a user deletion leaves no preferences row', async ({ web }) => {
     const api = await startApi(web)
     const browser = await signIn(api, creator)
@@ -137,7 +191,7 @@ describe('seam 1: user deletion', () => {
 
   // The end state: no row of the channel is left in any table that holds a channel id, found
   // from the catalog, so a channel-owned table added later is covered without editing this test.
-  test('after a user deletion and its job, no table holds a row of the channel, and the log counts every seeded row', async ({
+  test('after a user deletion and its job, no table holds a row of the channel, and the log counts every seeded row the channel still held', async ({
     web,
     worker,
     findJobs,
@@ -164,7 +218,6 @@ describe('seam 1: user deletion', () => {
         status: 'canceled',
         updatedAt: tx.now,
       })
-      await tx.sql.insert(proEnds).values({ channelId, endedAt: tx.now, purgeAfter: null })
       await tx.sql.insert(reachHistory).values({
         channelId,
         videoId: 'end-state',
@@ -191,12 +244,37 @@ describe('seam 1: user deletion', () => {
         .values({ channelId, figures: ['views'], updatedAt: tx.now })
       await tx.sql.insert(fixtureNotes).values({ channelId, body: 'end-state' })
     })
+    // The channel's pick, which a purchase makes and its end leaves, and its end of Pro.
+    const userId = await userIdOf(web, creator.email)
+    await web.asAnonymous(async (tx) => {
+      const event = {
+        userId,
+        customer: 'cus_end_state',
+        subscription: 'sub_end_state_pro',
+        plan: 'monthly',
+        periodEnd: null,
+        eventCreated: tx.now,
+      } as const
+      await recordUserSubscription(tx, { ...event, status: 'active' })
+      await recordUserSubscription(tx, { ...event, status: 'canceled' })
+    })
+    await worker.forChannel(channelId, (tx) =>
+      tx.sql.insert(proEnds).values({ channelId, endedAt: tx.now, purgeAfter: null }),
+    )
     await web.asAnonymous((tx) =>
-      recordSubscriptionPayment(tx, { invoiceId: 'in_end_state', channelId }),
+      recordSubscriptionPayment(tx, {
+        invoiceId: 'in_end_state',
+        userId: null,
+        legacyChannelId: channelId,
+      }),
     )
     const seeded = await worker.forChannel(channelId, (tx) => channelRowCounts(tx, channelId))
     // An absence proves nothing unless each table held a row of the channel first.
-    expect(Object.entries(seeded).filter(([, n]) => n === 0)).toEqual([])
+    // A channel's subscription payments are the release before blocks' rows, which nothing writes
+    // any more (stillstats#20); channel-owned.test.ts proves they cascade.
+    expect(Object.entries(seeded).filter(([, n]) => n === 0)).toEqual([
+      ['subscription_payments', 0],
+    ])
 
     await deleteUser(browser)
     const [deletion] = await findJobs('deleteChannel')
@@ -216,6 +294,7 @@ describe('seam 1: user deletion', () => {
     )
     expect(left).toEqual(Object.fromEntries(Object.keys(seeded).map((table) => [table, 0])))
     expect(openRequests).toEqual([])
-    expect(logged).toEqual([{ reason: 'user_deletion', rowCounts: seeded }])
+    // The user's deletion takes their Pro pick with the user row, before the channel's job runs.
+    expect(logged).toEqual([{ reason: 'user_deletion', rowCounts: { ...seeded, pro_picks: 0 } }])
   })
 })

@@ -3,7 +3,7 @@
 // sends them in, or what the Customer Portal and link.com change on a Managed Payments
 // subscription. Nick's walk of Pro on production (creator-analytics#791) covers those.
 import { randomUUID } from 'node:crypto'
-import { proEnds, subscriptions, type WebDatabase } from '@creator-analytics/database'
+import { proEnds, proPicks, userSubscriptions, type WebDatabase } from '@creator-analytics/database'
 import { test } from '@creator-analytics/database/testing'
 import { entitlementOf } from '@creator-analytics/entitlements'
 import { eq } from 'drizzle-orm'
@@ -63,20 +63,21 @@ async function paidChannel(web: WebDatabase) {
 const entitlementIn = (web: WebDatabase, ownerId: string, channelId: string) =>
   web.asUser(ownerId, (scope) => entitlementOf(scope, channelId))
 
-/** The channel's subscription row and its purge date, as its owner's scope reads them. */
+/** The owner's subscription row and their picked channel's purge date, as their scope reads them. */
 function storedSubscription(web: WebDatabase, ownerId: string) {
   return web.asUser(ownerId, (scope) =>
     scope.sql
       .select({
-        subscription: subscriptions.stripeSubscriptionId,
-        plan: subscriptions.plan,
-        status: subscriptions.status,
-        periodEnd: subscriptions.currentPeriodEnd,
+        subscription: userSubscriptions.stripeSubscriptionId,
+        plan: userSubscriptions.plan,
+        status: userSubscriptions.status,
+        periodEnd: userSubscriptions.currentPeriodEnd,
         purgeAfter: proEnds.purgeAfter,
-        updatedAt: subscriptions.updatedAt,
+        updatedAt: userSubscriptions.updatedAt,
       })
-      .from(subscriptions)
-      .leftJoin(proEnds, eq(proEnds.channelId, subscriptions.channelId)),
+      .from(userSubscriptions)
+      .leftJoin(proPicks, eq(proPicks.userId, userSubscriptions.userId))
+      .leftJoin(proEnds, eq(proEnds.channelId, proPicks.channelId)),
   )
 }
 
@@ -399,7 +400,7 @@ describe('seam 1: the webhook reads the changes to a subscription', () => {
 
     expect(api.reporter.reports).toEqual([
       {
-        message: 'A paid Stripe subscription names no channel',
+        message: 'A paid Stripe subscription names no user',
         context: { stripeObject: 'sub_test_gone' },
       },
     ])
@@ -426,7 +427,7 @@ describe('seam 1: the webhook reads the changes to a subscription', () => {
     expect(await storedSubscription(web, ownerId)).toEqual(before)
     expect(api.reporter.reports).toEqual([
       {
-        message: 'A second Stripe subscription names a paid channel',
+        message: 'A second Stripe subscription names a paid user',
         context: { stripeObject: 'cs_test_second' },
       },
     ])

@@ -288,6 +288,13 @@
       "when": 1795819643513,
       "tag": "0040_pro_ends",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1795823778301,
+      "tag": "0041_user_subscriptions",
+      "breakpoints": true
     }
   ]
 }

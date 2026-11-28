@@ -8,8 +8,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
-import { subscriptions, type WorkerDatabase } from '@creator-analytics/database'
-import { test as databaseTest } from '@creator-analytics/database/testing'
+import { test as databaseTest, subscribeOwner } from '@creator-analytics/database/testing'
 import type { FakeUpload } from '@creator-analytics/fake-google'
 import { sql } from 'drizzle-orm'
 import { describe, expect, test } from 'vitest'
@@ -186,20 +185,6 @@ async function connectedCreator(api: StartedApi) {
   return { browser, channelId }
 }
 
-/** Makes the channel Pro, so the retention comparison answers, as retention-curves.test.ts does. */
-async function subscribe(worker: WorkerDatabase, channelId: string): Promise<void> {
-  await worker.forChannel(channelId, (tx) =>
-    tx.sql.insert(subscriptions).values({
-      channelId,
-      stripeCustomerId: 'cus_cold_walk',
-      stripeSubscriptionId: 'sub_cold_walk',
-      status: 'active',
-      purgeAfter: null,
-      updatedAt: tx.now,
-    }),
-  )
-}
-
 const isDuration = (value: unknown) =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0
 
@@ -222,7 +207,7 @@ describe('the walk against the API', () => {
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       // Fills the cache, so only the clear can make the cold pass cold.
       expect(
         (await browser.fetch(`/api/channels/${channelId}/videos?window=lifetime`)).status,

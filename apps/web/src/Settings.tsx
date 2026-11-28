@@ -20,11 +20,14 @@ import {
   accountHeading,
   channelsHeading,
   channelsLoadingTextOf,
+  channelTierTexts,
   consentGivenTextOf,
   currencyChangedEvent,
   currencyLabel,
   currencyOptionsOf,
   noChannelText,
+  proHeading,
+  proSlotsTextOf,
   resetPreferencesButton,
   rpmSourcesHint,
   rpmSourcesLabel,
@@ -34,7 +37,7 @@ import {
   themeLabel,
   themeOptions,
 } from './settings.ts'
-import { manageSubscriptionText, subscribeTexts } from './subscribe.ts'
+import { manageSubscriptionText, type ProSection, subscribeTexts } from './subscribe.ts'
 import {
   supportHeading,
   supportLinkText,
@@ -44,11 +47,12 @@ import {
 } from './support.ts'
 
 /**
- * The creator's channels, each by its name on YouTube, the Support section when the support answer
- * has a link, and account: disconnect and revenue consent for each channel, and a subscribe action
- * for each plan for a channel the user may subscribe, or the Customer Portal's for a channel they
- * may manage, then the currency revenue shows in, the
- * theme, the RPM switch, connect, reset of the preferences, sign-out and delete. While the channels
+ * The creator's channels, each by its name on YouTube, with disconnect and revenue consent, and
+ * under each one the user owns whether it is Pro or Free while there is a Pro section; the Pro
+ * section, with the slots in use once the user holds a block, a subscribe action for each plan
+ * while they may subscribe and the Customer Portal's while they may manage; the Support section
+ * when the support answer has a link; and account: the currency revenue shows in, the theme, the
+ * RPM switch, connect, reset of the preferences, sign-out and delete. While the channels
  * are read, their place holds a placeholder, until the read fails. A change of currency saves the
  * preference and sends `currency_changed`; a change of the RPM switch saves its preference and
  * sends `rpm_sources_toggled`, with no toast, as the switch shows its own state. A change of theme
@@ -60,8 +64,7 @@ export function Settings({
   channelsFailed,
   supportLink,
   supportThanks,
-  subscribable,
-  manageable,
+  pro,
   theme,
   onDisconnect,
   onGiveRevenueConsent,
@@ -79,16 +82,14 @@ export function Settings({
   supportLink: string | null
   /** Stripe returned here after a Tip: the line shows whatever the support answer holds. */
   supportThanks: boolean
-  /** The channels the user may start a Checkout for: their own, free, with Pro offered. */
-  subscribable: ReadonlySet<string>
-  /** The channels the user may open the Customer Portal for: their own, paid. */
-  manageable: ReadonlySet<string>
+  /** The user's Pro, or null for no Pro section (`proSectionOf`). */
+  pro: ProSection | null
   /** The theme the page draws, which App applies. */
   theme: Theme
   onDisconnect: (channelId: string) => void
   onGiveRevenueConsent: (channelId: string) => void
-  onSubscribe: (channelId: string, plan: BillingPlan) => void
-  onManage: (channelId: string) => void
+  onSubscribe: (plan: BillingPlan) => void
+  onManage: () => void
   onConnect: () => void
   onResetPreferences: () => void
   onSignOut: () => void
@@ -144,52 +145,61 @@ export function Settings({
           <p>{noChannelText}</p>
         ) : (
           <ul className="channels">
-            {channels.map((channel) => (
-              <li className="channel" key={channel.id}>
-                <div className="channel-head">
-                  <a
-                    className="channel-name"
-                    href={`https://www.youtube.com/channel/${channel.youtubeChannelId}`}
-                  >
-                    {channelTitleOf(channel)}
-                  </a>
-                  <QuietButton onClick={() => onDisconnect(channel.id)}>Disconnect</QuietButton>
-                </div>
-                {channel.revenueConsentedAt ? (
-                  <p className="channel-consent">
-                    {consentGivenTextOf(channel.revenueConsentedAt)}
-                  </p>
-                ) : (
-                  <QuietButton onClick={() => onGiveRevenueConsent(channel.id)}>
-                    Give revenue consent
-                  </QuietButton>
-                )}
-                {subscribable.has(channel.id) && (
-                  <div className="app-actions">
-                    {billingPlans.map((plan) => (
-                      <button
-                        className="button"
-                        type="button"
-                        key={plan}
-                        onClick={() => onSubscribe(channel.id, plan)}
-                      >
-                        {subscribeTexts[plan]}
-                      </button>
-                    ))}
+            {channels.map((channel) => {
+              const tier = pro?.tiers.get(channel.id)
+              return (
+                <li className="channel" key={channel.id}>
+                  <div className="channel-head">
+                    <a
+                      className="channel-name"
+                      href={`https://www.youtube.com/channel/${channel.youtubeChannelId}`}
+                    >
+                      {channelTitleOf(channel)}
+                    </a>
+                    <QuietButton onClick={() => onDisconnect(channel.id)}>Disconnect</QuietButton>
                   </div>
-                )}
-                {manageable.has(channel.id) && (
-                  <div className="app-actions">
-                    <button className="button" type="button" onClick={() => onManage(channel.id)}>
-                      {manageSubscriptionText}
-                    </button>
-                  </div>
-                )}
-              </li>
-            ))}
+                  {channel.revenueConsentedAt ? (
+                    <p className="channel-consent">
+                      {consentGivenTextOf(channel.revenueConsentedAt)}
+                    </p>
+                  ) : (
+                    <QuietButton onClick={() => onGiveRevenueConsent(channel.id)}>
+                      Give revenue consent
+                    </QuietButton>
+                  )}
+                  {tier && <p className="channel-tier">{channelTierTexts[tier]}</p>}
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>
+      {pro && (
+        <section className="settings-section">
+          <h2>{proHeading}</h2>
+          {pro.blocks > 0 && <p>{proSlotsTextOf(pro.slotsInUse, pro.blocks)}</p>}
+          {(pro.canSubscribe || pro.canManage) && (
+            <div className="app-actions">
+              {pro.canSubscribe &&
+                billingPlans.map((plan) => (
+                  <button
+                    className="button"
+                    type="button"
+                    key={plan}
+                    onClick={() => onSubscribe(plan)}
+                  >
+                    {subscribeTexts[plan]}
+                  </button>
+                ))}
+              {pro.canManage && (
+                <button className="button" type="button" onClick={onManage}>
+                  {manageSubscriptionText}
+                </button>
+              )}
+            </div>
+          )}
+        </section>
+      )}
       {supportLink !== null && (
         <section className="settings-section">
           <h2>{supportHeading}</h2>

@@ -7,12 +7,7 @@ import type {
   EntitlementsAnswer,
   RefusalAnswer,
 } from '@creator-analytics/api-types'
-import {
-  memberships,
-  subscriptions,
-  type WebDatabase,
-  type WorkerDatabase,
-} from '@creator-analytics/database'
+import { memberships, type WebDatabase, type WorkerDatabase } from '@creator-analytics/database'
 import { test } from '@creator-analytics/database/testing'
 import type { FakeStripe } from '@creator-analytics/fake-stripe'
 import { describe, expect } from 'vitest'
@@ -22,6 +17,7 @@ import { type StartedApi, startApi } from '../test/start-api.ts'
 import {
   deliverStripeEvent,
   subscriptionCheckoutEvent,
+  subscriptionCreatedEvent,
   subscriptionDeletedEvent,
   testBilling,
 } from '../test/stripe.ts'
@@ -59,7 +55,12 @@ async function addMember(
   )
 }
 
-function checkout(browser: Browser, channelId: string, plan: unknown): Promise<Response> {
+function checkout(browser: Browser, plan: unknown): Promise<Response> {
+  return browser.postJson('/api/me/checkout', { plan })
+}
+
+/** The route of the release before blocks, kept for a tab opened before the deploy. */
+function channelCheckout(browser: Browser, channelId: string, plan: unknown): Promise<Response> {
   return browser.postJson(`/api/channels/${channelId}/checkout`, { plan })
 }
 
@@ -69,15 +70,16 @@ async function entitlementsOf(browser: Browser): Promise<EntitlementsAnswer> {
   return (await response.json()) as EntitlementsAnswer
 }
 
-describe('seam 1: the owner starts a Pro Checkout', () => {
+describe('seam 1: a user who owns a channel starts a Pro Checkout', () => {
   test.for(['monthly', 'annual'] as const)(
-    "the owner starts the %s plan and is sent to Stripe's Checkout, opened for the channel with Managed Payments",
+    "the owner starts the %s plan and is sent to Stripe's Checkout for one block, opened for the user with Managed Payments",
     async (plan, { web }) => {
       const api = await startApi(web, { billing: testBilling })
-      const { browser, channelId } = await ownedChannel(api)
+      const { browser } = await ownedChannel(api)
+      const userId = await userIdOf(web, owner.email)
       const stripe = fakeStripeOf(api)
 
-      const response = await checkout(browser, channelId, plan)
+      const response = await checkout(browser, plan)
 
       expect(response.status).toBe(200)
       const { url } = (await response.json()) as CheckoutStartAnswer
@@ -88,23 +90,125 @@ describe('seam 1: the owner starts a Pro Checkout', () => {
         'managed_payments[enabled]': 'true',
         'line_items[0][price]': testBilling.prices[plan],
         'line_items[0][quantity]': '1',
-        client_reference_id: channelId,
-        'metadata[stillstats_channel_id]': channelId,
-        'subscription_data[metadata][stillstats_channel_id]': channelId,
+        client_reference_id: userId,
+        'metadata[stillstats_user_id]': userId,
+        'metadata[plan]': plan,
+        'subscription_data[metadata][stillstats_user_id]': userId,
+        'subscription_data[metadata][plan]': plan,
       })
+      expect(Object.keys(session ?? {}).filter((key) => key.includes('adjustable'))).toEqual([])
       expect(stripe.checkoutSessions).toHaveLength(1)
     },
   )
 
   test("Stripe's page returns to Settings, whether the owner pays or cancels", async ({ web }) => {
     const api = await startApi(web, { billing: testBilling })
-    const { browser, channelId } = await ownedChannel(api)
+    const { browser } = await ownedChannel(api)
 
-    await checkout(browser, channelId, 'monthly')
+    await checkout(browser, 'monthly')
 
     const [session] = fakeStripeOf(api).checkoutSessions
     const settings = `${api.origin}/app/settings`
     expect([session?.get('success_url'), session?.get('cancel_url')]).toEqual([settings, settings])
+  })
+
+  test('a member who owns no channel is refused with not_owner, and no Checkout opens', async ({
+    web,
+    worker,
+  }) => {
+    const api = await startApi(web, { billing: testBilling })
+    const { channelId } = await ownedChannel(api)
+    const browser = await signIn(api, member)
+    await addMember(web, worker, channelId, member.email)
+
+    const response = await checkout(browser, 'monthly')
+
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ refusal: 'not_owner' } satisfies RefusalAnswer)
+    expect(fakeStripeOf(api).checkoutSessions).toEqual([])
+  })
+
+  test('a signed-in user who holds no channel is refused with not_owner', async ({ web }) => {
+    const api = await startApi(web, { billing: testBilling })
+    const browser = await signIn(api, member)
+
+    const response = await checkout(browser, 'monthly')
+
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ refusal: 'not_owner' } satisfies RefusalAnswer)
+    expect(fakeStripeOf(api).checkoutSessions).toEqual([])
+  })
+
+  test.for([
+    ['paid', 'active'],
+    ['not yet paid', 'incomplete'],
+    ['unpaid', 'unpaid'],
+  ] as const)(
+    'a user with a live %s subscription is refused with already_subscribed, so they are not charged twice',
+    async ([, status], { web }) => {
+      const api = await startApi(web, { billing: testBilling })
+      const { browser, channelId } = await ownedChannel(api)
+      await deliverStripeEvent(api, subscriptionCreatedEvent({ channelId, status }))
+
+      const response = await checkout(browser, 'monthly')
+
+      expect(response.status).toBe(409)
+      expect(await response.json()).toEqual({
+        refusal: 'already_subscribed',
+      } satisfies RefusalAnswer)
+      expect(fakeStripeOf(api).checkoutSessions).toEqual([])
+    },
+  )
+
+  test.for([['weekly'], [undefined], [7]])(
+    'a plan of %o is refused with invalid_plan',
+    async ([plan], { web }) => {
+      const api = await startApi(web, { billing: testBilling })
+      const { browser } = await ownedChannel(api)
+
+      const response = await checkout(browser, plan)
+
+      expect(response.status).toBe(400)
+      expect(await response.json()).toEqual({ error: 'invalid_plan' })
+    },
+  )
+
+  test('a user who subscribed before buys again as the same Stripe customer', async ({ web }) => {
+    const api = await startApi(web, { billing: testBilling })
+    const { browser, channelId } = await ownedChannel(api)
+    await deliverStripeEvent(
+      api,
+      subscriptionCheckoutEvent({ channelId, customer: 'cus_test_back' }),
+    )
+    await deliverStripeEvent(
+      api,
+      subscriptionDeletedEvent({ channelId, customer: 'cus_test_back', endedAt: new Date() }),
+    )
+
+    await checkout(browser, 'annual')
+
+    expect(fakeStripeOf(api).checkoutSessions[0]?.get('customer')).toBe('cus_test_back')
+  })
+})
+
+// The channel's Checkout route of the release before blocks, kept for a tab opened before the
+// deploy: its tests keep their names, and open the user's Checkout.
+describe('seam 1: the owner starts a Pro Checkout', () => {
+  test("the owner of a free channel is sent to the user's Checkout, as the user route opens it", async ({
+    web,
+  }) => {
+    const api = await startApi(web, { billing: testBilling })
+    const { browser, channelId } = await ownedChannel(api)
+    const userId = await userIdOf(web, owner.email)
+
+    const response = await channelCheckout(browser, channelId, 'monthly')
+
+    expect(response.status).toBe(200)
+    const [session] = fakeStripeOf(api).checkoutSessions.map((body) => Object.fromEntries(body))
+    expect(session).toMatchObject({
+      'line_items[0][quantity]': '1',
+      'metadata[stillstats_user_id]': userId,
+    })
   })
 
   test('a member who does not own the channel is refused with not_owner, and no Checkout opens', async ({
@@ -116,7 +220,7 @@ describe('seam 1: the owner starts a Pro Checkout', () => {
     const browser = await signIn(api, member)
     await addMember(web, worker, channelId, member.email)
 
-    const response = await checkout(browser, channelId, 'monthly')
+    const response = await channelCheckout(browser, channelId, 'monthly')
 
     expect(response.status).toBe(403)
     expect(await response.json()).toEqual({ refusal: 'not_owner' } satisfies RefusalAnswer)
@@ -130,7 +234,7 @@ describe('seam 1: the owner starts a Pro Checkout', () => {
     const { channelId } = await ownedChannel(api)
     const browser = await signIn(api, member)
 
-    const response = await checkout(browser, channelId, 'monthly')
+    const response = await channelCheckout(browser, channelId, 'monthly')
 
     expect(response.status).toBe(404)
     expect(await response.json()).toEqual({ refusal: 'not_connected' } satisfies RefusalAnswer)
@@ -141,10 +245,22 @@ describe('seam 1: the owner starts a Pro Checkout', () => {
     const api = await startApi(web, { billing: testBilling })
     const { channelId } = await ownedChannel(api)
 
-    const response = await checkout(new Browser(api.origin), channelId, 'monthly')
+    const response = await channelCheckout(new Browser(api.origin), channelId, 'monthly')
 
     expect(response.status).toBe(401)
     expect(fakeStripeOf(api).checkoutSessions).toEqual([])
+  })
+
+  test('with Pro unset, the Checkout route answers 404 as an unknown route does', async ({
+    web,
+  }) => {
+    const api = await startApi(web)
+    const { browser, channelId } = await ownedChannel(api)
+
+    const response = await channelCheckout(browser, channelId, 'monthly')
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: 'not_found' })
   })
 
   test('a paid channel is refused with already_subscribed, so its owner is not charged twice', async ({
@@ -154,60 +270,16 @@ describe('seam 1: the owner starts a Pro Checkout', () => {
     const { browser, channelId } = await ownedChannel(api)
     await deliverStripeEvent(api, subscriptionCheckoutEvent({ channelId }))
 
-    const response = await checkout(browser, channelId, 'monthly')
+    const response = await channelCheckout(browser, channelId, 'monthly')
 
     expect(response.status).toBe(409)
     expect(await response.json()).toEqual({ refusal: 'already_subscribed' } satisfies RefusalAnswer)
-    expect(fakeStripeOf(api).checkoutSessions).toEqual([])
-  })
-
-  test.for([['weekly'], [undefined], [7]])(
-    'a plan of %o is refused with invalid_plan',
-    async ([plan], { web }) => {
-      const api = await startApi(web, { billing: testBilling })
-      const { browser, channelId } = await ownedChannel(api)
-
-      const response = await checkout(browser, channelId, plan)
-
-      expect(response.status).toBe(400)
-      expect(await response.json()).toEqual({ error: 'invalid_plan' })
-    },
-  )
-
-  test('with Pro unset, the Checkout route answers 404 as an unknown route does', async ({
-    web,
-  }) => {
-    const api = await startApi(web)
-    const { browser, channelId } = await ownedChannel(api)
-
-    const response = await checkout(browser, channelId, 'monthly')
-
-    expect(response.status).toBe(404)
-    expect(await response.json()).toEqual({ error: 'not_found' })
-  })
-
-  test('a channel that subscribed before buys again as the same Stripe customer', async ({
-    web,
-    worker,
-  }) => {
-    const api = await startApi(web, { billing: testBilling })
-    const { browser, channelId } = await ownedChannel(api)
-    await deliverStripeEvent(
-      api,
-      subscriptionCheckoutEvent({ channelId, customer: 'cus_test_back' }),
-    )
-    // The subscription ended, as #787 records it.
-    await worker.forChannel(channelId, (scope) =>
-      scope.sql.update(subscriptions).set({ status: 'canceled' }),
-    )
-
-    await checkout(browser, channelId, 'annual')
-
-    expect(fakeStripeOf(api).checkoutSessions[0]?.get('customer')).toBe('cus_test_back')
   })
 })
 
-describe('seam 1: what the web app reads of each channel', () => {
+const freeAnswer = { blocks: 0, slotsInUse: 0 }
+
+describe("seam 1: what the web app reads of the user's Pro and each channel", () => {
   test('the owner of a free channel may subscribe, and a member who does not own it may not', async ({
     web,
     worker,
@@ -216,18 +288,25 @@ describe('seam 1: what the web app reads of each channel', () => {
     const { browser, channelId } = await ownedChannel(api)
     const memberBrowser = await signIn(api, member)
     await addMember(web, worker, channelId, member.email)
+    const free = { channelId, tier: 'free', purgeDate: null, canManage: false } as const
 
     expect(await entitlementsOf(browser)).toEqual({
       paidTierOffered: true,
-      channels: [{ channelId, tier: 'free', canSubscribe: true, canManage: false }],
+      canSubscribe: true,
+      canManage: false,
+      ...freeAnswer,
+      channels: [{ ...free, owner: true, picked: false, canSubscribe: true }],
     })
     expect(await entitlementsOf(memberBrowser)).toEqual({
       paidTierOffered: true,
-      channels: [{ channelId, tier: 'free', canSubscribe: false, canManage: false }],
+      canSubscribe: false,
+      canManage: false,
+      ...freeAnswer,
+      channels: [{ ...free, owner: false, picked: false, canSubscribe: false }],
     })
   })
 
-  test('a paid channel reads as paid, no one may subscribe it again, and its owner may manage it', async ({
+  test('a paid channel reads as paid and picked, the user may not subscribe again and may manage, with one block and one slot in use', async ({
     web,
   }) => {
     const api = await startApi(web, { billing: testBilling })
@@ -236,19 +315,52 @@ describe('seam 1: what the web app reads of each channel', () => {
 
     expect(await entitlementsOf(browser)).toEqual({
       paidTierOffered: true,
-      channels: [{ channelId, tier: 'paid', canSubscribe: false, canManage: true }],
+      canSubscribe: false,
+      canManage: true,
+      blocks: 1,
+      slotsInUse: 1,
+      channels: [
+        {
+          channelId,
+          tier: 'paid',
+          owner: true,
+          picked: true,
+          purgeDate: null,
+          canSubscribe: false,
+          canManage: true,
+        },
+      ],
     })
   })
 
-  test('the owner of an ended channel may subscribe it again', async ({ web }) => {
+  test('the owner of an ended channel may subscribe again, and reads its purge date', async ({
+    web,
+  }) => {
     const api = await startApi(web, { billing: testBilling })
     const { browser, channelId } = await ownedChannel(api)
     await deliverStripeEvent(api, subscriptionCheckoutEvent({ channelId }))
-    await deliverStripeEvent(api, subscriptionDeletedEvent({ channelId, endedAt: new Date() }))
+    const endedAt = new Date()
+    await deliverStripeEvent(api, subscriptionDeletedEvent({ channelId, endedAt }))
+    const purgeDate = new Date(
+      Math.floor(endedAt.getTime() / 1000) * 1000 + 30 * 24 * 60 * 60 * 1000,
+    )
 
     expect(await entitlementsOf(browser)).toEqual({
       paidTierOffered: true,
-      channels: [{ channelId, tier: 'free', canSubscribe: true, canManage: false }],
+      canSubscribe: true,
+      canManage: false,
+      ...freeAnswer,
+      channels: [
+        {
+          channelId,
+          tier: 'free',
+          owner: true,
+          picked: true,
+          purgeDate: purgeDate.toISOString(),
+          canSubscribe: true,
+          canManage: false,
+        },
+      ],
     })
   })
 
@@ -258,7 +370,20 @@ describe('seam 1: what the web app reads of each channel', () => {
 
     expect(await entitlementsOf(browser)).toEqual({
       paidTierOffered: false,
-      channels: [{ channelId, tier: 'free', canSubscribe: false, canManage: false }],
+      canSubscribe: false,
+      canManage: false,
+      ...freeAnswer,
+      channels: [
+        {
+          channelId,
+          tier: 'free',
+          owner: true,
+          picked: false,
+          purgeDate: null,
+          canSubscribe: false,
+          canManage: false,
+        },
+      ],
     })
   })
 })

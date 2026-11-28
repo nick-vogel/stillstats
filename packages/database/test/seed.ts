@@ -18,6 +18,7 @@ import {
 } from '../src/schema.ts'
 import type { WebDatabase, WorkerDatabase } from '../src/scopes.ts'
 import { fixtureNotes } from './fixtures.ts'
+import { recordUserSubscription } from './pro.ts'
 
 export async function seedUser(web: WebDatabase, userId: string): Promise<void> {
   await web.asAnonymous((scope) =>
@@ -66,7 +67,8 @@ export async function seedChannel(
     await scope.sql
       .insert(reportingJobs)
       .values({ channelId, jobId: `job-${channelId}`, createdAt: scope.now })
-    // An ended subscription, so a seeded channel stays on the free tier as every channel did before it.
+    // The channel's subscription as the release before blocks kept it, which the previous images
+    // still read: ended, so the channel stays on the free tier.
     await scope.sql.insert(subscriptions).values({
       channelId,
       stripeCustomerId: `cus_${channelId}`,
@@ -74,8 +76,6 @@ export async function seedChannel(
       status: 'canceled',
       updatedAt: scope.now,
     })
-    // Its end of Pro, with the purge date already cleared, as the history purge leaves it.
-    await scope.sql.insert(proEnds).values({ channelId, endedAt: scope.now, purgeAfter: null })
     await scope.sql.insert(reachHistory).values({
       channelId,
       videoId: 'fixture',
@@ -102,11 +102,36 @@ export async function seedChannel(
       .values({ channelId, figures: ['views'], updatedAt: scope.now })
     await scope.sql.insert(fixtureNotes).values({ channelId, body: 'fixture' })
   })
-  // Stripe's webhook is the one writer of a paid invoice, through its function in the anonymous scope.
-  await web.asAnonymous((scope) =>
-    scope.sql.execute(
-      sql`select record_subscription_payment(${`in_${channelId}`}, ${channelId}::uuid)`,
-    ),
-  )
+  // Stripe's webhook is the one writer of a pick, through the owner's subscription in the anonymous
+  // scope: a purchase fills the owner's free slots, and its end leaves the picks, so the channel is
+  // picked and free, as every channel was before it. A live paid subscription of the owner's
+  // answers other_subscription and picks nothing.
+  const turnedPro = await web.asAnonymous(async (scope) => {
+    const event = {
+      userId: ownerId,
+      customer: `cus_${ownerId}`,
+      subscription: `sub_seed_${channelId}`,
+      plan: 'monthly',
+      periodEnd: null,
+      eventCreated: scope.now,
+    } as const
+    const paid = await recordUserSubscription(scope, { ...event, status: 'active' })
+    await recordUserSubscription(scope, { ...event, status: 'canceled' })
+    // The webhook is the one writer of a paid invoice, too.
+    await scope.sql.execute(
+      sql`select record_user_subscription_payment(${`in_${channelId}`}, ${ownerId}, null)`,
+    )
+    return paid.turnedPro
+  })
+  // The end of Pro of each channel the purchase turned Pro, which deleted its row, with the purge
+  // date already cleared, as the history purge leaves it.
+  for (const picked of new Set([...turnedPro, channelId])) {
+    await worker.forChannel(picked, (scope) =>
+      scope.sql
+        .insert(proEnds)
+        .values({ channelId: picked, endedAt: scope.now, purgeAfter: null })
+        .onConflictDoNothing(),
+    )
+  }
   return channelId
 }

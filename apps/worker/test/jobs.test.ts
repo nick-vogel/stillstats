@@ -14,15 +14,15 @@ import {
   reachHistory,
   readCache,
   securityEvents,
-  subscriptions,
 } from '@creator-analytics/database'
 import {
   readFeedbackMessages,
   seedChannel,
   seedUser,
+  subscribeOwner,
   test,
 } from '@creator-analytics/database/testing'
-import { purgeDateOf } from '@creator-analytics/entitlements'
+import { purgeDateOf, requestAccountCancellation } from '@creator-analytics/entitlements'
 import { startFakeStripe } from '@creator-analytics/fake-stripe'
 import { type Reporter, recordingReporter } from '@creator-analytics/reporter'
 import {
@@ -90,7 +90,7 @@ describe('seam 2: the job worker', () => {
     expect(reporter.reports).toEqual([])
   })
 
-  test("a paid channel's deletion runs through every queue's handler, and cancels and refunds its subscription", async ({
+  test("a paid owner's account deletion runs through every queue's handler, and cancels and refunds the subscription", async ({
     web,
     worker,
     clock,
@@ -100,22 +100,21 @@ describe('seam 2: the job worker', () => {
     onTestFinished(() => stripe.close())
     const periodStart = new Date('2026-11-01T00:00:00.000Z')
     const channelId = await seedChannel(web, worker, 'jobs-paid-owner')
-    await worker.forChannel(channelId, (tx) =>
-      tx.sql
-        .update(subscriptions)
-        .set({ status: 'active' })
-        .where(eq(subscriptions.channelId, channelId)),
-    )
+    await subscribeOwner(web, worker, channelId)
     stripe.addSubscription({
       id: `sub_${channelId}`,
-      customer: `cus_${channelId}`,
+      customer: 'cus_jobs-paid-owner',
       periodStart,
       periodEnd: new Date(periodStart.getTime() + 30 * 24 * 60 * 60 * 1000),
       amountPaid: 700,
     })
     clock.set(new Date(periodStart.getTime() + 10 * 24 * 60 * 60 * 1000))
     stripe.setNow(clock.now())
-    await worker.forChannel(channelId, (tx) => requestDeletion(tx, channelId, 'user_deletion'))
+    // What DELETE /me does in its user scope, before it deletes the user row.
+    await web.asUser('jobs-paid-owner', async (tx) => {
+      await requestAccountCancellation(tx)
+      await requestDeletion(tx, channelId, 'user_deletion')
+    })
     const reporter = recordingReporter()
     const canceller = createStripeCanceller({
       secretKey: 'sk_test_stillstats',

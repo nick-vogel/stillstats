@@ -74,6 +74,24 @@ export function checkoutSessionEvent({
 
 const secondsOf = (date: Date) => Math.floor(date.getTime() / 1000)
 
+/**
+ * Who a Stillstats session or subscription pays for: the user its metadata names, as Checkout
+ * writes it since stillstats#20, or the channel, as one made before blocks names it. Neither, or
+ * both null, is one with no Stillstats metadata.
+ */
+export interface SubscriberFields {
+  /** The user the metadata names. */
+  userId?: string | null | undefined
+  /** The channel the metadata of a subscription made before blocks names. */
+  channelId?: string | null | undefined
+}
+
+function subscriberMetadataOf({ userId, channelId }: SubscriberFields): Record<string, string> {
+  if (userId) return { stillstats_user_id: userId }
+  if (channelId) return { stillstats_channel_id: channelId }
+  return {}
+}
+
 /** An event's JSON body, created now unless given. */
 function eventOf(
   type: string,
@@ -90,9 +108,7 @@ function eventOf(
   })
 }
 
-export interface SubscriptionCheckoutFields {
-  /** The channel the session's metadata names; `null` is a session with no Stillstats metadata. */
-  channelId: string | null
+export interface SubscriptionCheckoutFields extends SubscriberFields {
   /** The Checkout Session's ID, `cs_test_subscription` unless given. */
   id?: string
   plan?: 'monthly' | 'annual'
@@ -107,9 +123,11 @@ export interface SubscriptionCheckoutFields {
 
 /**
  * The JSON body of `checkout.session.completed` for a Pro Checkout, as the Checkout route
- * opens it: in subscription mode, from no Payment Link, with the channel in its metadata.
+ * opens it: in subscription mode, from no Payment Link, with the user in its metadata, or the
+ * channel for one made before blocks.
  */
 export function subscriptionCheckoutEvent({
+  userId,
   channelId,
   id = 'cs_test_subscription',
   plan = 'monthly',
@@ -124,7 +142,7 @@ export function subscriptionCheckoutEvent({
     {
       id,
       object: 'checkout.session',
-      client_reference_id: channelId,
+      client_reference_id: userId ?? channelId ?? null,
       payment_status: paymentStatus,
       status: 'complete',
       mode,
@@ -133,15 +151,15 @@ export function subscriptionCheckoutEvent({
       payment_link: null,
       customer,
       subscription,
-      metadata: channelId === null ? {} : { stillstats_channel_id: channelId, plan },
+      metadata: userId || channelId ? { ...subscriberMetadataOf({ userId, channelId }), plan } : {},
     },
     created,
   )
 }
 
-export interface SubscriptionCreatedFields {
-  /** The channel the subscription's metadata names; `null` is one with no Stillstats metadata. */
-  channelId: string | null
+export interface SubscriptionCreatedFields extends SubscriberFields {
+  /** Its one item's quantity, the number of blocks: 1 unless given. */
+  quantity?: number
   /**
    * How often its one item's price bills, Stripe's `recurring.interval`: `month` unless given. The
    * webhook reads the plan from it (#813).
@@ -173,7 +191,9 @@ export interface SubscriptionCreatedFields {
  */
 function subscriptionObjectOf(
   {
+    userId,
     channelId,
+    quantity = 1,
     interval = 'month',
     intervalCount = 1,
     price = interval === 'year' ? testBilling.prices.annual : testBilling.prices.monthly,
@@ -206,7 +226,7 @@ function subscriptionObjectOf(
       type: 'recurring',
       unit_amount: interval === 'year' ? 7000 : 700,
     },
-    quantity: 1,
+    quantity,
     current_period_end: secondsOf(periodEnd),
   }
   return {
@@ -214,7 +234,7 @@ function subscriptionObjectOf(
     object: 'subscription',
     customer,
     status,
-    metadata: channelId === null ? {} : { stillstats_channel_id: channelId },
+    metadata: subscriberMetadataOf({ userId, channelId }),
     ...extra,
     items: {
       object: 'list',
@@ -277,9 +297,7 @@ export function subscriptionDeletedEvent({
   )
 }
 
-export interface InvoiceFields {
-  /** The channel the subscription's metadata names; `null` is one with no Stillstats metadata. */
-  channelId: string | null
+export interface InvoiceFields extends SubscriberFields {
   /** The invoice's ID, `in_test_` and the subscription's ID unless given. */
   id?: string
   customer?: string
@@ -304,14 +322,15 @@ export interface InvoiceFields {
 
 /**
  * The JSON body of an invoice event of the subscription, such as `invoice.paid`. A subscription's
- * invoice carries a snapshot of the subscription's metadata, so it names the channel as the
- * subscription does, and since API version 2025-03-31.basil each line names its price under
+ * invoice carries a snapshot of the subscription's metadata, so it names the user, or the channel,
+ * as the subscription does, and since API version 2025-03-31.basil each line names its price under
  * `pricing.price_details`. Its `total` and `amount_paid` include the tax; `total_excluding_tax`
  * does not.
  */
 export function invoiceEvent(
   type: 'invoice.paid' | 'invoice.payment_failed',
   {
+    userId,
     channelId,
     customer = 'cus_test_stillstats',
     subscription = 'sub_test_stillstats',
@@ -341,7 +360,7 @@ export function invoiceEvent(
       type: 'subscription_details',
       subscription_details: {
         subscription,
-        metadata: channelId === null ? {} : { stillstats_channel_id: channelId },
+        metadata: subscriberMetadataOf({ userId, channelId }),
       },
     },
     lines: {

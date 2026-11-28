@@ -1,5 +1,8 @@
 export { enqueueHistoryPurges, historyPurgeJobData, purgeEndedHistory } from './history-purge.ts'
 export {
+  type AccountCancellationJobData,
+  type AccountCancellationJobName,
+  accountCancellationJobData,
   createRetention,
   type DeletionJobData,
   type DeletionJobName,

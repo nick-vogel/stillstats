@@ -119,7 +119,10 @@ describe('seam 2: the retention engine', () => {
     const otherChannelId = await seedChannel(web, worker, 'retention-user-b')
     const counts = (id: string) => worker.forChannel(id, (scope) => channelRowCounts(scope, id))
     const seeded = await counts(channelId)
-    expect(Object.values(seeded)).not.toContain(0)
+    // A channel's subscription payments are the release before blocks' rows, which nothing writes
+    // any more (stillstats#20); channel-owned.test.ts proves they cascade.
+    const { subscription_payments: _, ...held } = seeded
+    expect(Object.values(held)).not.toContain(0)
     const other = await counts(otherChannelId)
     const { requestId } = await request(worker, channelId)
 

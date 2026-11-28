@@ -12,6 +12,7 @@ import {
   consentGivenTextOf,
   currencyChangedEvent,
   currencyOptionsOf,
+  proSlotsTextOf,
   rpmSourcesToggledEvent,
   settingsOpenedEvent,
 } from './settings.ts'
@@ -103,5 +104,16 @@ describe("the Settings screen's loading status", () => {
 
   test('says nothing once they are read', () => {
     expect(channelsLoadingTextOf(false)).toBeNull()
+  })
+})
+
+describe("the Pro section's slots on the Settings screen (stillstats#20)", () => {
+  test('says the slots in use of the 4 each block holds', () => {
+    expect(proSlotsTextOf(1, 1)).toBe('1 of 4 slots in use')
+    expect(proSlotsTextOf(5, 2)).toBe('5 of 8 slots in use')
+  })
+
+  test('says none are in use before a channel is picked', () => {
+    expect(proSlotsTextOf(0, 1)).toBe('0 of 4 slots in use')
   })
 })

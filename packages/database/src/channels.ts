@@ -1,6 +1,24 @@
 import { sql } from 'drizzle-orm'
-import { index, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
-import { claimPolicy, isScopeUser, userChannelIds, webPolicy, workerPolicy } from './access.ts'
+import {
+  index,
+  pgPolicy,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core'
+import {
+  billingRole,
+  claimPolicy,
+  inScope,
+  isScopeUser,
+  proStateRole,
+  userChannelIds,
+  webPolicy,
+  workerPolicy,
+} from './access.ts'
 import { users } from './auth.ts'
 
 export function channelIdColumn() {
@@ -47,5 +65,18 @@ export const memberships = pgTable(
     webPolicy('memberships', 'delete', isScopeUser(t.userId), 'memberships_web_delete'),
     workerPolicy('memberships', t.channelId),
     claimPolicy('memberships'),
+    // Only record_user_subscription runs as app_billing: a turn to paid fills the user's free
+    // slots with their owned channels in the order they were connected.
+    pgPolicy('memberships_billing', {
+      for: 'select',
+      to: billingRole,
+      using: inScope('anonymous'),
+    }),
+    // Only pro_state runs as app_pro_state: a pick counts while its user still owns its channel.
+    pgPolicy('memberships_pro_state', {
+      for: 'select',
+      to: proStateRole,
+      using: sql`(${inScope('user')} or ${inScope('channel')})`,
+    }),
   ],
 )

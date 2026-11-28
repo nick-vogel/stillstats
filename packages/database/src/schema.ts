@@ -3,6 +3,7 @@ export {
   claimRole,
   feedbackCountRole,
   migrationRole,
+  proStateRole,
   rosterRole,
   webRole,
   workerRole,
@@ -23,6 +24,7 @@ export { feedbackMessages } from './feedback.ts'
 export { preferences } from './preferences.ts'
 export { reachHistory, reachHistoryDays } from './reach-history.ts'
 export {
+  accountCancellations,
   type DeletionReason,
   deletionLog,
   deletionReasons,
@@ -33,9 +35,12 @@ export { retentionCurveReads, retentionCurves } from './retention-curves.ts'
 export { sponsorReportFigureChoices } from './sponsor-report.ts'
 export {
   proEnds,
+  proPicks,
   subscriptionPayments,
   subscriptionPlans,
   subscriptions,
+  userSubscriptionPayments,
+  userSubscriptions,
 } from './subscriptions.ts'
 export { tips } from './tips.ts'
 export { quotaUsage, readCache, reportingJobs } from './youtube-gateway.ts'

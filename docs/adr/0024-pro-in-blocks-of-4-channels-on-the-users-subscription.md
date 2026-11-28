@@ -1,0 +1,19 @@
+# Pro is sold in blocks of 4 channels, on the user's subscription
+
+This supersedes ADR 0022's rule that the Paid tier is a subscription that belongs to a channel (stillstats#17). The rest of ADR 0022 stands: Stripe's hosted Checkout and Customer Portal, Managed Payments, no trial, the 30-day window after the end, and the price of an existing subscription.
+
+A creator with several channels paid once for each, and managed a subscription for each. Pro is now sold in Blocks: one Block is 4 channel slots, at $7 a month or $70 a year, the price one channel paid before. The Subscription belongs to the user, not to a channel, and its quantity is the number of Blocks it pays for. A user who owns 1 to 4 channels buys one Block and is done.
+
+A channel is Pro while its owner has picked it and the pick sits inside the owner's capacity: 4 slots for each Block of a live paid Subscription. The Entitlement stays the channel's (ADR 0001), so every worker job and every Pro read asks the same question of a channel as before, and the answer now comes from the owner's picks and capacity. Only a channel's owner, the user whose Membership has the `owner` role, picks it. A channel the user holds without owning it never takes a slot. Agency billing (#7) is left open, as before.
+
+The picks fill in connection order. A first purchase fills the slots with the user's owned channels in the order they were connected, and a return after the Subscription ended keeps the channels picked before it. The picks rank by when they were picked, then by connection, so a fifth channel on one Block stays free until a slot opens. The owner picks and unpicks channels in Settings (stillstats#21).
+
+The number of Blocks changes in the app, not in the Customer Portal: Settings adds a Block at once with a prorated charge (stillstats#22) and removes one at the end of the paid period (stillstats#23). Checkout sells exactly one Block, with no adjustable quantity, and the Portal keeps the card and the cancellation.
+
+A Pro grant gives a user Blocks with no purchase, from the admin screen (stillstats#24). A granted Block fills slots as a bought one does.
+
+A disconnect is narrower than ADR 0022 said. It still deletes the channel's data within ADR 0006's windows. It frees the channel's slot at once, since the slot counts only while the user still owns the channel, and it cancels and refunds nothing: the Subscription pays for the user's other channels too. An account deletion still cancels the user's Subscription at once and refunds the unused part of the period, as ADR 0022 says. A revocation at Google is a disconnect here.
+
+The purge date stays the channel's (stillstats#19). It is 30 days after the channel stopped being Pro: its Subscription ended, or later it left its Block. Picking it again for a live Block before the date keeps the history.
+
+The Subscription moves in an expand release (docs/deploy.md, "The release step"). Each channel subscription became its owner's, with quantity 1 and that channel picked, and one owner's several became one. The channel-keyed tables stay for the previous release's images until the remove release drops them. A subscription made before blocks names its channel in its metadata, and the webhook still records it onto the channel's owner.

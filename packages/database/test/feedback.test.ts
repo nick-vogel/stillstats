@@ -4,6 +4,7 @@ import { describe, expect } from 'vitest'
 import { setting } from '../src/access.ts'
 import { feedbackCountToday } from '../src/feedback.ts'
 import {
+  accountCancellations,
   accounts,
   activityDays,
   consentStates,
@@ -431,6 +432,12 @@ describe('the admin scope (creator-analytics#583)', () => {
         endedMemberships: 0,
         requestedAt: scope.now,
       })
+      // The seeded channel's owner holds the seed's subscription, which is theirs to pend.
+      await scope.sql.insert(accountCancellations).values({
+        id: randomUUID(),
+        stripeSubscriptionId: `sub_seed_${channelId}`,
+        createdAt: scope.now,
+      })
     })
     await web.asAnonymous((scope) =>
       scope.sql
@@ -453,8 +460,10 @@ describe('the admin scope (creator-analytics#583)', () => {
       })
     })
     await sendMessage(web, userId)
+    // A channel's subscription payments are the release before blocks' rows, which nothing writes
+    // any more (stillstats#20).
     const tables = (await web.asAnonymous(publicTables)).filter(
-      (table) => table !== 'feedback_messages',
+      (table) => !['feedback_messages', 'subscription_payments'].includes(table),
     )
     const counts = (scope: Scoped<ScopeKind>) => rowCountsOf(scope, tables)
     const seen = [

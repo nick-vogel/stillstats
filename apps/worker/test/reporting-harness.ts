@@ -1,11 +1,6 @@
 import { randomBytes } from 'node:crypto'
-import {
-  type Scoped,
-  subscriptions,
-  type WebDatabase,
-  type WorkerDatabase,
-} from '@creator-analytics/database'
-import { test as databaseTest, seedUser } from '@creator-analytics/database/testing'
+import type { Scoped, WebDatabase, WorkerDatabase } from '@creator-analytics/database'
+import { test as databaseTest, seedUser, subscribeOwner } from '@creator-analytics/database/testing'
 import { type FakeGoogle, startFakeGoogle } from '@creator-analytics/fake-google'
 import {
   createLogger,
@@ -130,17 +125,13 @@ export async function connectedChannel(
   })
 }
 
-/** The channel subscribes to Stillstats Pro: its subscription is active. */
-export async function subscribe(worker: WorkerDatabase, channelId: string): Promise<void> {
-  await worker.forChannel(channelId, (tx) =>
-    tx.sql.insert(subscriptions).values({
-      channelId,
-      stripeCustomerId: `cus_${channelId}`,
-      stripeSubscriptionId: `sub_${channelId}`,
-      status: 'active',
-      updatedAt: tx.now,
-    }),
-  )
+/** The channel's owner subscribes to Stillstats Pro, and the channel is picked. */
+export async function subscribe(
+  web: WebDatabase,
+  worker: WorkerDatabase,
+  channelId: string,
+): Promise<void> {
+  await subscribeOwner(web, worker, channelId)
 }
 
 /**

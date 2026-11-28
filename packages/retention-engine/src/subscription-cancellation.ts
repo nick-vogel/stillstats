@@ -1,14 +1,20 @@
 import Stripe from 'stripe'
 
-/** Cancels a deleted channel's Stripe subscription at once and refunds the unused part. */
+/**
+ * Cancels the Stripe subscription of a deleted account at once and refunds the unused part
+ * (ADR 0022, ADR 0024), or of a deleted channel, a cancellation the release before blocks left
+ * pending.
+ */
 export interface SubscriptionCanceller {
   /**
    * Safe to run again from any point: a canceled subscription is not canceled again, and a
-   * refund this cancellation already made is not made again.
+   * refund this cancellation already made is not made again. The channel is a channel deletion's
+   * of the release before blocks, which the refund's metadata names; an account deletion names
+   * none.
    */
   cancelAndRefund(
     subscriptionId: string,
-    cancellation: { cancellationId: string; channelId: string },
+    cancellation: { cancellationId: string; channelId?: string },
   ): Promise<void>
 }
 
@@ -34,8 +40,8 @@ export function stripeSecretKeyOf(
   return secretKey
 }
 
-// The API's metadata key for the channel a subscription pays for (apps/api/src/billing.ts), and the
-// one that ties a refund to the cancellation that made it.
+// The API's metadata key for the channel a subscription made before blocks paid for
+// (apps/api/src/billing.ts), and the one that ties a refund to the cancellation that made it.
 const channelMetadataKey = 'stillstats_channel_id'
 const cancellationMetadataKey = 'stillstats_cancellation_id'
 
@@ -67,7 +73,9 @@ export function createStripeCanceller({
             prorate: false,
             invoice_now: false,
             cancellation_details: {
-              comment: `Stillstats deleted the channel it paid for (cancellation ${cancellationId})`,
+              comment: channelId
+                ? `Stillstats deleted the channel it paid for (cancellation ${cancellationId})`
+                : `Stillstats deleted the account that paid for it (cancellation ${cancellationId})`,
             },
           },
           { idempotencyKey: `cancel-${cancellationId}` },
@@ -102,7 +110,10 @@ export function createStripeCanceller({
         {
           payment_intent: paymentIntent,
           amount,
-          metadata: { [cancellationMetadataKey]: cancellationId, [channelMetadataKey]: channelId },
+          metadata: {
+            [cancellationMetadataKey]: cancellationId,
+            ...(channelId && { [channelMetadataKey]: channelId }),
+          },
         },
         { idempotencyKey: `refund-${cancellationId}` },
       )

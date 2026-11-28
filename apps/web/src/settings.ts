@@ -1,4 +1,9 @@
-import { type RevenueCurrency, revenueCurrencies, type Theme } from '@creator-analytics/api-types'
+import {
+  type RevenueCurrency,
+  revenueCurrencies,
+  type Theme,
+  type Tier,
+} from '@creator-analytics/api-types'
 import type { Option } from './ListSelect.tsx'
 import type { ProductEvent } from './landing.ts'
 import { loadingText } from './loading.ts'
@@ -10,6 +15,20 @@ export const settingsHeading = settingsName
 export const channelsHeading = 'Your channels'
 export const accountHeading = 'Account'
 export const noChannelText = 'No channel is connected.'
+
+// Drafted for stillstats#20, for Nick's word-for-word approval: the Pro section's heading, and the
+// line under each channel the user owns, which says whether it is Pro.
+export const proHeading = 'Pro'
+export const channelTierTexts: Record<Tier, string> = { paid: 'Pro', free: 'Free' }
+
+/** The slots each block of Pro holds, as `slotsPerBlock` in `@creator-analytics/entitlements`. */
+const slotsPerBlock = 4
+
+// Drafted for stillstats#20, for Nick's word-for-word approval.
+/** The Pro section's line on the slots: those the picked channels take, of all the blocks hold. */
+export function proSlotsTextOf(slotsInUse: number, blocks: number): string {
+  return `${slotsInUse} of ${blocks * slotsPerBlock} slots in use`
+}
 
 export const settingsOpenedEvent: ProductEvent = { name: 'settings_opened' }
 

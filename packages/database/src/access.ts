@@ -16,10 +16,16 @@ export const rosterRole = pgRole('app_roster')
 // counts a user's own feedback messages, which the user scope may send and must not read.
 export const feedbackCountRole = pgRole('app_feedback_count')
 
-// Owns the record_subscription and record_subscription_payment functions and nothing else, and no
-// login role is a member of it. Stripe's webhook writes a channel's subscription and its paid
-// invoices in the anonymous scope, which reads and writes no row of either itself.
+// Owns the record_user_subscription and record_user_subscription_payment functions, and the
+// retired channel ones that raise, and nothing else, and no login role is a member of it. Stripe's
+// webhook writes a user's subscription, its channel picks and its paid invoices in the anonymous
+// scope, which reads and writes no row of any of them itself.
 export const billingRole = pgRole('app_billing')
+
+// Owns the pro_state function and nothing else, and no login role is a member of it. A channel's
+// Pro state is the rank of its pick inside its owner's capacity, which needs the owner's
+// subscription and other picks, which neither a member's user scope nor a channel scope may read.
+export const proStateRole = pgRole('app_pro_state')
 
 export type SettingName = 'app.scope' | 'app.user_id' | 'app.channel_id' | 'app.now'
 

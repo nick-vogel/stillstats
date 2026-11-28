@@ -10,14 +10,8 @@ import {
   type VideoListAnswer,
   type VideoRow,
 } from '@creator-analytics/api-types'
-import {
-  proEnds,
-  reachHistory,
-  reachHistoryDays,
-  subscriptions,
-  type WorkerDatabase,
-} from '@creator-analytics/database'
-import { test as apiTest } from '@creator-analytics/database/testing'
+import { reachHistory, reachHistoryDays, type WorkerDatabase } from '@creator-analytics/database'
+import { test as apiTest, subscribeOwner } from '@creator-analytics/database/testing'
 import type { FakeUpload } from '@creator-analytics/fake-google'
 import { describe, expect, test } from 'vitest'
 import type { Browser } from '../test/browser.ts'
@@ -337,27 +331,6 @@ async function connectedCreator(api: StartedApi) {
   return { browser, channelId }
 }
 
-async function subscribe(
-  worker: WorkerDatabase,
-  channelId: string,
-  { status = 'active', purgeAfter = null }: { status?: string; purgeAfter?: Date | null } = {},
-): Promise<void> {
-  await worker.forChannel(channelId, async (tx) => {
-    await tx.sql.insert(subscriptions).values({
-      channelId,
-      stripeCustomerId: 'cus_video_history',
-      stripeSubscriptionId: 'sub_video_history',
-      status,
-      updatedAt: tx.now,
-    })
-    // The channel's own purge date, 30 days after it stopped being Pro.
-    if (purgeAfter) {
-      const endedAt = new Date(purgeAfter.getTime() - 30 * 24 * 60 * 60 * 1000)
-      await tx.sql.insert(proEnds).values({ channelId, endedAt, purgeAfter })
-    }
-  })
-}
-
 /**
  * The history the worker would store, every day from 2026-09-10 to 2026-10-04 but 2026-09-22, with
  * code 5 (YouTube search) and 7 (suggested videos). v1's row on 2026-09-19 is its 8th day.
@@ -427,7 +400,7 @@ describe("seam 1: a paid channel's video list and video screen carry its impress
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeHistory(worker, channelId)
 
       const list = await listOf(browser, channelId, { window: 'last28' })
@@ -453,7 +426,7 @@ describe("seam 1: a paid channel's video list and video screen carry its impress
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeHistory(worker, channelId)
 
       const list = await listOf(browser, channelId, { window: 'first7' })
@@ -479,7 +452,7 @@ describe("seam 1: a paid channel's video list and video screen carry its impress
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeHistory(worker, channelId)
 
       const detail = await detailOf(browser, channelId, 'v2', { window: 'first7' })
@@ -512,7 +485,7 @@ describe("seam 1: a paid channel's video list and video screen carry its impress
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeHistory(worker, channelId)
 
       const detail = await detailOf(browser, channelId, 'v-old', { window: 'last28' })
@@ -556,7 +529,7 @@ describe("seam 1: an ended channel's video list and video screen read its histor
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId, { status: 'canceled', purgeAfter })
+      await subscribeOwner(web, worker, channelId, { status: 'canceled', purgeAfter })
       await storeHistory(worker, channelId)
 
       const list = await listOf(browser, channelId, { window: 'first7' })
@@ -574,7 +547,7 @@ describe("seam 1: an ended channel's video list and video screen read its histor
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId, { status: 'canceled', purgeAfter })
+      await subscribeOwner(web, worker, channelId, { status: 'canceled', purgeAfter })
       await storeHistory(worker, channelId)
       clock.set(new Date(purgeAfter.getTime() + 1000))
 
@@ -623,7 +596,7 @@ describe('seam 1: the video list sorts by impressions and CTR only for a channel
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
       const purgeAfter = new Date('2026-11-06T01:00:00Z')
-      await subscribe(worker, channelId, { status: 'canceled', purgeAfter })
+      await subscribeOwner(web, worker, channelId, { status: 'canceled', purgeAfter })
       await storeHistory(worker, channelId)
       clock.set(new Date(purgeAfter.getTime() + 1000))
 
@@ -719,7 +692,7 @@ describe('seam 1: the video list sorted by impressions or CTR', () => {
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeReach(worker, channelId, distinctReach)
 
       expect(await historySortOrders(browser, channelId)).toEqual(distinctOrders)
@@ -732,7 +705,7 @@ describe('seam 1: the video list sorted by impressions or CTR', () => {
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId, {
+      await subscribeOwner(web, worker, channelId, {
         status: 'canceled',
         purgeAfter: new Date('2026-11-06T01:00:00Z'),
       })
@@ -748,7 +721,7 @@ describe('seam 1: the video list sorted by impressions or CTR', () => {
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       // In the first 7 days the history, from 2026-09-10, holds none of v-old's (0 impressions)
       // and misses 2026-09-25 of v3's, which has the most; v1's and v2's are held whole.
       await storeReach(
@@ -782,7 +755,7 @@ describe('seam 1: the video list sorted by impressions or CTR', () => {
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeReach(worker, channelId, [
         ['v-old', '2026-09-20', 100, 0.1],
         ['v1', '2026-09-20', 100, 0.1],
@@ -802,7 +775,7 @@ describe('seam 1: the video list sorted by impressions or CTR', () => {
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeReach(worker, channelId, [
         ['v-old', '2026-09-20', 100, 0.1],
         ['v1', '2026-09-20', 400, 0.05],
@@ -822,7 +795,7 @@ describe('seam 1: the video list sorted by impressions or CTR', () => {
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       // v1's 8th day, 2026-09-19, is outside its first 7, and gives it the most in the last 28.
       await storeReach(worker, channelId, [
         ['v-old', '2026-09-03', 100, 0.1],
@@ -882,7 +855,7 @@ describe('seam 1: the video list filters by traffic source and minimum impressio
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
       const purgeAfter = new Date('2026-11-06T01:00:00Z')
-      await subscribe(worker, channelId, { status: 'canceled', purgeAfter })
+      await subscribeOwner(web, worker, channelId, { status: 'canceled', purgeAfter })
       await storeHistory(worker, channelId)
       clock.set(new Date(purgeAfter.getTime() + 1000))
 
@@ -903,7 +876,7 @@ describe('seam 1: the video list filters by traffic source and minimum impressio
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeHistory(worker, channelId)
 
       const answers = []
@@ -955,7 +928,7 @@ describe('seam 1: the video list counts one traffic source in impressions and CT
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeReach(worker, channelId, searchAndSuggested, { missing: ['2026-09-25'] })
 
       const allSources = await listOf(browser, channelId, { window: 'last28' })
@@ -981,7 +954,7 @@ describe('seam 1: the video list counts one traffic source in impressions and CT
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeReach(worker, channelId, searchAndSuggested)
 
       const allSources = await idsAcrossPages(browser, channelId, {
@@ -1006,7 +979,7 @@ describe('seam 1: the video list counts one traffic source in impressions and CT
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeReach(worker, channelId, searchAndSuggested)
 
       const search = await listOf(browser, channelId, {
@@ -1029,7 +1002,7 @@ describe('seam 1: the video list hides videos under a minimum of impressions bef
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeReach(worker, channelId, distinctReach)
 
       const list = await listOf(browser, channelId, {
@@ -1051,7 +1024,7 @@ describe('seam 1: the video list hides videos under a minimum of impressions bef
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeReach(worker, channelId, searchAndSuggested)
 
       const allSources = await listOf(browser, channelId, {
@@ -1077,7 +1050,7 @@ describe('seam 1: the video list hides videos under a minimum of impressions bef
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
       await storeReach(worker, channelId, distinctReach)
 
       const list = await listOf(browser, channelId, { window: 'first7', minImpressions: '250' })
@@ -1094,7 +1067,7 @@ describe('seam 1: the video list hides videos under a minimum of impressions bef
       clock.set(noonToday)
       const api = await startApi(web)
       const { browser, channelId } = await connectedCreator(api)
-      await subscribe(worker, channelId)
+      await subscribeOwner(web, worker, channelId)
 
       const list = await listOf(browser, channelId, { window: 'last28', minImpressions: '100' })
 

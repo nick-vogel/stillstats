@@ -4,8 +4,7 @@
 // on a fast one. The one exact split runs on a stubbed clock. The baseline (#1056) reads the real
 // durations on production.
 import { randomUUID } from 'node:crypto'
-import { subscriptions, type WorkerDatabase } from '@creator-analytics/database'
-import { test } from '@creator-analytics/database/testing'
+import { subscribeOwner, test } from '@creator-analytics/database/testing'
 import type { FakeUpload } from '@creator-analytics/fake-google'
 import { describe, expect, vi } from 'vitest'
 import { Browser } from '../test/browser.ts'
@@ -46,20 +45,6 @@ async function connectedCreator(api: StartedApi) {
   const channelId = channels[0]?.id
   if (!channelId) throw new Error('The creator has no connected channel')
   return { browser, channelId }
-}
-
-/** Makes the channel Pro, as retention-curves.test.ts does. */
-async function subscribe(worker: WorkerDatabase, channelId: string): Promise<void> {
-  await worker.forChannel(channelId, (tx) =>
-    tx.sql.insert(subscriptions).values({
-      channelId,
-      stripeCustomerId: 'cus_request_timing',
-      stripeSubscriptionId: 'sub_request_timing',
-      status: 'active',
-      purgeAfter: null,
-      updatedAt: tx.now,
-    }),
-  )
 }
 
 interface TimingEntry {
@@ -244,7 +229,7 @@ describe('seam 1: a budget screen read reports where its time went', () => {
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
 
     const read = await timed(
       api,
@@ -356,7 +341,7 @@ describe('seam 3: the header carries no ID', () => {
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     const userId = await userIdOf(web, creator.email)
 
     const reads = await Promise.all(

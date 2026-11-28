@@ -2,14 +2,8 @@
 // it, and the rest of the summary is read from the fake Google server. These tests cannot prove a
 // real report's numbers; Nick's walk of a paid channel on production (#791) covers them.
 import type { ChannelSummaryAnswer } from '@creator-analytics/api-types'
-import {
-  proEnds,
-  reachHistory,
-  reachHistoryDays,
-  subscriptions,
-  type WorkerDatabase,
-} from '@creator-analytics/database'
-import { test } from '@creator-analytics/database/testing'
+import { reachHistory, reachHistoryDays, type WorkerDatabase } from '@creator-analytics/database'
+import { subscribeOwner, test } from '@creator-analytics/database/testing'
 import type { FakeChannel } from '@creator-analytics/fake-google'
 import { describe, expect } from 'vitest'
 import type { Browser } from '../test/browser.ts'
@@ -58,27 +52,6 @@ async function connectedCreator(api: StartedApi) {
   return { browser, channelId }
 }
 
-async function subscribe(
-  worker: WorkerDatabase,
-  channelId: string,
-  { status = 'active', purgeAfter = null }: { status?: string; purgeAfter?: Date | null } = {},
-): Promise<void> {
-  await worker.forChannel(channelId, async (tx) => {
-    await tx.sql.insert(subscriptions).values({
-      channelId,
-      stripeCustomerId: 'cus_history',
-      stripeSubscriptionId: 'sub_history',
-      status,
-      updatedAt: tx.now,
-    })
-    // The channel's own purge date, 30 days after it stopped being Pro.
-    if (purgeAfter) {
-      const endedAt = new Date(purgeAfter.getTime() - 30 * 24 * 60 * 60 * 1000)
-      await tx.sql.insert(proEnds).values({ channelId, endedAt, purgeAfter })
-    }
-  })
-}
-
 /**
  * The history the worker would store: 2026-10-02 with the video's 100 impressions at 10% and the
  * short's 300 at 2%, 2026-10-03 held with no impression, and 2026-10-04 with the video's 100 at 5%.
@@ -125,7 +98,7 @@ describe('seam 1: the channel summary of a paid channel carries its impressions 
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeHistory(worker, channelId)
 
     const summary = await readSummary(browser, channelId, {})
@@ -154,7 +127,7 @@ describe('seam 1: the channel summary of a paid channel carries its impressions 
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeHistory(worker, channelId)
 
     const shorts = await readSummary(browser, channelId, { format: 'short' })
@@ -198,7 +171,7 @@ describe('seam 1: an ended channel still reads its history until its purge date'
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId, { status: 'canceled', purgeAfter })
+    await subscribeOwner(web, worker, channelId, { status: 'canceled', purgeAfter })
     await storeHistory(worker, channelId)
 
     const summary = await readSummary(browser, channelId, {})
@@ -227,7 +200,7 @@ describe('seam 1: an ended channel still reads its history until its purge date'
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId, { status: 'canceled', purgeAfter })
+    await subscribeOwner(web, worker, channelId, { status: 'canceled', purgeAfter })
     await storeHistory(worker, channelId)
     clock.set(new Date(purgeAfter.getTime() + 1000))
 
@@ -242,7 +215,7 @@ describe('seam 1: an ended channel still reads its history until its purge date'
     clock.set(noonToday)
     const api = await startApi(web)
     const { browser, channelId } = await connectedCreator(api)
-    await subscribe(worker, channelId)
+    await subscribeOwner(web, worker, channelId)
     await storeHistory(worker, channelId)
 
     const summary = await readSummary(browser, channelId, {})

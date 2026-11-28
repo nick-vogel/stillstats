@@ -6,8 +6,9 @@
 import { randomUUID } from 'node:crypto'
 import {
   proEnds,
-  subscriptionPayments,
-  subscriptions,
+  proPicks,
+  userSubscriptionPayments,
+  userSubscriptions,
   type WebDatabase,
 } from '@creator-analytics/database'
 import { test } from '@creator-analytics/database/testing'
@@ -78,20 +79,23 @@ function storedSubscription(web: WebDatabase, ownerId: string) {
   return web.asUser(ownerId, (scope) =>
     scope.sql
       .select({
-        subscription: subscriptions.stripeSubscriptionId,
-        plan: subscriptions.plan,
-        status: subscriptions.status,
-        periodEnd: subscriptions.currentPeriodEnd,
+        subscription: userSubscriptions.stripeSubscriptionId,
+        plan: userSubscriptions.plan,
+        status: userSubscriptions.status,
+        periodEnd: userSubscriptions.currentPeriodEnd,
         purgeAfter: proEnds.purgeAfter,
       })
-      .from(subscriptions)
-      .leftJoin(proEnds, eq(proEnds.channelId, subscriptions.channelId)),
+      .from(userSubscriptions)
+      .leftJoin(proPicks, eq(proPicks.userId, userSubscriptions.userId))
+      .leftJoin(proEnds, eq(proEnds.channelId, proPicks.channelId)),
   )
 }
 
 function storedPayments(web: WebDatabase, ownerId: string) {
   return web.asUser(ownerId, (scope) =>
-    scope.sql.select({ invoice: subscriptionPayments.stripeInvoiceId }).from(subscriptionPayments),
+    scope.sql
+      .select({ invoice: userSubscriptionPayments.stripeInvoiceId })
+      .from(userSubscriptionPayments),
   )
 }
 
