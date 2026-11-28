@@ -54,7 +54,10 @@ function migrationsThrough(lastTag?: string): string {
   return folder
 }
 
-/** A database of its own, migrated through one release, with row-level security forced. */
+/**
+ * A database of its own, migrated through one release, or through every migration, with
+ * row-level security forced.
+ */
 export interface MigrationDatabase {
   /** Runs `work` on a pool as the server's admin, past every policy: setup only. */
   asAdmin<T>(work: (pool: pg.Pool) => Promise<T>): Promise<T>
@@ -68,7 +71,14 @@ export interface MigrationDatabase {
   drop(): Promise<void>
 }
 
-export async function migrationDatabase(name: string, lastTag: string): Promise<MigrationDatabase> {
+/**
+ * A database of its own, migrated through `lastTag`, or through every migration without one, as a
+ * test whose setup has to commit uses it: its rows never reach the shared test database.
+ */
+export async function migrationDatabase(
+  name: string,
+  lastTag?: string,
+): Promise<MigrationDatabase> {
   const database = `${name}_${randomUUID().replaceAll('-', '')}`
   const urls = databaseUrls()
   const urlFor = (url: string, role?: string) => {

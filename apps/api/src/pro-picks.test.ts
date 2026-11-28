@@ -1,6 +1,7 @@
 // Limits: these pick and unpick through the API in one test transaction, so they cannot show two
 // tabs picking the last free slot at once on two connections; the row lock that orders them is
-// Postgres's, and packages/database/test/pro-picks.test.ts shows the second one counts the first.
+// Postgres's, and packages/database/test/pro-picks-locks.test.ts runs two picks at once on two
+// connections and shows the second waits for the first and counts its pick.
 import type {
   ChannelSummaryAnswer,
   EntitlementsAnswer,

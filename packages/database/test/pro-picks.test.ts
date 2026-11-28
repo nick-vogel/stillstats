@@ -181,7 +181,9 @@ describe("pick_pro_channel, the owner's pick of a channel into a free slot (stil
     expect(await picksOf(web, ownerId)).toEqual([])
   })
 
-  test('two picks of the last free slot at once leave one picked and the other refused', async ({
+  // The harness runs these two picks one after the other, so this shows the second counts the
+  // first's pick once it committed; pro-picks-locks.test.ts runs them at once, on two connections.
+  test('two picks of the last free slot, one after the other, leave one picked and the other refused', async ({
     web,
     worker,
   }) => {
